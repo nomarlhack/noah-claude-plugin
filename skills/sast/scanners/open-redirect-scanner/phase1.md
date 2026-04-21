@@ -46,6 +46,9 @@ Open Redirect sink는 "URL을 인자로 받아 그 URL의 콘텐츠를 로드하
 - Spring: `RedirectView`, `redirect:` prefix, `sendRedirect`
 - Rails: `redirect_to`, `redirect_back`
 - PHP: `header('Location: ' . $url)`
+- Go: `http.Redirect(w, r, url, 302)`, `http.RedirectHandler`
+- C#/.NET: `Response.Redirect(url)`, `RedirectResult(url)` (ASP.NET Core)
+- Rust: `axum::response::Redirect::to(url)`, `rocket::response::Redirect::to(url)`
 - HTML: `<meta http-equiv="refresh" content="0; url=...">`
 
 **클라이언트사이드:**
@@ -83,8 +86,12 @@ Open Redirect sink는 "URL을 인자로 받아 그 URL의 콘텐츠를 로드하
 - **메타 refresh의 동적 URL**: HTML 응답에 사용자 입력으로 `<meta refresh>` 생성.
 - **앱 브리지/딥링크**: `myapp://action?url=...` 같은 커스텀 스킴.
 - **PostMessage → location.href 체인**: dom-xss-scanner와 겹치지만 redirect로도 등록.
+- **CRLF in redirect URL**: `Location: https://evil.com\r\nSet-Cookie: ...` — HTTP 헤더 인젝션과 결합.
+- **302 응답 본문에 외부 리소스 fetch**: 일부 브라우저가 redirect 전 본문 처리 — `<script>`/`<iframe>` 실행 가능.
+- **Tab-nabbing** (`target="_blank"` 없는 `window.opener` 탈취): open redirect 후 window.opener로 원본 페이지 조작.
+- **정규식 `^https://example\.com`** (`.`는 임의 문자 매칭): `https://example-com.attacker.com` 우회.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **상대 경로 강제**: `if (!url.startsWith('/') || url.startsWith('//')) reject`.
 - **WHATWG URL 파싱 후 host 화이트리스트**: `new URL(input, base).host` 비교 — 단, base 없이 파싱하면 invalid relative URL이 throw.
@@ -92,6 +99,20 @@ Open Redirect sink는 "URL을 인자로 받아 그 URL의 콘텐츠를 로드하
 - **고정 redirect 맵**: 사용자 입력은 key, 실제 URL은 서버가 매핑.
 - **`url.parse(x).protocol === 'https:' && ALLOWED_HOSTS.includes(parsed.host)`** + `parsed.host`가 정확한 host 추출.
 - **OAuth `redirect_uri` 사전 등록**: 등록된 URL과 정확 일치 검증.
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| `startsWith('https://example.com')` | 가능 | `https://example.com.attacker.com`, `https://example.com@attacker.com`, `https://example.com#attacker.com` |
+| 정규식 `^https://example\.com` | 가능 | `.`이 임의 문자 매칭 → `https://example-com.attacker.com` 통과 |
+| `startsWith('/')` (상대 경로 강제) | 가능 | `//evil.com` (protocol-relative), `/\evil.com` (일부 브라우저 정규화), `/%2f%2fevil.com` |
+| Host 화이트리스트 (URL 파싱 후) | 환경 의존 | WHATWG URL vs Python `urlparse` vs Java `java.net.URL` 파싱 차이 — 서버는 A로 파싱, 브라우저는 B로 해석 |
+| Scheme 블랙리스트 (`javascript:`) | 가능 | `JavaScript:`, `java\tscript:`, `data:text/html,...`, `vbscript:`, `file:///` |
+| Punycode 변환 후 검증 | 부분 가능 | 동형 문자 (`а` 키릴 vs `a` 라틴) — 정규화 안 하면 통과 |
+| Fragment만 검증 제외 | 가능 | `/safe?url=...#https://evil.com` — fragment가 location.hash로 들어가면 SPA 라우터 조작 |
 
 ## 후보 판정 의사결정
 
@@ -164,11 +185,6 @@ URL 기반 리다이렉트/네비게이션을 수행하는 모든 sink 식별.
 | `UNKNOWN` | 임의 | **추적 한계 후보**로 별도 분류 |
 
 "추적 한계 후보"는 일반 후보와 분리. 어디서 멈췄는지(파일:라인), 멈춘 사유(Step C 종료 조건), 추가 정보 시 재평가 가능성을 명시.
-
-## 인접 스캐너 분담
-
-- **OAuth `redirect_uri`** 검증 결함(와일드카드/부분 매칭)은 **oauth-scanner `REDIRECT_URI_LOOSE`** 단독 담당. 본 스캐너 후보 아님.
-- **서버가 사용자 입력 URL로 직접 HTTP 요청**하는 케이스는 **ssrf-scanner** 담당. 본 스캐너는 **응답 Location/HTML/script를 통해 사용자가 리다이렉트**되는 경우만.
 
 ## 후보 판정 제한
 

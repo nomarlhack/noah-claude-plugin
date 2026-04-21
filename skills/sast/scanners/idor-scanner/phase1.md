@@ -40,6 +40,9 @@ IDOR sink는 "엔드포인트가 객체 식별자를 받고 그 식별자로 리
 | 바디 파라미터 | `{userId: ..., action: ...}` (멀티 액션 핸들러) |
 | Hidden form field | `<input type=hidden name=id value=...>` |
 | 내부 API 노출 | `/internal/...`이 외부 라우트로 누설 |
+| WebSocket 채널 ID | `subscribe('/user/:id/...')`, `JOIN room <id>` |
+| gRPC method 인자 | `.proto` service method의 ID 필드 |
+| SSE stream URL | `/events/:resourceId/stream` |
 
 ## Source-first 추가 패턴
 
@@ -52,6 +55,9 @@ IDOR sink는 "엔드포인트가 객체 식별자를 받고 그 식별자로 리
 - 검색 endpoint (`?q=...&owner=...`)
 - 보고서 export endpoint
 - 멀티테넌시 endpoint (org_id를 사용자 입력으로)
+- gRPC service method (proto 정의 + 핸들러)
+- JWT claim 안에 객체 ID 포함된 경우 (토큰 변조 가능 시 IDOR)
+- 이메일/전화번호 기반 조회 (`?email=`) — PII가 식별자 역할
 
 ## 자주 놓치는 패턴 (Frequently Missed)
 
@@ -77,8 +83,12 @@ IDOR sink는 "엔드포인트가 객체 식별자를 받고 그 식별자로 리
 - **Social login link/unlink**: 다른 사용자 계정에 자기 social 연결.
 - **`org_id` switch**: 멀티테넌시에서 사용자가 다른 org_id로 요청하면 통과.
 - **role/permission 변경 endpoint**: `PUT /users/:id/role`에서 **다른 사용자**의 role을 변경하는 케이스만 본 스캐너 담당(cross-user). 자기 자신 role을 변경하는 mass assignment는 business-logic `PRIV_ESCALATION` 담당.
+- **HTTP method 차이**: GET은 권한 체크, HEAD/OPTIONS/PATCH 누락. method-tampering과 결합.
+- **CDN signed URL 만료 미검증**: presigned URL 발급 후 만료 후에도 백엔드가 검증 안 하면 재사용 가능.
+- **Static asset 추측 가능 경로**: `/uploads/2024/01/15/IMG_001.jpg` 같은 패턴 노출.
+- **권한 체크 후 ID 재조회 (TOCTOU)**: 검증 시점 ID와 실제 사용 시점 ID 사이 race.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **쿼리 레벨 owner scope**: `Order.where(user_id: current_user.id).find(id)`.
 - **글로벌 미들웨어 owner check**: 모든 `/orders/:id` 진입 시 `before_action :ensure_owner`.
@@ -88,8 +98,22 @@ IDOR sink는 "엔드포인트가 객체 식별자를 받고 그 식별자로 리
 - **공개 리소스**: 설계상 공개 (공개 게시글) — 비즈니스 요구사항 확인.
 - **본인 리소스만 반환하는 API**: 식별자 받지만 내부적으로 `current_user`만 조회.
 - **GraphQL field-level resolver에 권한 체크**.
+- **Capability 토큰**: 객체 ID 대신 unguessable token + 서명 검증 (예: HMAC).
+- **Row-Level Security (Postgres RLS)**: DB 세션 변수에 user_id 설정 후 `CREATE POLICY` 강제 — 코드 누락에도 안전망.
+- **GraphQL DataLoader + per-user 인가 키**: 배치 조회 시에도 사용자별로 분리된 캐시 키.
 
-## 후보 판정 의사결정
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| 권한 체크가 일부 HTTP method만 적용 | 가능 | GET 검증 → PUT/DELETE/PATCH/HEAD/OPTIONS 우회. method-tampering 결합 |
+| 권한 체크 후 별도 ID 재조회 | 가능 | TOCTOU race — 검증 직후 ID 변경된 상태로 두 번째 조회 |
+| ID 타입 캐스트 후 검증 (정수 변환) | 가능 | `parseInt('123abc')` → 123 통과, 다른 곳에선 문자열 그대로 사용. SQL은 leading zero `0123`도 동일 |
+| Path 정규화 누락 | 가능 | `/users/123` 차단 시 `/users/123/`, `/users/.//123`, `/users/%31%32%33` 우회 |
+| 정책 라이브러리 default-allow 설정 | 가능 | 정의되지 않은 액션이 자동 허용. CanCan/Pundit `unless raise` 누락 |
+| Substring/prefix 권한 검사 | 가능 | `user_id.startsWith(currentUser)` → `12` 사용자가 `123`, `124` 접근 |
 
 | 조건 | 판정 |
 |---|---|
@@ -104,19 +128,6 @@ IDOR sink는 "엔드포인트가 객체 식별자를 받고 그 식별자로 리
 | 본인 자원만 조회 (식별자 받지만 무시) | 제외 |
 | 공개 리소스 (비즈니스 요구사항 확인됨) | 제외 |
 | Read는 보호, Update/Delete는 미검증 | 후보 |
-
-## 본 스캐너 담당 아님 (business-logic-scanner 참조)
-
-아래 패턴은 코드 표면이 IDOR과 비슷해 보일 수 있으나 본 스캐너 후보로 등록하지 않는다. 후보 표면이 겹치는 경우 business-logic-scanner 단독으로 보고된다.
-
-- **상태 전이 순서 우회 (워크플로우)**: `order.status = req.body.status` 등 결제/승인 단계 건너뛰기 → `STATE_BYPASS`
-- **Race / TOCTOU**: 잔액 차감, 쿠폰 중복 사용, 재고 마이너스 등 비원자적 연산 → `RACE_CONDITION`
-- **멱등성 위반**: Idempotency-Key 미사용으로 중복 결제/주문 → `DATA_INTEGRITY`
-- **가격·수량·할인 무결성**: 클라이언트가 보낸 가격·수량·쿠폰 값을 서버가 재계산 없이 신뢰 → `PRICE_TAMPER`
-- **레이트 리밋·기능 남용**: OTP/SMS/초대/쿠폰 발급의 rate limit 부재 → `FEATURE_ABUSE`
-- **자기 자신 권한 상승 (mass assignment)**: 일반 사용자가 `{role: "admin"}` 등으로 자기 role 변경 → `PRIV_ESCALATION`
-
-위 항목은 후보로 등록하지 않고 Source→Sink 추적도 수행하지 않는다.
 
 ## 후보 판정 제한
 

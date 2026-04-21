@@ -65,8 +65,12 @@ WebSocket sink는 두 카테고리:
 - **STOMP over WebSocket**: SUBSCRIBE 권한 검사 누락.
 - **Unauthenticated 진입 후 escalation 메시지**: 첫 메시지에서 user_id 자가 선언.
 - **WebSocket secure (wss) 미사용**: 평문 ws://로 인증 토큰 노출.
+- **Compression attack (CVE-2017-7526 류)**: permessage-deflate 활성 + 피해자 데이터 예측 공격 — CRIME의 WS 변형.
+- **WebSocket frame smuggling**: fragmented frame을 악용한 메시지 경계 혼동.
+- **SignalR long polling fallback**: WebSocket 차단 환경에서 HTTP로 fallback — 각 전송 수단별 인증 차이.
+- **gRPC-Web over WebSocket**: proto 기반이지만 프록시가 ws로 변환 시 동일 문제.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **`verifyClient`** (ws) 또는 **`cors.origin`** (socket.io) 화이트리스트 + 정확 매칭.
 - **핸드셰이크 시 인증 검증** (쿠키 또는 Authorization 헤더 또는 ticket 토큰).
@@ -77,6 +81,18 @@ WebSocket sink는 두 카테고리:
 - **`wss://` 강제** + HSTS.
 - **JWT 만료 시 자동 disconnect** + 클라이언트가 재인증 후 재연결.
 - **subprotocol 화이트리스트**.
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| Origin 화이트리스트 substring | 가능 | `https://allowed.com.attacker.com`, `https://allowed.com@attacker.com` |
+| `null` Origin 허용 (파일 업로드 폼 호환용) | 가능 | `<iframe sandbox>` 안에서 WebSocket 연결 시 Origin null — 공격자 도메인에서 iframe으로 CSWSH |
+| 핸드셰이크 인증만 + 연결 유지 | 가능 | 세션/토큰 만료 후에도 연결 유지 — 재검증 필요 |
+| 메시지 rate limit per connection | 가능 | 여러 connection 동시 생성 — per user/IP rate limit 필요 |
+| 채널 구독 owner 검증 (핸드셰이크 시) | 가능 | 검증 후 다른 채널 ID로 메시지 송신 시 서버가 cross-check 안 하면 우회 |
 
 ## 후보 판정 의사결정
 

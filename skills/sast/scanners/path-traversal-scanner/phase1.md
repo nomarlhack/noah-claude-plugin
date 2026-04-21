@@ -50,6 +50,9 @@ Path Traversal sink는 두 종류:
 | Java | `new File()`, `Files.readAllBytes`, `FileInputStream`, `ClassLoader.getResource(As)Stream`, `RequestDispatcher.include/forward` |
 | Ruby | `File.read/open`, `IO.read`, `send_file`, `render file:` |
 | PHP | `include`, `require`, `include_once`, `require_once`, `file_get_contents`, `fopen`, `readfile` |
+| Go | `os.Open`, `os.ReadFile`, `os.Create`, `ioutil.ReadFile`, `filepath.Join` (검증 없으면 위험) |
+| Rust | `std::fs::read`, `std::fs::File::open`, `tokio::fs::read` |
+| C#/.NET | `File.ReadAllText`, `File.OpenRead`, `Server.MapPath`, `Path.Combine` (절대경로 입력 시 base 무시 — 안전하지 않음) |
 
 **내부 API path sink:**
 
@@ -66,6 +69,9 @@ Path Traversal sink는 두 종류:
 - ZIP/TAR 아카이브 내부 entry 이름 (zipslip-scanner와 겹치지만 단일 파일 LFI는 여기)
 - i18n locale 코드 (`/locales/{lang}.json`)
 - theme 이름 (`/themes/{theme}/style.css`)
+- 다국어 PO/MO 파일 경로 (`/locales/{lang}/messages.po`)
+- 백업/복구 파일 경로 (`/admin/backups/{name}/restore`)
+- 로그 조회 endpoint (`/admin/logs/{file}`)
 
 ## 자주 놓치는 패턴 (Frequently Missed)
 
@@ -82,8 +88,13 @@ Path Traversal sink는 두 종류:
 - **심볼릭 링크 추적**: 업로드 디렉토리에 사용자가 심볼릭 링크 생성 가능한 경우.
 - **압축 해제 시 절대 경로 entry**: `/etc/passwd`로 시작하는 entry name (zipslip).
 - **`res.sendFile`/`render file:` 의 옵션 객체에서 입력값이 path가 되는 경우**.
+- **Unicode/UTF-8 over-long 우회**: `．．／` (fullwidth), `..%c0%af` (UTF-8 over-long for `/`) — 일부 컨테이너/언어에서 정규화.
+- **Tomcat `..;/` (path parameter)**: 세미콜론으로 normalization 우회. Jetty 등 다른 컨테이너도 파싱 차이.
+- **`/proc/self/...` 정보 노출**: `/proc/self/environ`, `/proc/self/maps`, `/proc/self/cwd/` — 환경변수·메모리·경로 leak.
+- **Java `URL.toString()` vs `Path.normalize()` 차이**: URL은 정규화 안 함. URL 단위로 검증 후 File API로 변환 시 우회.
+- **Windows ADS (Alternate Data Stream)**: `file.txt::$DATA`, `file.txt:hidden` — 스트림 명으로 우회.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **`path.resolve(BASE, userInput)` + `resolved.startsWith(BASE + path.sep)` 검증**.
 - **Python `os.path.commonpath([base, resolved]) == base`** 검증.
@@ -92,6 +103,23 @@ Path Traversal sink는 두 종류:
 - **`send_from_directory(safe_dir, filename)`** (Flask) — 내부적으로 escape 검증. 단 `filename`이 절대경로면 무시되는 케이스 확인.
 - **확장자 + 정규식 화이트리스트** (`/^[a-z0-9_-]+\.pdf$/`).
 - **DB ID로만 파일 찾기**: 사용자 입력이 DB primary key, 실제 경로는 서버가 매핑.
+- **chroot/jail/컨테이너 격리**: 프로세스가 base dir 외 접근 자체 불가 — 영향도 감소 (코드 검증과 별개).
+- **Java `Path.toRealPath()` + `startsWith(basePath.toRealPath())`**: 심볼릭 링크 해결 후 비교 — symlink 우회 차단.
+- **Go `filepath.Clean` + `filepath.Rel` 음수 검증**: `Rel`이 `..`로 시작하면 base 외부.
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| `..` 단일 문자열 차단 (`replace("..", "")`) | 가능 | `....//` (chained replace 후 `..`로 복원), `..\..\`, `..%2f`, `....\\` |
+| URL 디코딩 후 `..` 검증 | 가능 | Double encoding `%252e%252e%252f` — 디코딩이 한 번만 적용되면 검증 통과 |
+| 확장자 화이트리스트 (`.pdf`만 허용) | 가능 | Null byte `file.php%00.pdf` (구버전 PHP/Node), 이중 확장자 `file.php.pdf` (Apache mod_mime), Windows ADS `file.pdf::$DATA` |
+| `path.resolve()` 후 `startsWith(BASE)` 검증 | 부분 가능 | Symlink 추가(공격자가 base 안에 외부로 가는 symlink 생성 가능 시), TOCTOU race |
+| 절대경로 차단 (첫 글자 `/` 검증) | 가능 | Windows에서 `\path` (single backslash), UNC `\\server\share`, 환경변수 `%SYSTEMROOT%` |
+| Path normalization 후 검증 | 환경 의존 | Tomcat `..;/`, Jetty `..%5c`, IIS `..\..\..` 컨테이너별 파싱 차이 — 컨테이너가 정규화 후 다른 경로 |
+| Unicode 정규화 누락 | 가능 | `．．／` (fullwidth), `..%c0%af` (UTF-8 over-long) — 일부 OS/언어에서 `..`로 해석 |
 
 ## 후보 판정 의사결정
 

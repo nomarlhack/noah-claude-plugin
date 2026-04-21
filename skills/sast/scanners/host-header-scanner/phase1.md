@@ -38,6 +38,8 @@ Host Header / IP Spoofing sink는 두 카테고리:
 | Flask | `request.host`, `request.host_url`, `url_for(_external=True)` | `request.remote_addr`, `request.access_route`, `ProxyFix` |
 | Spring | `request.getServerName`, `request.getHeader("Host")`, `ServletUriComponentsBuilder.fromCurrentRequest` | `request.getRemoteAddr`, `getHeader("X-Forwarded-For")` |
 | Rails | `request.host`, `request.host_with_port`, mailer `default_url_options` | `request.remote_ip`, `request.ip` |
+| Go | `r.Host`, `r.Header.Get("Host")`, `r.Header.Get("X-Forwarded-Host")` | `r.RemoteAddr`, `r.Header.Get("X-Forwarded-For")` |
+| C#/.NET | `Request.Host`, `HttpContext.Request.Headers["Host"]`, `Url.Action(...)` | `HttpContext.Connection.RemoteIpAddress`, `Request.Headers["X-Forwarded-For"]` |
 
 ## Source-first 추가 패턴
 
@@ -66,8 +68,12 @@ Host Header / IP Spoofing sink는 두 카테고리:
 - **`Host: 127.0.0.1` 으로 SSRF + cache poisoning 결합**.
 - **메일 본문에 `Reply-To` 인젝션**: Host 헤더 외에 메일 헤더 자체 인젝션 (CRLF와 겹침).
 - **WebSocket origin 검증**: WebSocket 핸드셰이크에서 `Host` 검증 없이 `Origin`만 검증하면 우회.
+- **HTTP/2 `:authority` pseudo-header**: HTTP/1.1 Host 헤더와 다른 경로로 도달 — 일부 서버는 `:authority`만 검증하고 `Host`는 미검증.
+- **CRLF in Host**: `Host: evil.com\r\nAdditional-Header: ...` — 일부 서버 파서가 관대할 때.
+- **Web cache deception**: `/profile.css` 같은 정적 확장자로 캐시 강제 + Host 변조.
+- **ASN/GeoIP spoof via X-Forwarded-For**: IP chain에 특정 국가 IP 삽입으로 geo-restriction 우회.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **고정 base URL**: `BASE_URL = process.env.BASE_URL` 같은 환경변수 + 코드에서 Host 헤더 미사용.
 - **Django `ALLOWED_HOSTS`** 명시 + `build_absolute_uri` 사용.
@@ -77,6 +83,19 @@ Host Header / IP Spoofing sink는 두 카테고리:
 - **Cache key에 Host 헤더 포함** (CDN 설정).
 - **이메일 링크 host를 환경변수로 강제** (사용자 요청 host와 무관).
 - **mailer `default_url_options = {host: ENV['HOST']}`** (Rails).
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| `ALLOWED_HOSTS` substring match | 가능 | `allowed.com.attacker.com`, `allowed.com:80.attacker.com` |
+| Host 헤더만 검증 (X-Forwarded-Host 미검증) | 가능 | `trust proxy` 활성 시 `X-Forwarded-Host: evil.com` 그대로 사용 |
+| X-Forwarded-For 첫 번째 IP 신뢰 | 가능 | `X-Forwarded-For: fake_trusted_ip, real_client, proxy` — 오른쪽 carve 방식으로만 정확 |
+| `X-Real-IP` 단일 헤더 신뢰 | 환경 의존 | nginx 설정이 실제 `X-Real-IP`를 overwrite해야 안전. 미설정 시 클라이언트 위조 통과 |
+| HTTP/1.1 Host만 검증 | 가능 | HTTP/2 `:authority` 경로로 다른 값 전달 가능 |
+| Cache key에 Host 미포함 (CDN) | 가능 | Web cache poisoning — Host 변조 응답이 다른 사용자에게 캐시됨 |
 
 ## 후보 판정 의사결정
 

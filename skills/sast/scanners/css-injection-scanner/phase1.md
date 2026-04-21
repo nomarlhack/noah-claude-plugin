@@ -58,8 +58,12 @@ CSS Injection sink는 "사용자 입력이 CSS 파서에 의해 declaration/sele
 - **selector specificity 조작으로 click-jacking style overlay**.
 - **CSS-in-JS template literal 직접 보간**: ``` styled.div`color: ${props.color}` ``` — `props.color`가 사용자 입력이고 `;` 포함 시 declaration 추가.
 - **dynamic class name이 CSS rule 본문이 되는 빌드 패턴** (CSS modules에서 흔치 않음).
+- **SVG `<style>` 블록**: 사용자 업로드 SVG 내 `<style>`은 inline CSS로 취급되어 같은 origin 실행.
+- **CSS Houdini Paint API**: `CSS.registerProperty`로 등록된 커스텀 property가 사용자 입력일 때 렌더링 조작.
+- **CSS `:has()` / 고급 selector로 sibling 정보 추출**: 최신 브라우저 지원 selector로 exfiltration 채널 확대.
+- **Print CSS media query (`@media print`)**: 화면 외 컨텍스트에서 다른 규칙 적용 — 감시 회피에 사용.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **enum/화이트리스트 검증**: `if (!ALLOWED_COLORS.includes(c)) reject`.
 - **CSS color 정규식 검증**: `/^#[0-9a-fA-F]{3,8}$|^rgb\(...\)$/` 등 strict.
@@ -68,6 +72,19 @@ CSS Injection sink는 "사용자 입력이 CSS 파서에 의해 declaration/sele
 - **DOMPurify CSS 모드** (`ALLOWED_TAGS: []`+ `ALLOW_STYLE` 옵션 적절 설정).
 - **Trusted Types `TrustedScriptURL`/CSP `style-src` strict** (`'self'` only, no `unsafe-inline`).
 - **CSP `style-src` nonce/hash**.
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| `;`/`}` 차단만 | 가능 | `url(...)` 함수 단독 삽입으로 외부 fetch (declaration 탈출 불필요) |
+| `url()` 차단 | 가능 | `@import`, `@font-face` `src`, `image-set()`, `-webkit-image-set()`, `cursor: url(...)` 누락 시 |
+| CSS variable `--x` + 값만 전달 | 부분 가능 | `var(--x)` 소비 지점이 `url(var(--x))` 형태면 여전히 외부 fetch 가능 |
+| enum 검증 (`#[0-9a-f]+`) | 가능 | 공백/탭/주석 삽입 (`#fff/*...*/`) 일부 파서 허용. CSS 파서 관대함 이용 |
+| CSP `style-src 'self'` | 부분 가능 | 같은 origin에 업로드 가능한 CSS 파일 있으면 `@import` 우회 |
+| HTML escape만 (`<`/`>` escape) | 가능 | `"` escape 안 하면 속성 값 탈출, CSS 컨텍스트에선 HTML escape 효과 없음 |
 
 ## 후보 판정 의사결정
 

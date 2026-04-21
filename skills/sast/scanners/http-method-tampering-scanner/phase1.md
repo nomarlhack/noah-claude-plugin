@@ -57,8 +57,12 @@ HTTP Method Tampering sink는 "라우트의 일부 메서드에는 인증/인가
 - **gateway/CDN과 백엔드의 메서드 처리 차이**: gateway는 GET 허용, 백엔드는 모두 허용 → gateway 우회.
 - **Reverse proxy `proxy_method` 변경 미들웨어**: gateway가 메서드 변환.
 - **GraphQL endpoint**: GET vs POST에 따라 mutation 허용 차이.
+- **HTTP/2 `:method` pseudo-header**: HTTP/1.1 Method와 다른 경로 — 일부 서버/gateway 처리 차이.
+- **`CONNECT` 메서드 남용**: 일부 프록시 환경에서 raw tunnel 생성 가능.
+- **WebDAV 메서드 (`PROPFIND`, `COPY`, `MOVE`, `LOCK`)**: 활성화 잔존 시 의도치 않게 파일 조작.
+- **Kubernetes API `PATCH` vs `PUT`**: strategic merge patch가 의도와 다르게 객체 수정.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **`app.use('/admin', authMiddleware)` + `app.use('/admin', adminRouter)`**: 라우터 단위 미들웨어 → 모든 메서드에 적용.
 - **`router.all('/admin/*', authMiddleware)`** (Express).
@@ -68,6 +72,19 @@ HTTP Method Tampering sink는 "라우트의 일부 메서드에는 인증/인가
 - **method-override 미들웨어 미사용** 또는 인증 후 적용.
 - **CSRF 미들웨어가 모든 unsafe method (POST/PUT/DELETE/PATCH)에 적용**.
 - **gateway/WAF에서 메서드 화이트리스트** (`limit_except GET POST { deny all; }`).
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| GET/POST만 화이트리스트 | 가능 | `HEAD`는 GET 핸들러 호출 (응답 본문만 생략) — GET 핸들러에 상태 변경 로직이 있으면 HEAD로 트리거 |
+| method-override 미들웨어 비활성화 | 부분 가능 | 프레임워크 기본 활성 (Rails `Rack::MethodOverride`) 잔존 가능 |
+| 인증 미들웨어 적용 후 method-override | 가능 | 적용 순서가 역전되면 인증 GET 통과 → override로 DELETE |
+| Spring Security `.antMatchers("/x", POST)` | 가능 | 다른 메서드(GET/PUT/DELETE 등) 누락 — `HttpMethod.GET` 별도 설정 |
+| gateway가 특정 메서드만 허용 | 부분 가능 | gateway-backend 메서드 처리 차이 — HTTP smuggling 결합 시 우회 |
+| Case-sensitive 메서드 검증 | 가능 | `get`/`Get`/`GET` 중 하나만 차단, 대소문자 변형 통과 |
 
 ## 후보 판정 의사결정
 
@@ -81,11 +98,6 @@ HTTP Method Tampering sink는 "라우트의 일부 메서드에는 인증/인가
 | HEAD/OPTIONS가 GET 핸들러 호출 + 인증 미체크 | 후보 (라벨: `HEAD_BYPASS`) |
 | 모든 메서드에 동일 미들웨어 chain 확인 | 제외 |
 | CSRF 토큰이 모든 unsafe method에 적용 | 제외 (CSRF 한정) |
-
-## 인접 스캐너 분담
-
-- **method override를 통한 CSRF 토큰 우회** (POST → GET 변환으로 CSRF 스킵)는 **csrf-scanner** 단독 담당. 본 스캐너 후보 아님.
-- 본 스캐너 `OVERRIDE_BYPASS`는 method override가 **인증/인가 미들웨어를 우회**하는 케이스만 담당(CSRF 무관).
 
 ## 후보 판정 제한
 

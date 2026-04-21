@@ -41,6 +41,10 @@ CSRF sink는 "쿠키 기반 인증으로 호출되는 상태 변경 엔드포인
 | Laravel | `VerifyCsrfToken` 기본 활성, `$except` 배열로 제외 |
 | Flask | `Flask-WTF` 또는 직접 구현 |
 | FastAPI | 기본 방어 없음 |
+| Go (Gin/Echo/Chi) | 기본 방어 없음 — `gorilla/csrf` 미들웨어 명시 적용 필요 |
+| Phoenix (Elixir) | `Plug.CSRFProtection` 기본 활성, `:protect_from_forgery` plug |
+| ASP.NET Core | `AddAntiforgery()` + `[ValidateAntiForgeryToken]` 또는 `[AutoValidateAntiforgeryToken]` |
+| Nest.js | 기본 방어 없음 — `csurf`/`csrf-csrf` 명시 적용 |
 
 ## Source-first 추가 패턴
 
@@ -76,8 +80,12 @@ CSRF sink는 "쿠키 기반 인증으로 호출되는 상태 변경 엔드포인
 - **Multipart form-data CSRF**: preflight 트리거 안 되는 simple request.
 - **JSON CSRF via Flash/구 브라우저**: 현대 브라우저는 막히지만 레거시.
 - **`/admin/*` 라우트에 CSRF 미적용** (다른 인증 방식 가정).
+- **Referer 단독 검증**: `Referrer-Policy: no-referrer` 메타 태그/링크 속성으로 Referer 제거 가능 → 검증 우회.
+- **Token rotation 없음 (정적 token)**: 세션 동안 동일 토큰 → 한번 노출되면 영구 사용. XSS/Referer 누출 시 위험.
+- **CSRF token이 GET URL에 포함**: 응답 페이지에서 외부 링크 클릭 시 Referer로 token 누출.
+- **method override (POST `_method=DELETE`)와 CSRF 적용 범위 불일치**: POST에 CSRF 검증, override 후 DELETE 동작이 검증 우회.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **세션 쿠키 `SameSite=Strict` 또는 `Lax`** + 모든 unsafe method가 POST 이상.
 - **CSRF 토큰 검증 미들웨어 + 세션별 unique** + body/header에서 검증.
@@ -86,6 +94,22 @@ CSRF sink는 "쿠키 기반 인증으로 호출되는 상태 변경 엔드포인
 - **Origin/Referer 화이트리스트 검증** (모든 unsafe method).
 - **Content-Type `application/json` 강제 + simple request 차단**: preflight 발생 → CORS 보호.
 - **`X-Requested-With` 같은 커스텀 헤더 요구**: simple request 아니므로 preflight.
+- **`Sec-Fetch-Site` 헤더 검증**: 모던 브라우저(Chrome/Firefox/Safari)가 자동 첨부. `cross-site` 차단으로 방어.
+- **HMAC-signed CSRF token (서버 무상태)**: `HMAC(secret, sessionId + nonce)` 검증.
+- **Per-request one-time token**: 토큰을 1회 사용 후 무효화 — 노출 영향 최소화.
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| Naive double submit (cookie와 body 일치만 검증) | 가능 | 공격자가 임의 token을 cookie와 body에 동일 값으로 설정 (cookie 주입 가능 시) — HMAC 미적용이면 임의 값 통과 |
+| Origin 화이트리스트 substring/prefix match | 가능 | `startsWith("https://example.com")` → `https://example.com.attacker.com` 또는 `evil-example.com` 통과 |
+| Referer 단독 검증 | 가능 | `<meta name="referrer" content="no-referrer">`, `rel="noreferrer"`, HTTPS→HTTP 다운그레이드로 Referer 제거 |
+| `SameSite=Lax` (기본값) + GET 상태 변경 | 가능 | Lax는 top-level GET 허용 — `<a>` 클릭/`<img src>` 트리거 |
+| 토큰 검증을 unsafe method 일부에만 적용 | 가능 | POST에만 적용, PUT/DELETE/PATCH 누락. method override 결합 가능 |
+| 토큰을 GET URL/body에서 모두 받음 | 가능 | GET URL에 포함된 토큰이 Referer로 외부 누출 → 재사용 |
 
 ## 후보 판정 의사결정
 
@@ -101,11 +125,6 @@ CSRF sink는 "쿠키 기반 인증으로 호출되는 상태 변경 엔드포인
 | Login endpoint에 CSRF 미적용 | 후보 (라벨: `LOGIN_CSRF`) |
 | WebSocket handshake에 Origin 검증 없음 | 후보 (라벨: `CSWSH`) |
 | GraphQL mutation을 GET으로 허용 | 후보 |
-
-## 인접 스캐너 분담
-
-- **method override(`X-HTTP-Method-Override` 등)를 통한 CSRF 토큰 우회** (예: POST → GET 변환으로 CSRF 토큰 검증 스킵)는 본 스캐너 단독 담당. http-method-tampering-scanner 후보 아님.
-- **method override가 인증 미들웨어를 우회**하는 케이스(CSRF 무관, 인가 영향)는 **http-method-tampering-scanner `OVERRIDE_BYPASS`** 단독 담당.
 
 ## 후보 판정 제한
 

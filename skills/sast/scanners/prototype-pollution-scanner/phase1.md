@@ -78,8 +78,12 @@ Prototype Pollution sink는 "사용자 제어 키가 객체 속성 키 위치(`o
 - **GraphQL resolver 인자 spread**: `{...args}` 후 키 walk.
 - **TypeScript "타입 안전"이 런타임 안전과 무관**: 타입 정의에 `[key: string]` 있어도 prototype 오염 가능.
 - **Map/Set이 아닌 plain object를 cache로 사용**: cache key가 사용자 입력이면 오염.
+- **Class-based pollution (CVE-2022-21824)**: Node.js `console` formatters 오염 — class method walk로 RCE.
+- **`Object.fromEntries(userArray)`**: key가 `__proto__`/`constructor`면 오염.
+- **Proxy handler 오염**: 오염된 `Object.prototype.get`으로 모든 proxy 동작 변경.
+- **AST parser 오염**: `esprima`/`acorn` 옵션 객체 오염 → 파싱 결과 조작.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **`Object.create(null)` 사용**: 프로토타입 체인 자체가 없어 오염 불가.
 - **`Map`/`Set` 사용**: prototype lookup 없음.
@@ -89,6 +93,19 @@ Prototype Pollution sink는 "사용자 제어 키가 객체 속성 키 위치(`o
 - **lodash 4.17.21+** + 위험 함수 미사용.
 - **`hasOwnProperty` 체크**: walk 시 own property만 처리.
 - **`secure-json-parse` 사용**: `__proto__` 키 자동 제거.
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| `__proto__` 키 차단 | 가능 | `constructor.prototype` 또는 `constructor["prototype"]` 경로 — 별도 차단 필요 |
+| `hasOwnProperty` 체크 | 가능 | 오염된 `hasOwnProperty` 자체 (prototype pollution으로 덮어쓴 상태)는 false 반환 가능 — `Object.prototype.hasOwnProperty.call(obj, key)` 필요 |
+| `secure-json-parse` (JSON 전용) | 부분 가능 | JSON은 안전하나 multipart/urlencoded 파서는 별도 — 파서별 방어 필요 |
+| `Object.freeze(Object.prototype)` | 환경 의존 | 일부 라이브러리가 prototype 확장에 의존 — freeze 후 동작 이상 또는 try/catch로 silent fail |
+| Lodash 4.17.21+ 업그레이드 | 부분 가능 | Lodash 내 CVE는 수정되나 custom merge/set 함수는 별도 확인 |
+| JSON Schema `additionalProperties: false` | 가능 | 검증 후 다시 merge하는 코드가 있으면 우회 — 검증과 사용 시점 사이 재오염 가능 |
 
 ## 후보 판정 의사결정
 

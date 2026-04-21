@@ -112,6 +112,23 @@ grep_patterns:
 | `no-store` 또는 `private, no-cache` 설정 | 제외 |
 | 정적 자산 (CSS/JS/이미지)에 캐시 없음 | 제외 (해당 없음) |
 
+### 8. Cross-Origin-* (COOP/COEP/CORP)
+
+Spectre/Meltdown 류 side-channel 완화. SharedArrayBuffer 사용 시 필수.
+
+| 설정 | 판정 |
+|---|---|
+| SharedArrayBuffer / cross-origin isolation 필요 환경 + COOP/COEP 없음 | 후보 (라벨: `COOP_MISSING`) |
+| COEP `require-corp` + 모든 cross-origin 리소스에 CORP 없음 | 후보 (라벨: `CORP_MISSING`) |
+| `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp` 설정 | 제외 |
+
+### 9. Clear-Site-Data (로그아웃)
+
+| 설정 | 판정 |
+|---|---|
+| 로그아웃 엔드포인트에서 `Clear-Site-Data: "cache", "cookies", "storage"` 미설정 | 후보 (라벨: `CLEAR_SITE_DATA_MISSING`, 심각도 낮음) |
+| 로그아웃 시 클라이언트 데이터 명시 제거 | 제외 |
+
 ## Source-first 추가 패턴
 
 - nginx.conf, apache.conf, httpd.conf, .htaccess 등 웹서버 설정 파일
@@ -120,7 +137,7 @@ grep_patterns:
 - Docker/docker-compose에서 프록시 설정
 - 환경별 설정 파일 (production.rb, settings.py 등)
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **helmet (Node.js)**: `app.use(helmet())` — 주요 보안 헤더를 기본값으로 설정. 개별 옵션을 확인하여 비활성화된 헤더가 있는지 체크.
 - **Spring Security headers()**: 기본 설정으로 X-Frame-Options, X-Content-Type-Options 등 포함.
@@ -142,10 +159,6 @@ grep_patterns:
 | helmet/Spring Security 사용하지만 일부 비활성화 | 후보 (비활성화된 항목만) |
 | 코드에 없지만 인프라 설정 파일에서 설정 확인 | 제외 |
 | 코드/설정 어디에도 없음 + 인프라 확인 불가 | 후보 (전제조건: "인프라 계층 미확인" 명시) |
-
-## 스캐너 간 분담 — 점검 범위 제외 항목
-
-- **HSTS (Strict-Transport-Security)**: 본 스캐너의 점검 범위에 포함되지 않는다. `tls-scanner`가 전송 계층 보안 관점에서 Phase 1·Phase 2 모두 전담한다. Source-first 탐색 중 HSTS 관련 설정이 발견되더라도 후보로 등록하지 않는다.
 
 ## 후보 판정 제한
 

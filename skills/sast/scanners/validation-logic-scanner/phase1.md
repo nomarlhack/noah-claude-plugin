@@ -99,8 +99,15 @@ grep_patterns:
 - **중첩 객체 검증 누락**: 최상위 필드만 검증하고 중첩 객체의 필드는 미검증
 - **Content-Type 불일치**: `application/json` 기대하지만 `application/x-www-form-urlencoded`도 수용하여 파싱 차이 발생
 - **숫자 범위 미검증**: 나이, 수량 등 논리적 범위가 있는 필드에 음수/극대값 허용
+- **유니코드 정규화 누락**: 이메일/username에 `Café` vs `Café` (NFC/NFD) 혼용 — 동일 사용자 중복 등록/계정 혼동
+- **Zero-width/invisible 문자**: `user\u200Bname`이 원본과 달라 중복 허용 또는 검증 우회
+- **Case sensitivity 차이**: 이메일 `Admin@example.com`과 `admin@example.com` — 저장은 case-sensitive, 검증은 lowercase 비교
+- **Locale-aware comparison**: Turkish locale에서 `i`.toUpperCase() → `İ` (대문자 dot 포함) — 문자 비교 불일치
+- **JSON duplicate keys**: 대부분 파서가 마지막 값 유지하나 일부는 첫 값 — 파서별 동작 차이로 우회
+- **Positional vs named parameter 혼합**: API가 둘 다 받으면 다른 처리 경로 유발
+- **NaN/Infinity 처리**: `JSON.parse`에 없는 특수값이지만 `parseFloat`/`Number`는 허용 — 범위 검증 후 NaN 통과
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **NestJS ValidationPipe + class-validator DTO**: `@UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))` — 미정의 필드 자동 거부
 - **Joi/Yup 스키마 + `stripUnknown: true`**: 알 수 없는 필드 자동 제거
@@ -110,21 +117,6 @@ grep_patterns:
 - **Express-validator 체인**: `body('field').isString().isLength({ min: 1, max: 100 })` — 타입 + 길이 검증
 - **ORM allowlist/select**: Sequelize `attributes`, Mongoose `select`, ActiveRecord `permit` — 바인딩 필드 제한
 - **`===` 일관 사용 (ESLint eqeqeq rule)**: strict equality만 사용하면 타입 혼동 방지
-
-## 인접 스캐너 분담
-
-| 취약점 | 담당 스캐너 |
-|---|---|
-| `req.body`를 ORM에 직접 전달 → role 필드로 자기 권한 상승 | `business-logic-scanner` (PRIV_ESCALATION) |
-| `req.body`를 ORM에 직접 전달 → owner_id 변경으로 타인 리소스 탈취 | `idor-scanner` (MASS_ASSIGNMENT) |
-| `req.body` 객체가 MongoDB 쿼리 연산자(`$gt`, `$ne`)로 해석 | `nosqli-scanner` |
-| 타입 미검증 입력이 SQL 쿼리에 직접 삽입 | `sqli-scanner` |
-| 객체 병합 시 `__proto__` 오염 | `prototype-pollution-scanner` |
-| 스키마에 정의되지 않은 필드를 서버가 수용 (위 케이스 아닌 일반적 경우) | **본 스캐너** (SCHEMA_DEFECT) |
-| 서버 검증 누락 상태에서 타입 조작으로 로직 우회 | **본 스캐너** (TYPE_CONFUSION) |
-| 클라이언트만 검증, 서버 무방비 (위 injection 케이스 아닌 일반적 경우) | **본 스캐너** (VALIDATION_MISMATCH) |
-
-**경계 원칙**: 타입 조작이 **구체적 injection**(SQLi, NoSQLi, PP)으로 이어지면 해당 전문 스캐너가 담당한다. 본 스캐너는 injection이 아닌 **로직 우회**(인증 우회, 상태 조작, 데이터 무결성 훼손)만 다룬다.
 
 ## 후보 판정 의사결정
 

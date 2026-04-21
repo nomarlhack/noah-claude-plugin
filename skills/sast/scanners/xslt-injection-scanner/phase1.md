@@ -58,8 +58,12 @@ XSLT Injection sink는 두 종류:
 - **lxml `extensions={(ns, name): func}`**: 사용자 신뢰 코드면 안전하나, 동적으로 등록되면 위험.
 - **XSL-FO PDF 생성**: 외부 이미지 fetch로 SSRF.
 - **사용자 업로드 스타일시트 + 동적 입력 XML 조합**: 두 입력 모두 사용자 제어.
+- **XSLT 3.0 `fn:transform()` dynamic evaluation**: 스타일시트 동적 평가 → 메타 XSLT 공격.
+- **Xalan `xalan:pipeDocument`/`xalan:write`**: Xalan 확장으로 임의 파일 쓰기/명령 실행.
+- **Saxon `saxon:extra-attributes` with `xsl:script`**: Saxon EE에서 Java/C# 바인딩 허용 시 RCE.
+- **XSL-FO 외부 이미지 `<fo:external-graphic src="...">`**: URL fetch로 SSRF.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **고정 스타일시트 파일 + XML 데이터만 사용자 입력**: 스타일시트 경로가 환경변수/상수.
 - **XSLT 파라미터 전달**: `transformer.setParameter(name, value)` (스타일시트 구조 변경 불가).
@@ -67,6 +71,17 @@ XSLT Injection sink는 두 종류:
 - **Saxon `ConfigurationProperty.ALLOW_EXTERNAL_FUNCTIONS=false`**.
 - **PHP `registerPHPFunctions` 미호출** + 스타일시트가 신뢰 출처.
 - **.NET `XsltSettings.Default`** (script + document 모두 false).
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| JAXP secure processing만 활성화 | 부분 가능 | `document()`/`unparsed-text()` 자체는 secure 대상 아님 — 별도 `ACCESS_EXTERNAL_DTD/STYLESHEET` 속성 설정 필요 |
+| 외부 스타일시트 fetch만 차단 (`<xsl:import href="...">`) | 가능 | 인라인 `<msxsl:script>`/Saxon extension 등 내부 확장으로 우회 |
+| 확장 함수 비활성화 (`EnableScript=false`) | 부분 가능 | `document()` 함수는 별도 (`EnableDocumentFunction`) — 하나만 끄면 다른 쪽 남음 |
+| 화이트리스트 스타일시트만 허용 | 가능 | 파일 선택 자체 제어 안 되면 안전하나, 경로 traversal로 다른 스타일시트 선택 가능 |
 
 ## 후보 판정 의사결정
 
@@ -79,11 +94,6 @@ XSLT Injection sink는 두 종류:
 | Java factory에 `FEATURE_SECURE_PROCESSING` 미설정 + 신뢰할 수 없는 입력 | 후보 |
 | 고정 스타일시트 + 사용자 입력은 XML 데이터/파라미터만 | 제외 |
 | lxml `extensions` 정적 등록만, 동적 함수 없음 | 제외 |
-
-## 인접 스캐너 분담
-
-- **XSLT `document()`/`unparsed-text()` 함수**에 의한 외부 리소스 로드(SSRF/file read 효과)는 본 스캐너 단독 담당. xxe-scanner 후보 아님.
-- **XML parser entity expansion** (DTD, external entity)은 **xxe-scanner** 단독 담당. XSLT 엔진 내부에서 XML 파싱 시에도 entity 관련 결함은 xxe-scanner.
 
 ## 후보 판정 제한
 

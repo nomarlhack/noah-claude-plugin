@@ -1,147 +1,159 @@
 ### Phase 2: 동적 테스트 (검증)
 
-> 공통 시작 절차 / 공통 검증 기준은 `prompts/guidelines-phase2.md` 지침 7에 정의되어 있다. 이 파일은 보안 헤더 스캐너의 고유 절차만 다룬다.
+**도구 선택:** 응답 헤더 점검이 본질 — curl만 사용. Playwright는 사용하지 않는다.
 
-**도구 선택:** 응답 헤더만 확인하면 되므로 **curl만 사용**한다. Playwright는 사용하지 않는다.
-
----
-
-## 기본 원칙
-
-- 모든 판정은 **실제 응답 헤더**로 한다. 코드/설정 파일에서 "있을 것 같다"는 이유만으로 안전 판정하지 않는다.
-- 코드/설정에 없어도 응답에 있으면 **보고서 제외** (CDN/프록시/웹서버 계층 보강). 코드/설정에 있어도 응답에 없으면 **확인됨**.
-- Cache-Control 검증은 반드시 **인증 세션 쿠키를 동반**한 요청으로 수행한다.
-- **각 라벨 검증은 phase1.md의 후보 path별로 반복**한다. 루트(`/`) 1회 덤프로 모든 라벨을 판정하지 않는다. SPA shell만 CSP가 붙고 그 외 라우트는 누락되는 경우가 흔하다.
+**기본 원칙:**
+- 모든 판정은 **실제 응답 헤더** 기반
+- 코드/설정에 있어도 응답에 없으면 확인됨, 반대도 성립
+- 각 라벨 검증은 phase1 후보 **path별로 반복** (루트 1회로 전체 판정 금지)
+- Cache-Control은 **인증 세션 쿠키 동반** 요청만 유효
+- CORS는 정상 GET + 공격자 Origin GET + Preflight OPTIONS **3회 비교** 필수
 
 ---
 
-## Step 1: 후보 path별 헤더 일괄 조회
+## 라벨별 테스트
 
-phase1.md 후보의 각 URL에 대해 한 번씩 실행한다.
+### 정찰 — 후보 path별 헤더 일괄 조회
 
+```bash
+# phase1 후보의 각 URL에 대해 한 번씩 실행
+curl -sIv "https://target/<path>" 2>&1 | grep -iE '^< (content-security-policy|content-security-policy-report-only|strict-transport-security|x-frame-options|x-content-type-options|referrer-policy|permissions-policy|feature-policy|access-control-|cache-control|pragma|expires|cross-origin-)'
 ```
-curl -sIv "https://<host>/<path>" 2>&1 | grep -iE '^< (content-security-policy|content-security-policy-report-only|strict-transport-security|x-frame-options|x-content-type-options|referrer-policy|permissions-policy|feature-policy|access-control-|cache-control|pragma|expires)'
+
+### `CSP_MISSING` / `CSP_UNSAFE_INLINE` / `CSP_UNSAFE_EVAL` / `CSP_WILDCARD` / `CSP_REPORT_ONLY`
+
+```bash
+curl -sI "https://target/<html-path>" | grep -i '^content-security-policy:'
 ```
 
-이 출력을 기준으로 아래 라벨별 판정을 수행한다.
+| 응답 | 판정 |
+|---|---|
+| HTML 페이지에 `Content-Security-Policy` 없음 | 확인됨 (`CSP_MISSING`) |
+| `script-src` 또는 `default-src`에 `'unsafe-inline'` | 확인됨 (`CSP_UNSAFE_INLINE`) — `strict-dynamic` + nonce/hash와 함께면 제외 |
+| `script-src` 또는 `default-src`에 `'unsafe-eval'` | 확인됨 (`CSP_UNSAFE_EVAL`) |
+| `default-src` 또는 `script-src`에 단독 `*` | 확인됨 (`CSP_WILDCARD`) |
+| `Content-Security-Policy-Report-Only`만 (강제 CSP 부재) | 확인됨 (`CSP_REPORT_ONLY`) |
 
----
+### `CORS_WILDCARD_CRED` / `CORS_REFLECT` / `CORS_NULL`
 
-## Step 2: 라벨별 테스트
-
-### Content-Security-Policy
-
-**`CSP_MISSING` — CSP 헤더 부재**
-```
-curl -sI "https://<host>/<html-path>" | grep -i '^content-security-policy:'
-```
-- 확인됨: HTML을 반환하는 페이지 응답에서 출력 없음
-- 비 HTML 경로(`/api/*` JSON만 반환)에서는 판정 제외
-
-**`CSP_UNSAFE_INLINE` / `CSP_UNSAFE_EVAL`**
-```
-curl -sI "https://<host>/<html-path>" | grep -i '^content-security-policy:'
-```
-- 확인됨: 응답 값의 `script-src` / `default-src` 디렉티브에 `'unsafe-inline'` 또는 `'unsafe-eval'` 포함
-- `strict-dynamic` + nonce/hash가 함께 설정된 경우는 strict-dynamic이 unsafe-inline을 무력화하므로 보고서 제외
-
-**`CSP_WILDCARD`**
-- 확인됨: `default-src` 또는 `script-src`에 단독 `*` (scheme 제한 없음)
-
-**`CSP_REPORT_ONLY`**
-```
-curl -sI "https://<host>/<html-path>" | grep -iE '^content-security-policy(-report-only)?:'
-```
-- 확인됨: `Content-Security-Policy-Report-Only`만 존재하고 강제 `Content-Security-Policy`는 부재
-
-### CORS (Access-Control-Allow-Origin)
-
-CORS 검증은 **정상 GET + 공격자 Origin GET + Preflight OPTIONS** 3회 요청을 비교한다. 실제 정책은 preflight에서 분기되는 경우가 많아 GET만으로는 부족하다.
-
-```
+3회 요청 비교:
+```bash
 # 정상 Origin
-curl -sI -H "Origin: https://<host>" "https://<host>/api/<endpoint>" | grep -iE '^access-control-'
+curl -sI -H "Origin: https://target" "https://target/api/<endpoint>" | grep -iE '^access-control-'
 
 # 공격자 Origin
-curl -sI -H "Origin: https://evil.com" "https://<host>/api/<endpoint>" | grep -iE '^access-control-'
+curl -sI -H "Origin: https://evil.com" "https://target/api/<endpoint>" | grep -iE '^access-control-'
 
 # null Origin
-curl -sI -H "Origin: null" "https://<host>/api/<endpoint>" | grep -iE '^access-control-'
+curl -sI -H "Origin: null" "https://target/api/<endpoint>" | grep -iE '^access-control-'
 
 # Preflight OPTIONS
 curl -sI -X OPTIONS \
   -H "Origin: https://evil.com" \
   -H "Access-Control-Request-Method: POST" \
   -H "Access-Control-Request-Headers: authorization,content-type" \
-  "https://<host>/api/<endpoint>" | grep -iE '^access-control-'
+  "https://target/api/<endpoint>" | grep -iE '^access-control-'
 ```
 
-**`CORS_WILDCARD_CRED`**
-- 확인됨: `Access-Control-Allow-Origin: *` + `Access-Control-Allow-Credentials: true` (브라우저는 거부하지만 서버 응답 자체가 misconfig 지표)
+| 응답 | 판정 |
+|---|---|
+| `Access-Control-Allow-Origin: *` + `Access-Control-Allow-Credentials: true` | 확인됨 (`CORS_WILDCARD_CRED`) |
+| 공격자 Origin 반사 + Credentials 허용 | 확인됨 (`CORS_REFLECT`) |
+| `Access-Control-Allow-Origin: null` 반사 + Credentials | 확인됨 (`CORS_NULL`) |
 
-**`CORS_REFLECT`**
-- 확인됨: 공격자 Origin 요청에서 `Access-Control-Allow-Origin: https://evil.com` 그대로 반사됨 + `Access-Control-Allow-Credentials: true`
+### `CLICKJACK_UNPROTECTED`
 
-**`CORS_NULL`**
-- 확인됨: `Access-Control-Allow-Origin: null` 반사 + Credentials 허용
-
-### Clickjacking (X-Frame-Options / CSP frame-ancestors)
-
-**`CLICKJACK_UNPROTECTED`**
+```bash
+curl -sI "https://target/<html-path>" | grep -iE '^(x-frame-options|content-security-policy):'
 ```
-curl -sI "https://<host>/<html-path>" | grep -iE '^(x-frame-options|content-security-policy):'
+
+| 응답 | 판정 |
+|---|---|
+| `X-Frame-Options` 부재 AND CSP `frame-ancestors` 부재 | 확인됨 |
+| `X-Frame-Options: ALLOW-FROM ...` (비표준) | 확인됨 (`CLICKJACK_ALLOWFROM`) |
+
+### `MIME_SNIFF`
+
+```bash
+# 사용자 업로드 URL (파일 업로드 후 응답에서 URL 추출)
+curl -sI "https://target/<user-upload-url>" | grep -i '^x-content-type-options:'
 ```
-- 확인됨: `X-Frame-Options` 부재 AND CSP `frame-ancestors` 디렉티브 부재
 
-**`CLICKJACK_ALLOWFROM`**
-- 확인됨: `X-Frame-Options: ALLOW-FROM ...` (비표준, 최신 브라우저 미지원)
+| 응답 | 판정 |
+|---|---|
+| 출력 없음 또는 `nosniff` 외 값 | 확인됨 |
 
-### X-Content-Type-Options
+### `REFERRER_LEAK` / `REFERRER_UNSAFE`
 
-**`MIME_SNIFF`**
-
-사용자 업로드 파일을 서빙하는 경로를 대상으로 확인한다. 업로드 경로가 phase1에 명시되지 않은 경우 먼저 정상 업로드 API로 파일을 올린 뒤 응답에서 URL을 추출한다.
-
+```bash
+curl -sI "https://target/" | grep -i '^referrer-policy:'
 ```
-curl -sI "https://<host>/<user-upload-url>" | grep -i '^x-content-type-options:'
+
+| 응답 | 판정 |
+|---|---|
+| 출력 없음 + 외부 링크에 민감 URL 파라미터 | 확인됨 (`REFERRER_LEAK`) |
+| `unsafe-url` 또는 `no-referrer-when-downgrade` | 확인됨 (`REFERRER_UNSAFE`) |
+| `strict-origin-when-cross-origin` 이상 | 안전 |
+
+### `PERMISSIONS_MISSING`
+
+```bash
+curl -sI "https://target/" | grep -iE '^(permissions-policy|feature-policy):'
 ```
-- 확인됨: 출력 없음 또는 값이 `nosniff`가 아님
 
-### Referrer-Policy
+| 응답 | 판정 |
+|---|---|
+| 출력 없음 + 민감 기능(카메라/마이크/위치) 사용 | 확인됨 |
 
-**`REFERRER_LEAK`**
+### `CACHE_SENSITIVE`
+
+```bash
+# 인증 세션 쿠키 동반 필수
+curl -sI -H "Cookie: <세션쿠키>" "https://target/<auth-required-path>" | grep -iE '^(cache-control|pragma|expires):'
 ```
-curl -sI "https://<host>/" | grep -i '^referrer-policy:'
+
+| 응답 | 판정 |
+|---|---|
+| 인증 응답에 `Cache-Control` 부재이거나 `public`/`max-age>0` | 확인됨 |
+| `no-store` 또는 `private, no-cache` | 안전 |
+
+### `COOP_MISSING` / `CORP_MISSING` (Cross-Origin)
+
+```bash
+curl -sI "https://target/" | grep -iE '^cross-origin-(opener|embedder|resource)-policy:'
 ```
-- 확인됨: 출력 없음 (브라우저 기본값에 의존) AND phase1에서 외부 링크에 민감 URL 파라미터가 식별됨
 
-**`REFERRER_UNSAFE`**
-- 확인됨: 값이 `unsafe-url` 또는 `no-referrer-when-downgrade`
-- `strict-origin-when-cross-origin` 이상은 보고서 제외
+| 응답 | 판정 |
+|---|---|
+| SharedArrayBuffer 사용 + COOP/COEP 없음 | 확인됨 |
+| `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp` | 안전 |
 
-### Permissions-Policy (구 Feature-Policy)
+### `CLEAR_SITE_DATA_MISSING` (로그아웃)
 
-**`PERMISSIONS_MISSING`**
+```bash
+curl -sI -X POST "https://target/logout" -H "Cookie: <세션>" | grep -i 'clear-site-data'
 ```
-curl -sI "https://<host>/" | grep -iE '^(permissions-policy|feature-policy):'
-```
-- 확인됨: 출력 없음 AND phase1에서 민감 기능(카메라/마이크/위치 등) 사용이 식별됨
-- 민감 기능 미사용 프로젝트는 보고서 제외
 
-### Cache-Control (민감 응답)
-
-**`CACHE_SENSITIVE`**
-
-반드시 **인증 세션 쿠키를 동반**하여 phase1의 인증 필요 후보 path별로 확인한다.
-
-```
-curl -sI -H "Cookie: <세션쿠키>" "https://<host>/<auth-required-path>" | grep -iE '^(cache-control|pragma|expires):'
-```
-- 확인됨: 인증 필요 응답에 `Cache-Control` 부재이거나 `public` / `max-age>0`
-- `no-store` 또는 `private, no-cache` 설정은 보고서 제외
+| 응답 | 판정 |
+|---|---|
+| 출력 없음 (로그아웃 시 클라이언트 데이터 명시 제거 안 함) | 확인됨 (영향도 약함) |
 
 ---
 
-**검증 기준 (스캐너 고유 부분만):**
-- **확인됨**: 동적 테스트로 실제 응답 헤더에서 결함이 관찰됨. 각 라벨별로 curl 명령 + 응답 헤더 출력을 증거로 첨부한다.
-- **보고서 제외 (스캐너 고유)**: 응답 헤더에서 안전한 설정이 확인된 경우 (코드/설정에는 없어도 CDN/프록시/웹서버 계층에서 주입된 경우 포함).
+**참고사항:**
+
+- 모든 판정은 **실제 응답 헤더** 기반 — 코드에 있어도 응답에 없으면 확인됨, 반대도 성립
+- 각 라벨 검증은 phase1 후보 **path별로 반복** — 루트 1회로 전체 판정 금지 (SPA shell만 CSP 붙는 사례 흔함)
+- Cache-Control 검증은 **인증 세션 쿠키 동반** 요청으로만 유효
+- CORS는 정상 GET + 공격자 Origin GET + Preflight OPTIONS **3회 비교** 필수 (preflight에서 분기되는 경우 다수)
+- HSTS는 HTTPS 응답에서만 의미 — HTTP 환경에선 판정 제외
+- Feature-Policy는 deprecated — Permissions-Policy로 교체 확인
+- COOP/COEP는 SharedArrayBuffer 사용 환경에서만 필수 — 일반 페이지엔 권장 수준
+- CSP `strict-dynamic` + nonce/hash 조합은 `unsafe-inline` 무력화 — 제외 판정
+- `X-XSS-Protection`은 최신 브라우저에서 deprecated — 설정 부재가 결함 아님
+- CSP report-only 모드는 실제 차단 없음 — 강제 모드 미적용 시 `CSP_REPORT_ONLY` 후보
+- 다수 Set-Cookie/응답 헤더는 개별 판정 — cookie-security-scanner와 별도
+- CDN/프록시/웹서버 계층에서 헤더 추가 가능 — 코드에 없어도 응답에 있으면 안전
+- Cache poisoning은 응답이 cache header 포함 + Host가 cache key 미포함일 때 — host-header-scanner 결합
+- Frame-ancestors는 X-Frame-Options 대체 — CSP만으로도 clickjacking 방어 가능
+- COEP `require-corp`는 cross-origin resource를 모두 CORP 헤더 요구 — 호환성 영향 큼

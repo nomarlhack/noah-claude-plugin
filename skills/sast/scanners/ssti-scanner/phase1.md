@@ -93,14 +93,34 @@ SSTI sink는 "사용자 입력이 템플릿 컴파일러의 입력 문자열 위
 - **Mustache → Handlebars 마이그레이션 잔재**: triple-stash `{{{x}}}`는 escape 안 함 (XSS이지 SSTI는 아니지만 함께 점검).
 - **i18n 라이브러리 (i18next, ICU MessageFormat)** 의 동적 키 평가에 사용자 입력.
 - **에러 메시지에 입력 반영 후 템플릿 처리**: `flash[:notice] = "Welcome #{params[:name]}"` + ERB로 렌더.
+- **Go `text/template` vs `html/template`**: `text/template`은 HTML escape 없음 + 반사된 입력이 템플릿 문자열이면 SSTI.
+- **Razor (.NET) `@Html.Raw()` + 동적 view 컴파일**: `RazorEngine.Compile(userInput)`.
+- **JSP EL + 동적 include**: `<jsp:include page="${userInput}">` — page가 `.jsp`면 서버사이드 평가.
+- **Tornado (Python) `tornado.template.Template(x)`**: Python 코드 블록 포함 가능 — RCE 직결.
+- **Pebble (Java) `engine.getTemplate(x)`**: Spring Boot 환경에서 자주 사용. sandbox 기본 없음.
 
-## 안전 패턴 카탈로그 (FP Guard)
+## 안전 패턴 (FP Guard)
 
 - **파일 기반 템플릿 + 데이터 컨텍스트**: `render('view.ejs', {data})` — 사용자가 파일 경로를 제어하지 않는 한 안전.
 - **Handlebars 기본 사용** (커스텀 unsafe helper 없음).
 - **Django Template 기본 사용** (sandbox 적용).
 - **Jinja2 SandboxedEnvironment** 사용.
 - **템플릿 컴파일 캐시**: 미리 컴파일된 템플릿 객체에 데이터만 주입.
+- **Freemarker `new_builtin_class_resolver=TemplateClassResolver.SAFER_RESOLVER`**: reflection 기반 공격 차단.
+- **Twig sandbox (`SecurityPolicy`)**: 허용 tag/filter/function 명시 화이트리스트.
+- **Velocity 2.x `SecureUberspector`**: 구 Velocity 1.x와 달리 기본 reflection 차단.
+
+## 우회 가능 패턴
+
+방어 처리가 보이지만 우회 가능한 경우 후보 사유에 우회 방식을 함께 기록한다.
+
+| 방어 코드 | 우회 가능성 | 우회 방식 |
+|---|---|---|
+| Jinja2 SandboxedEnvironment | 환경 의존 | 구버전 sandbox escape CVE 존재 (`__class__.__mro__` walk 일부 변형). 버전 확인 필수 |
+| Freemarker `SAFER_RESOLVER` | 부분 가능 | `?eval` built-in, `"freemarker.template.utility.Execute"?new()` 같은 ObjectWrapper 경로 확인 |
+| 키워드 블랙리스트 (`__class__` 차단) | 가능 | `["__class__"]` attribute access, `\x5f\x5fclass\x5f\x5f` unicode, `request.__init_subclasses__()` 우회 |
+| Velocity 2.x SecureUberspector | 부분 가능 | SSTI 자체 차단되나 custom uberspector 등록되면 약화 |
+| 길이 제한 (예: 100자) | 가능 | 짧은 페이로드 `{{().__class__.__bases__[0].__subclasses__()[N].__init__.__globals__["...` (수십 자) |
 
 ## 후보 판정 의사결정
 
