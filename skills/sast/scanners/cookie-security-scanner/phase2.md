@@ -1,6 +1,6 @@
 ### 정찰 페이로드
 
-**Set-Cookie 발행 시점 수집:**
+#### Set-Cookie 발행 시점 수집
 ```bash
 # 로그인 시점 쿠키 발행
 curl -si -X POST "https://target/login" -d "username=U&password=P" | grep -i 'set-cookie'
@@ -15,7 +15,7 @@ curl -sI "https://target/" -H "Cookie: SESSION=X" | grep -i 'set-cookie'
 curl -si -X POST "https://target/login" -d "username=U&password=P&remember=1" | grep -i 'set-cookie'
 ```
 
-**속성 파싱:**
+#### 속성 파싱
 ```bash
 # 각 Set-Cookie 헤더 파싱
 curl -si "https://target/login" -d "username=U&password=P" 2>&1 | grep -i 'set-cookie:' | while read line; do
@@ -31,32 +31,32 @@ done
 
 ---
 
-**기본 페이로드 (라벨별):**
+#### 기본 페이로드 (라벨별)
 
-**`COOKIE_NO_SECURE`:**
+#### `COOKIE_NO_SECURE`
 - 민감 쿠키에 `Secure` 미존재 → 확인됨
 - HTTP 평문 환경에서 쿠키 노출 가능
 
-**`COOKIE_NO_HTTPONLY`:**
+#### `COOKIE_NO_HTTPONLY`
 - 세션 쿠키에 `HttpOnly` 미존재 → XSS 시 `document.cookie`로 탈취
 
-**`COOKIE_SAMESITE_NONE`:**
+#### `COOKIE_SAMESITE_NONE`
 - 명시 `SameSite=None` 발견 → cross-site 자동 전송 → CSRF 게이트 (csrf-scanner 결합)
 - 미설정 (브라우저 기본 Lax)은 제외
 
-**`COOKIE_PERSISTENT`:**
+#### `COOKIE_PERSISTENT`
 - 세션/인증 쿠키 `Max-Age > 7d` 또는 장기 `Expires`
 - 공용 PC에서 브라우저 종료 후에도 세션 유지 → 탈취 영향도 격상
 
-**`COOKIE_LOOSE_SCOPE`:**
+#### `COOKIE_LOOSE_SCOPE`
 - `Domain=.example.com` (상위 도메인) → 모든 서브도메인 공유
 - subdomain takeover (subdomain-takeover-scanner 결합) 시 영향 확대
 
-**`COOKIE_PREFIX_MISUSE`:**
+#### `COOKIE_PREFIX_MISUSE`
 - `__Host-` + `Domain` 조합 (브라우저 거부) → 의도 불일치
 - `__Secure-` + `Secure` 미설정
 
-**Session fixation 검증:**
+#### Session fixation 검증
 ```bash
 # 로그인 전 쿠키
 curl -si "https://target/" | grep -i 'set-cookie:' > /tmp/pre.txt
@@ -70,7 +70,7 @@ curl -si -X POST "https://target/login" -d "username=U&password=P" \
 diff /tmp/pre.txt /tmp/post.txt
 ```
 
-**Partitioned (CHIPS) 확인:**
+#### Partitioned (CHIPS) 확인
 ```bash
 curl -si "https://target/" | grep -i 'partitioned'
 # Chrome 3rd-party cookie 차단 대응 — 적절히 적용되었는지 확인

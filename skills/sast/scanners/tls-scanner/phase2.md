@@ -1,6 +1,6 @@
 **도구 선택:** `openssl s_client` + curl. Playwright 미사용.
 
-**기본 원칙:**
+#### 기본 원칙
 - 모든 판정은 **실제 TLS 핸드셰이크 결과** 기반
 - 각 테스트는 `timeout 10` 적용
 - HSTS는 Test 7에서 (전송 계층 보안)

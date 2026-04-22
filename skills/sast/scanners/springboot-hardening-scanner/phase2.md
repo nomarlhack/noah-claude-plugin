@@ -1,6 +1,6 @@
 **도구 선택:** curl만 사용. Playwright 불필요.
 
-**[필수] 동적 테스트 전 가드 스크립트:**
+#### [필수] 동적 테스트 전 가드 스크립트
 ```bash
 python3 <NOAH_SAST_DIR>/tools/phase2_actuator_check.py "<테스트URL>" && curl -sI "<테스트URL>"
 ```
@@ -10,14 +10,14 @@ exit 1 시 curl 미실행. `/actuator/shutdown` 절대 호출 금지.
 
 ### 정찰 페이로드
 
-**Spring Boot 식별 (헤더/응답 fingerprint):**
+#### Spring Boot 식별 (헤더/응답 fingerprint)
 ```bash
 curl -sI "https://target/" | grep -iE "X-Application-Context|Server"
 curl -s "https://target/nonexistent_$(date +%s)" | grep -i "Whitelabel Error Page"
 # Whitelabel 에러 페이지 또는 X-Application-Context 헤더 → Spring Boot
 ```
 
-**Actuator base path 발견:**
+#### Actuator base path 발견
 ```bash
 for base in "/actuator" "/management" "/admin" "/monitoring" "/internal/actuator"; do
   python3 <NOAH_SAST_DIR>/tools/phase2_actuator_check.py "https://target${base}" && \
@@ -25,7 +25,7 @@ for base in "/actuator" "/management" "/admin" "/monitoring" "/internal/actuator
 done
 ```
 
-**Actuator endpoint enumeration:**
+#### Actuator endpoint enumeration
 ```bash
 for ep in env beans configprops mappings prometheus heapdump threaddump httptrace metrics info health auditevents conditions loggers scheduledtasks sessions jolokia; do
   python3 <NOAH_SAST_DIR>/tools/phase2_actuator_check.py "https://target/actuator/${ep}" && \
@@ -33,14 +33,14 @@ for ep in env beans configprops mappings prometheus heapdump threaddump httptrac
 done
 ```
 
-**Swagger/API doc 발견:**
+#### Swagger/API doc 발견
 ```bash
 for path in "/swagger-ui.html" "/swagger-ui/index.html" "/v3/api-docs" "/v2/api-docs" "/api-docs" "/swagger" "/redoc"; do
   curl -sI "https://target${path}" | head -1
 done
 ```
 
-**H2 Console / DevTools 탐지:**
+#### H2 Console / DevTools 탐지
 ```bash
 curl -sI "https://target/h2-console"
 curl -sI "https://target/h2-console/"

