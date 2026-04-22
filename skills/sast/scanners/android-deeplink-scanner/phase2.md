@@ -2,7 +2,7 @@
 
 #### [필수] 동적 테스트 전 환경 점검
 
-다른 스캐너와 달리 curl만으로 검증 불가. 다음 조건 중 하나라도 미충족이면 **테스트 시작 전 사용자에게 안내**하고 응답에 따라 진행/중단 결정:
+Tier 2 이상 페이로드는 adb + device + 대상 APK 설치가 필요하다. 아래 점검을 먼저 실행하고, 미충족 항목이 있으면 **테스트 시작 전 사용자에게 안내**해 응답을 받은 뒤 진행 여부를 결정한다:
 
 ```bash
 # 1. adb 설치 확인
@@ -371,7 +371,7 @@ myapp://USER:PASS@host/path                         (userinfo 포함 — 일부 
 
 ### 참고사항
 
-- **환경 전제 조건**: 다른 스캐너와 달리 curl만으로 검증 불가. Phase 2 시작 전 `adb devices` + 대상 APK 설치 확인 필수. 미충족 시 사용자에게 안내 후 응답 받기 — 무단 진행 금지
+- **환경 전제 조건**: Tier 2 이상은 `adb devices` + 대상 APK 설치 확인 후 진행. 미충족 시 사용자 안내 후 응답 받기 — 무단 진행 금지
 - **Tier 분리**: Tier 1 (assetlinks.json HTTP curl 검증) → curl만 가능. Tier 2 (`adb am start` 페이로드) → emulator/device 필요. Tier 3 (Frida hook, PoC APK 설치) → rooted device + 빌드 환경 필요. 환경에 맞춰 가능한 Tier만 수행
 - **외부 진입 영향도**: deeplink는 카카오톡/문자메시지/이메일/웹페이지 링크 클릭만으로 트리거 — 사용자가 URL을 직접 입력할 필요 없음. phishing 메시지에 `kakaotalk://...?url=javascript:...` 한 줄만 넣어 보내면 클릭 한 번으로 발화 → 영향도 큼
 - **host별 routing 분기 모두 점검**: `when(uri.host){"adwebview"->...; "open"->...}` 같은 dispatch 코드는 host 한 곳만 검증 누락이어도 전체 게이트 — Phase 1에서 모든 분기 cross-check 필수
