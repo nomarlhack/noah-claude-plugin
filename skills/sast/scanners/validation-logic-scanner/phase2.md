@@ -182,7 +182,7 @@ curl -X POST "https://target/api/<endpoint>" \
 - 모든 테스트는 **서버 응답 동작**으로 판정 — 클라이언트 검증은 무시
 - 각 라벨 phase1 후보별 개별 테스트, 정상 응답을 비교 기준으로 캡처 후 진행
 - 쓰기 작업은 테스트 전용 리소스 생성 후 대상 (비파괴적 원칙)
-- Mass assignment 경계: `role`/`isAdmin`/`admin` 변경 시 본 스캐너는 `SCHEMA_DEFECT`, cross-scanner는 business-logic `PRIV_ESCALATION`, idor `MASS_ASSIGNMENT` — 중복 가능성 보고서 명시
+- Mass assignment 경계: `role`/`isAdmin`/`admin` 변경 시 validation-logic에서는 `SCHEMA_DEFECT`, business-logic에서는 `PRIV_ESCALATION`, idor에서는 `MASS_ASSIGNMENT` — 중복 가능성 보고서 명시
 - NoSQLi 경계: MongoDB 연산자(`$gt`/`$ne`/`$regex`) 포함 응답은 `TYPE_CONFUSION` 아닌 nosqli-scanner 영역
 - Unicode 정규화 누락 (NFC/NFD)은 이메일/username 중복 허용 게이트
 - Zero-width/invisible 문자는 검증 우회 변형

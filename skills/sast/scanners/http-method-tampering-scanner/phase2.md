@@ -109,4 +109,4 @@ curl -X POST "https://target/api/resource" -d "_method=DELETE&id=1" -H "Cookie: 
 - HTTP/2 `:method` pseudo-header는 HTTP/1.1 변환 시 다른 값 가능 — gateway 환경 점검
 - Kubernetes API의 PATCH는 strategic merge patch — 의도와 다른 객체 수정 가능
 - ASP.NET MVC route 정의에서 method 미명시 시 모든 method 허용
-- 동일 라우트에 method별 다른 핸들러 등록은 가장 위험 — 권한 체크 누락 빈번
+- 동일 라우트에 method별 다른 핸들러 등록은 권한 체크 누락이 빈번한 패턴

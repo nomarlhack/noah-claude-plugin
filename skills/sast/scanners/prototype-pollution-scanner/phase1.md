@@ -60,7 +60,7 @@ Prototype Pollution sink는 "사용자 제어 키가 객체 속성 키 위치(`o
 
 ## 자주 놓치는 패턴 (Frequently Missed)
 
-- **multipart/urlencoded 파서의 `__proto__` 키 수용**: `multer`/`formidable`/`busboy`/`koa-body`/`express.urlencoded({extended:true})` 등이 키 필터링 없이 body를 plain object로 구성. `qs` 우회와 동일 경로, sink 함수 호출 불필요. (파서 라이브러리명은 `file-upload-scanner` 쪽에서 grep 탐지되므로 본 스캐너는 `__proto__`/`allowPrototypes`/`urlencoded` 등 오염 신호에 집중.)
+- **multipart/urlencoded 파서의 `__proto__` 키 수용**: `multer`/`formidable`/`busboy`/`koa-body`/`express.urlencoded({extended:true})` 등이 키 필터링 없이 body를 plain object로 구성. `qs` 우회와 동일 경로, sink 함수 호출 불필요. 파서 라이브러리명 grep은 file-upload-scanner가 담당 — prototype-pollution은 `__proto__`/`allowPrototypes`/`urlencoded` 오염 신호에 집중.
 - **`qs` 파서의 `__proto__` 우회**: `qs.parse('__proto__[isAdmin]=true')` → 객체에 `__proto__.isAdmin = true`. Express 4.x 기본 `qs` 사용.
 - **MongoDB `$` 연산자와 동시 차단 미흡**: NoSQLi 방어로 `$` prefix는 막아도 `__proto__`는 안 막는 케이스.
 - **서버 가젯 (가장 영향도 큼)**:

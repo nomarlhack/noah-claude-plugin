@@ -217,7 +217,7 @@ Adobe Reader 등 PDF 뷰어에서 열면 alert 발화 — 클라이언트 영향
 - CSP는 서버 puppeteer에 적용 안 됨 — 브라우저 CSP 무의미
 - 결과 PDF가 다른 사용자에게 발송되면 stored exfiltration 영향도
 - Markdown → HTML → PDF 체인도 동일 위험 (marked `html: true` / `sanitize: false`)
-- 격리 컨테이너 + 네트워크 egress 차단이 유일한 확실한 방어
+- 격리 컨테이너 + 네트워크 egress 차단은 영향 최소화에 가장 효과적 (옵션 단위 차단은 개별 스킴 잔존 가능)
 - XSS → PDF 서버 렌더 체인은 blind SSRF/LFI 게이트로 자주 활용
 - AWS metadata가 가장 큰 영향 (IAM credential → 계정 takeover) — ssrf-scanner 결합
 - IMDSv2 환경은 PUT request 가능한 puppeteer/JS 환경에서만 토큰 획득 가능 (wkhtmltopdf는 GET only)

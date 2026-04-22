@@ -132,7 +132,7 @@ curl -X POST "https://target/slo" -d "SAMLRequest=<위조_LogoutRequest>"
 
 - XSW가 가장 흔한 SAML 취약점 — `wantAssertionsSigned`/`wantResponseSigned` 양쪽 활성화 필수
 - Comment injection은 파서 구현에 따라 (ruby-saml 구버전, python-saml 일부) 취약 — CVE-2018-0489
-- XXE 방어는 xxe-scanner가 단독 담당 — 본 스캐너는 SAML 특화
+- XXE 방어는 xxe-scanner 담당 — saml-scanner는 SAML 특화 sink만 다룸
 - 메타데이터 URL이 HTTP이면 MITM으로 IdP 키 교체 가능 — HTTPS + 서명 필수
 - Assertion 1회용 캐시(`duplicate assertion ID` 방어)가 없으면 시계 skew 내 replay
 - XSW는 SAML Raider (Burp extension)로 자동 생성 가능 — 8가지 변형 자동 시도

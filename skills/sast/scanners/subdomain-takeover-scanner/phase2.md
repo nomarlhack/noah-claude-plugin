@@ -125,7 +125,7 @@ subjack -w subdomains.txt -t 100 -timeout 30 -ssl -c fingerprints.json
 ### 참고사항
 
 - 가장 흔한 패턴: 마케팅 캠페인 종료 후 외부 서비스 해지하지만 DNS 잔존
-- `staging-*`, `old-*`, `legacy-*`, `cbt-*` 접두사가 가장 위험 — 일반 보안 점검에서 누락
+- `staging-*`, `old-*`, `legacy-*`, `cbt-*` 접두사는 일반 보안 점검에서 누락이 잦은 대상
 - GitHub Pages takeover는 repo fork + Pages 활성화로 가장 쉬움
 - Heroku/Shopify는 계정 등록으로 takeover
 - MX takeover는 이메일 스푸핑으로 영향도 매우 높음 — DKIM/SPF 결합 시 심각

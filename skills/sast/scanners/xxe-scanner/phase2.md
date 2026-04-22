@@ -138,7 +138,7 @@ curl -X POST "https://target/api/xml" -H "Content-Type: application/xml" --data-
 
 - Classic XXE (직접 반영)는 파서가 응답에 엔티티 결과 포함할 때만 — JSON API는 대부분 blind
 - Parameter entity OOB는 외부 DTD 호스팅 인프라 필요 (콜백 서버 + DTD 파일)
-- Local DTD trick은 외부 네트워크 차단 환경에서 유일한 blind 추출 — OS/설치 환경별 DTD 경로 다름 (Yelp/SUSE/RedHat)
+- Local DTD trick은 외부 네트워크 차단 환경에서 주요 blind 추출 경로 — OS/설치 환경별 DTD 경로 다름 (Yelp/SUSE/RedHat)
 - XInclude는 DOCTYPE 차단 우회 — `setXIncludeAware(false)` 미적용 환경
 - Java `DocumentBuilderFactory`의 6개 `setFeature` 모두 활성화 필수 (1개 누락도 위험)
 - PHP 8.0+에서 `libxml_disable_entity_loader`는 no-op — 코드 있어도 방어 안 됨
