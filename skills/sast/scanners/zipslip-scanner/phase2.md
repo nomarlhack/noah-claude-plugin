@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **테스트 ZIP 생성 (Python):**
 ```python
@@ -79,7 +77,7 @@ curl "https://target/zipslip-<TIMESTAMP>.txt"
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 (entry name) |
 |---|---|
@@ -103,7 +101,7 @@ curl "https://target/zipslip-<TIMESTAMP>.txt"
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 압축 해제 시점에 외부 검증이 어려움 — OAST + 웹루트 접근 병행 필수
 - 웹루트 (`public/`, `static/`, `uploads/`) 상대 경로를 소스에서 사전 파악

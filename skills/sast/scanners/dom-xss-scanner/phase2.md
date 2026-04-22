@@ -1,8 +1,6 @@
-### Phase 2: 동적 테스트 (Playwright 전용)
-
 **원칙**: DOM XSS는 서버 미경유 — **curl 금지**, Playwright로만 검증.
 
-**기본 페이로드:**
+### 기본 페이로드
 
 **Source별:**
 
@@ -79,7 +77,7 @@ console.log('CSP:', response.headers()['content-security-policy']);
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 phase1 `## 우회 가능 패턴` (xss-scanner와 공유).
 
@@ -103,7 +101,7 @@ phase1 `## 우회 가능 패턴` (xss-scanner와 공유).
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - DOM XSS는 서버 무경유 — curl 결과로 판정 절대 금지
 - hash sink가 가장 빈번 — `location.hash`, `window.location.hash`

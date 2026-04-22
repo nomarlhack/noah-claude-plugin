@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**정찰 페이로드:**
+### 정찰 페이로드
 
 **직렬화 sink 탐지 (요청/응답에서 시그니처):**
 
@@ -21,7 +19,7 @@ curl -v "https://target/api/endpoint" 2>&1 | grep -iE "rO0AB|gASV|AAEAAAD|x-java
 
 ---
 
-**기본 페이로드:**
+### 기본 페이로드
 
 **Java (ysoserial):**
 ```bash
@@ -122,7 +120,7 @@ curl "https://target/check?file=phar://uploaded.phar/x.txt"
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 우회 |
 |---|---|
@@ -144,7 +142,7 @@ xxd -p payload.ser | tr -d '\n'
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - classpath/의존성에서 gadget chain 라이브러리(Commons Collections, BeanUtils, Spring) 확인이 실전 성공률 결정
 - URLDNS는 가장 신뢰성 높은 blind 탐지 (의존성 불필요 — Java 7+ 표준 JDK)

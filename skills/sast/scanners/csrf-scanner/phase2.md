@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**정찰 페이로드:**
+### 정찰 페이로드
 
 **SameSite 쿠키 속성 확인:**
 ```
@@ -31,7 +29,7 @@ curl -v "https://target/api/<endpoint>" -H "Sec-Fetch-Site: cross-site" 2>&1 | g
 
 ---
 
-**기본 페이로드:**
+### 기본 페이로드
 
 **HTML form (auto-submit, simple request):**
 ```html
@@ -92,7 +90,7 @@ ws.onopen = () => ws.send(JSON.stringify({action:'admin_delete', userId:'victim'
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -117,7 +115,7 @@ GET /redirect?url=evil%0d%0aSet-Cookie:csrf_token=ATTACKER_VAL HTTP/1.1
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 빈출 타깃: 비밀번호 변경, 이메일 변경, 결제, 관리자 권한 변경, 게시글 작성/삭제
 - GraphQL mutation을 GET으로 허용하면 CSRF 직결 (graphql-scanner와 결합)

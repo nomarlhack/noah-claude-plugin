@@ -1,5 +1,3 @@
-### Phase 2: 동적 테스트 (검증)
-
 **도구 선택:** curl만 사용. Playwright 불필요.
 
 **[필수] 동적 테스트 전 가드 스크립트:**
@@ -10,7 +8,7 @@ exit 1 시 curl 미실행. `/actuator/shutdown` 절대 호출 금지.
 
 ---
 
-**정찰 페이로드:**
+### 정찰 페이로드
 
 **Spring Boot 식별 (헤더/응답 fingerprint):**
 ```bash
@@ -174,7 +172,7 @@ Phase 1 결과 그대로 유지:
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - `/actuator/shutdown`에 대한 HTTP 요청은 절대 수행 금지 — phase2_actuator_check.py 가드 필수
 - actuator endpoint는 shutdown/refresh 외에도 `env`, `beans`, `configprops`, `mappings`, `prometheus`, `heapdump`, `threaddump` 등이 민감

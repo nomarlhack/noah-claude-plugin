@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**정찰 페이로드:**
+### 정찰 페이로드
 
 **JWKS endpoint 발견 (RS256→HS256 confusion 사전 단계):**
 ```
@@ -29,7 +27,7 @@ echo "<TOKEN>" | cut -d. -f2 | base64 -d 2>/dev/null | jq .
 
 ---
 
-**기본 페이로드:**
+### 기본 페이로드
 
 **Algorithm None** (`NONE_ALG` 라벨):
 ```bash
@@ -135,7 +133,7 @@ HEADER='{"alg":"RS256","jwk":{"kty":"RSA","n":"...","e":"AQAB"}}'
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 우회 |
 |---|---|
@@ -150,7 +148,7 @@ HEADER='{"alg":"RS256","jwk":{"kty":"RSA","n":"...","e":"AQAB"}}'
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - `alg:none` 테스트는 5초 안에 결과 확인 가능 — 가장 먼저 시도
 - RS256→HS256 confusion은 public key가 JWKS endpoint에 공개되어 있으면 성공률 높음

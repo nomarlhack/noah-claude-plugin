@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **기준선 측정 (필수):**
 ```bash
@@ -60,7 +58,7 @@ curl -m 30 -w "%{time_total}\n" -o /dev/null -s "https://target/api/x?input=$(py
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -91,7 +89,7 @@ email=aaaa...!&name=normal
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - Node.js는 단일 스레드 — 1개 ReDoS가 전체 서비스 블로킹 → 영향도 가장 큼
 - Go regexp/Rust regex는 RE2 기반 (선형 시간 보장) — 패턴 매칭 차단

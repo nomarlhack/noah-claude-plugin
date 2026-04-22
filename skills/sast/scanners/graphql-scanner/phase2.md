@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**정찰 페이로드:**
+### 정찰 페이로드
 
 엔드포인트 후보 경로 (서버 직접 fuzzing):
 - `/graphql`, `/graphiql`, `/graphql/console`, `/graphql.php`, `/graphiql.php`
@@ -31,7 +29,7 @@ Introspection 전체 dump:
 
 ---
 
-**기본 페이로드:**
+### 기본 페이로드
 
 **Query (shorthand / 명시):**
 ```
@@ -115,7 +113,7 @@ map: {"0":["variables.f"]}
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 우회 페이로드 |
 |---|---|
@@ -140,7 +138,7 @@ map: {"0":["variables.f"]}
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - "Did you mean ...?" 응답이 schema 추론의 핵심 — introspection 비활성 환경에서 가장 강력
 - Apollo Server 4+ `csrfPrevention: true` 기본 — `Content-Type` 변형으로 우회 시도

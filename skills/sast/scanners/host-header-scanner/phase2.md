@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **Host 헤더 변조** (`MAIL_HOST_INJECTION` 라벨):
 - `Host: evil.com` (응답에 Host 반영 확인)
@@ -82,7 +80,7 @@ curl "https://target/?cb=<같은_value>"
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -99,7 +97,7 @@ curl "https://target/?cb=<같은_value>"
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 패스워드 리셋이 가장 큰 영향 — 피해자 메일에 공격자 도메인 링크 → 토큰 탈취
 - API gateway 뒤에서 `trust proxy` 정확한 hop count 미설정 시 X-Forwarded-Host/For 통과

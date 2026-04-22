@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**정찰 페이로드:**
+### 정찰 페이로드
 
 **JS/CSS 파일 enumeration:**
 ```bash
@@ -24,7 +22,7 @@ curl -s "https://target/static/js/main.js" | grep "sourceMappingURL=data:"
 
 ---
 
-**기본 페이로드:**
+### 기본 페이로드
 
 **.map 파일 다운로드 시도:**
 ```bash
@@ -85,7 +83,7 @@ curl -s "https://sentry.io/api/0/organizations/<org>/releases/<release>/files/"
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -109,7 +107,7 @@ GET /static/js/../js/main.js.map → 200 (path 정규화 차이)
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - Source Map 자체는 직접 공격 벡터가 아니나 민감 정보 포함 시 심각도 격상
 - `hidden-source-map`은 주석만 제거 — 파일은 여전히 배포되므로 추측 가능 이름이면 무용지물

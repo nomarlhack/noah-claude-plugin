@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **파일 읽기 (`document()`):**
 ```xml
@@ -69,7 +67,7 @@ curl -X POST "https://target/api/transform" -H "Content-Type: application/xml" -
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -93,7 +91,7 @@ curl -X POST "https://target/api/transform" -H "Content-Type: application/xml" -
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 빈출 sink: "리포트 템플릿 업로드", "XSL-FO PDF 생성", "데이터 변환" 기능
 - PHP `XSLTProcessor::registerPHPFunctions` 호출이 코드에 보이면 즉시 RCE 위험

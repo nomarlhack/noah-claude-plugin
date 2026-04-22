@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **Linux/macOS 메타문자 (셸 경유 sink):**
 - `; id` (query/body)
@@ -62,7 +60,7 @@ for i in 1 2 3; do curl -w "%{time_total}\n" -o /dev/null -s "https://target/api
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -89,7 +87,7 @@ for i in 1 2 3; do curl -w "%{time_total}\n" -o /dev/null -s "https://target/api
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 빈출 sink: DNS lookup/ping, git clone, 이미지 변환 (ImageMagick/ffmpeg/wkhtmltopdf), PDF 생성, 파일 변환 파이프라인
 - 파일 업로드 후 변환 파이프라인이 인자 주입 노출 빈번 (file-upload-scanner와 결합)

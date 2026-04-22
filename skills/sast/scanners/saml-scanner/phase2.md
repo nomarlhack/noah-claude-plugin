@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **SAML Response 캡처 (Playwright):**
 ```javascript
@@ -114,7 +112,7 @@ curl -X POST "https://target/slo" -d "SAMLRequest=<위조_LogoutRequest>"
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -130,7 +128,7 @@ curl -X POST "https://target/slo" -d "SAMLRequest=<위조_LogoutRequest>"
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - XSW가 가장 흔한 SAML 취약점 — `wantAssertionsSigned`/`wantResponseSigned` 양쪽 활성화 필수
 - Comment injection은 파서 구현에 따라 (ruby-saml 구버전, python-saml 일부) 취약 — CVE-2018-0489

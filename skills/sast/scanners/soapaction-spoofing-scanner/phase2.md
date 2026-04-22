@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**정찰 페이로드:**
+### 정찰 페이로드
 
 **WSDL/MEX endpoint 발견:**
 ```bash
@@ -31,7 +29,7 @@ curl -s "https://target/ws/service?wsdl" | grep -oE 'name="[^"]+"' | head -50
 
 ---
 
-**기본 페이로드:**
+### 기본 페이로드
 
 **SOAPAction vs Body 불일치 (핵심 우회):**
 ```xml
@@ -123,7 +121,7 @@ Content-Type: multipart/related; type="application/xop+xml"; boundary=---
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -147,7 +145,7 @@ Content-Type: multipart/related; type="application/xop+xml"; boundary=---
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - gateway/WAF는 SOAPAction만 검사하고 Body 미검사가 일반적 — Body operation 변경이 핵심 우회
 - JAX-WS handler chain에서 SOAPAction == Body operation 검증 명시 필요

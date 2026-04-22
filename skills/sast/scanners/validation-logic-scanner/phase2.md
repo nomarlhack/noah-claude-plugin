@@ -1,5 +1,3 @@
-### Phase 2: 동적 테스트 (검증)
-
 **도구 선택:** curl만 사용. Playwright 미사용.
 
 **기본 원칙:**
@@ -171,7 +169,7 @@ curl -X POST "https://target/api/<endpoint>" \
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 우회 |
 |---|---|
@@ -183,7 +181,7 @@ curl -X POST "https://target/api/<endpoint>" \
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - Mass assignment 경계: `role`/`isAdmin`/`admin` 변경 시 본 스캐너는 `SCHEMA_DEFECT`, cross-scanner는 business-logic `PRIV_ESCALATION`, idor `MASS_ASSIGNMENT` — 중복 가능성 보고서 명시
 - NoSQLi 경계: MongoDB 연산자(`$gt`/`$ne`/`$regex`) 포함 응답은 `TYPE_CONFUSION` 아닌 nosqli-scanner 영역

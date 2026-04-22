@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **엔진 식별 (수학 연산):**
 
@@ -63,7 +61,7 @@ return "redirect:" + userInput;  // userInput이 "${T(java.lang.Runtime).getRunt
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -91,7 +89,7 @@ return "redirect:" + userInput;  // userInput이 "${T(java.lang.Runtime).getRunt
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 빈출 sink: "이메일 템플릿 미리보기", "동적 보고서 템플릿", "위젯/숏코드", "마케팅 페이지 빌더", 관리자 권한이라도 후보 유지
 - Spring `return "redirect:" + userInput` 같은 view name 평가가 SpringEL SSTI로 빈출 (CVE-2022-22965)

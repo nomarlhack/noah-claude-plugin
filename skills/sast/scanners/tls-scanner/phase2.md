@@ -1,5 +1,3 @@
-### Phase 2: 동적 테스트 (검증)
-
 **도구 선택:** `openssl s_client` + curl. Playwright 미사용.
 
 **기본 원칙:**
@@ -118,7 +116,7 @@ echo | timeout 10 openssl s_client -connect target:443 -tls1_3 2>&1 | grep -i "e
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - `openssl s_client` 미설치 시 `[도구 한계]` — 설치 시도 금지
 - 비표준 포트 (`:8443` 등)는 Phase 1에서 확인된 포트로 테스트

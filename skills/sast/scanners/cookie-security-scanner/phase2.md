@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**정찰 페이로드:**
+### 정찰 페이로드
 
 **Set-Cookie 발행 시점 수집:**
 ```bash
@@ -80,7 +78,7 @@ curl -si "https://target/" | grep -i 'partitioned'
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 우회 |
 |---|---|
@@ -91,7 +89,7 @@ curl -si "https://target/" | grep -i 'partitioned'
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - Set-Cookie는 로그인/OAuth 콜백/remember-me 시점에 발행 — 이미 세션 있는 상태에서 일반 페이지는 없을 수 있음
 - 민감 쿠키 판별: `JSESSIONID`, `connect.sid`, `sessionid`, `session`, `token`, `auth`, `jwt`, `remember`, `PHPSESSID`, `_session`, `csrf`, `xsrf`

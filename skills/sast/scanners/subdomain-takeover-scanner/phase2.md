@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**정찰 페이로드:**
+### 정찰 페이로드
 
 **DNS 레코드 수집:**
 ```bash
@@ -39,7 +37,7 @@ curl -s "https://crt.sh/?q=%25.target.com&output=json" | jq -r '.[].name_value' 
 
 ---
 
-**기본 페이로드:**
+### 기본 페이로드
 
 **서비스별 fingerprint 확인:**
 ```bash
@@ -124,7 +122,7 @@ subjack -w subdomains.txt -t 100 -timeout 30 -ssl -c fingerprints.json
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 가장 흔한 패턴: 마케팅 캠페인 종료 후 외부 서비스 해지하지만 DNS 잔존
 - `staging-*`, `old-*`, `legacy-*`, `cbt-*` 접두사가 가장 위험 — 일반 보안 점검에서 누락

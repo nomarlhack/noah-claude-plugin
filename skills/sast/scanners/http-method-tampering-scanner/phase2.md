@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **Method enumeration (어떤 method 허용되는지):**
 ```bash
@@ -63,7 +61,7 @@ curl --http2 "https://target/admin" -X PATCH
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -91,7 +89,7 @@ curl -X POST "https://target/api/resource" -d "_method=DELETE&id=1" -H "Cookie: 
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - Express `app.all` vs `app.get` 혼용이 가장 흔한 패턴
 - Spring `@RequestMapping("/path")` (method 미지정)은 모든 HTTP method 허용 — 보안 설정도 method 미지정해야 일치

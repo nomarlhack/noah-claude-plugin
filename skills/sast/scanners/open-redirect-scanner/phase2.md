@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **서버 redirect (Location 헤더):**
 - `https://evil.com` (query)
@@ -49,7 +47,7 @@ const { chromium } = require('playwright');
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -90,7 +88,7 @@ const { chromium } = require('playwright');
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 빈출 파라미터: `redirect`, `returnUrl`, `next`, `goto`, `callback`, `redirect_uri`, `dest`, `link`, `url`, `target`, `continue`
 - OAuth/SSO 콜백이 가장 큰 영향 (인가 코드 탈취 → 계정 takeover) — oauth-scanner 결합

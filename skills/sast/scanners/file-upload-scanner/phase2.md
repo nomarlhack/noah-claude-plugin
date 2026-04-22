@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **무해 테스트 파일 (확인 마커 포함):**
 ```bash
@@ -125,7 +123,7 @@ curl -s "https://target/uploads/<PATH>/test.php"
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 우회 |
 |---|---|
@@ -151,7 +149,7 @@ curl -X POST "https://target/api/upload" \
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - RCE 게이트는 `.php`/`.phtml`/`.jsp`/`.aspx`/`.htaccess`/`web.config` 업로드 + 웹 접근 가능
 - 프로필 사진, 첨부파일, 리치 에디터 paste, CSV 임포트가 빈출 sink

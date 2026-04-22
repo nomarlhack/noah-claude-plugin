@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **Classic XXE (직접 반영):**
 ```xml
@@ -113,7 +111,7 @@ curl -X POST "https://target/api/import" -F "file=@evil.xlsx"
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 우회 |
 |---|---|
@@ -136,7 +134,7 @@ curl -X POST "https://target/api/xml" -H "Content-Type: application/xml" --data-
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - Classic XXE (직접 반영)는 파서가 응답에 엔티티 결과 포함할 때만 — JSON API는 대부분 blind
 - Parameter entity OOB는 외부 DTD 호스팅 인프라 필요 (콜백 서버 + DTD 파일)

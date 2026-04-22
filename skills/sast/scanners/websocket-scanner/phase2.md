@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**정찰 페이로드:**
+### 정찰 페이로드
 
 **WebSocket endpoint 발견:**
 ```bash
@@ -42,7 +40,7 @@ done
 
 ---
 
-**기본 페이로드:**
+### 기본 페이로드
 
 **CSWSH (외부 Origin + 피해자 쿠키)** (`CSWSH` 라벨):
 ```
@@ -117,7 +115,7 @@ curl "https://target/signalr/connect?transport=longPolling&clientProtocol=2.0" \
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -134,7 +132,7 @@ curl "https://target/signalr/connect?transport=longPolling&clientProtocol=2.0" \
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - `ws` 라이브러리 기본 — `verifyClient` 미설정 시 모든 origin 허용 (Node)
 - Socket.IO 4.x `cors.origin: '*'` 또는 미명시는 cross-origin 허용

@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **state 검증** (`STATE_MISSING`/`STATE_WEAK_STORAGE` 라벨):
 ```
@@ -96,7 +94,7 @@ GET /api/x  Authorization: Bearer REVOKED_TOKEN  ← 여전히 200
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -112,7 +110,7 @@ GET /api/x  Authorization: Bearer REVOKED_TOKEN  ← 여전히 200
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - state 검증은 1단계만으로 결정 금지 — 반드시 2단계 (유효 코드 + 전체 체인) 검증
 - 유효 인가 코드는 일회용/수분 만료 — 사용자에게 즉시 사용 안내

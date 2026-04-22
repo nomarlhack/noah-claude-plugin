@@ -1,6 +1,4 @@
-### Phase 2: 동적 테스트 (검증)
-
-**기본 페이로드:**
+### 기본 페이로드
 
 **JS 실행 (puppeteer/headless Chrome):**
 - `<script>document.write("JS_EXECUTED_"+Date.now())</script>` (PDF에 결과 캡처되면 확인)
@@ -29,7 +27,7 @@
 
 ---
 
-**우회 페이로드:**
+### 우회 페이로드
 
 | 방어 | 페이로드 |
 |---|---|
@@ -43,7 +41,7 @@
 
 ---
 
-**참고사항:**
+### 참고사항
 
 - HTML→PDF 변환기가 sink — 직접 PDF 생성 라이브러리(pdfkit/reportlab)는 안전
 - wkhtmltopdf, puppeteer, WeasyPrint가 가장 흔한 엔진
