@@ -1,5 +1,35 @@
 ### 정찰 페이로드
 
+#### [필수] 동적 테스트 전 환경 점검
+
+다른 스캐너와 달리 curl만으로 검증 불가. 다음 조건 중 하나라도 미충족이면 **테스트 시작 전 사용자에게 안내**하고 응답에 따라 진행/중단 결정:
+
+```bash
+# 1. adb 설치 확인
+which adb || echo "MISSING: adb"
+
+# 2. device/emulator 연결 확인 (최소 1개 'device' 상태)
+adb devices | awk 'NR>1 && $2=="device"{c++} END{print c+0" device(s)"}'
+
+# 3. 대상 APK 설치 확인
+adb shell pm list packages | grep -F '<com.target.app>' || echo "MISSING: target package"
+
+# 4. (선택) Frida server — JS bridge/PendingIntent hook 페이로드용
+adb shell 'su -c "ps -A | grep frida-server"' 2>/dev/null || echo "MISSING: frida-server (Tier 3 페이로드 사용 시 필요)"
+```
+
+**점검 분기:**
+
+| 결과 | 조치 |
+|---|---|
+| 모두 OK | 정찰/기본/우회 페이로드 정상 진행 |
+| `adb` 부재 | 사용자에게 `brew install android-platform-tools` 또는 Android SDK platform-tools 설치 요청. 거부 시 전체 후보를 `[환경 제한: adb 부재]`로 표시 |
+| device 0개 | 사용자에게 (a) Android emulator 부팅 (`emulator -avd <name>`) 또는 (b) USB-debugging 활성화한 device 연결 요청. 거부 시 `[환경 제한: device 부재]` |
+| 대상 APK 미설치 | 사용자에게 sandbox/test 빌드 APK 설치 요청 (`adb install <path>.apk`). 거부/APK 부재 시 `[환경 제한: 대상 APK 미설치]` |
+| frida-server 부재 | Tier 1-2 (adb am start 페이로드)는 진행. Tier 3 (Frida hook 페이로드 — `JS_BRIDGE_EXPOSURE`/`PENDING_INTENT_HIJACK`)은 `[환경 제한: Frida 부재]` |
+
+**[필수] sandbox 한정**: prod 사용자 단말/계정 device 절대 사용 금지. emulator 또는 전용 테스트 device만 허용.
+
 #### Manifest 정적 분석 (APK / source repo)
 
 ```bash
@@ -341,6 +371,8 @@ myapp://USER:PASS@host/path                         (userinfo 포함 — 일부 
 
 ### 참고사항
 
+- **환경 전제 조건**: 다른 스캐너와 달리 curl만으로 검증 불가. Phase 2 시작 전 `adb devices` + 대상 APK 설치 확인 필수. 미충족 시 사용자에게 안내 후 응답 받기 — 무단 진행 금지
+- **Tier 분리**: Tier 1 (assetlinks.json HTTP curl 검증) → curl만 가능. Tier 2 (`adb am start` 페이로드) → emulator/device 필요. Tier 3 (Frida hook, PoC APK 설치) → rooted device + 빌드 환경 필요. 환경에 맞춰 가능한 Tier만 수행
 - **외부 진입 영향도**: deeplink는 카카오톡/문자메시지/이메일/웹페이지 링크 클릭만으로 트리거 — 사용자가 URL을 직접 입력할 필요 없음. phishing 메시지에 `kakaotalk://...?url=javascript:...` 한 줄만 넣어 보내면 클릭 한 번으로 발화 → 영향도 큼
 - **host별 routing 분기 모두 점검**: `when(uri.host){"adwebview"->...; "open"->...}` 같은 dispatch 코드는 host 한 곳만 검증 누락이어도 전체 게이트 — Phase 1에서 모든 분기 cross-check 필수
 - WebView XSS는 `url=javascript:`/`url=data:text/html,...`이 가장 흔한 형태 — 카카오톡 `kakaotalk://adwebview/reward?url=...` 같은 패턴이 다수 앱에 동일 구조로 존재
