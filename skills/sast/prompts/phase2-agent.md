@@ -10,7 +10,7 @@
 그 후:
 1. 해당 스캐너의 phase2.md를 Read
 2. Phase 1 평가본(`<PHASE1_RESULTS_DIR>/evaluation/<scanner-name>-eval.md`)을 Read하여 테스트할 후보 목록 및 각 후보의 `CONFIRM` / `OVERRIDE` / `DISCARD` 판정 확인. **DISCARD 후보는 테스트 대상에서 제외** (이미 `status: safe` 확정, 토큰 낭비 방지). 평가본 부재 시 원본 `<PHASE1_RESULTS_DIR>/<scanner-name>.md`를 fallback으로 사용하고 반환에 `[FALLBACK: eval MD 부재]` 표기
-3. guidelines-phase2.md와 phase2.md의 지침을 그대로 따라 동적 테스트 수행
+3. Phase 1에서 도출된 각 후보(CONFIRM/OVERRIDE)가 **실제로 취약한지** 동적으로 검증. guidelines-phase2.md의 공통 지침을 따르되, 해당 스캐너 phase2.md는 검증에 활용할 **페이로드/우회 변형/응답 신호 cheat sheet**로 참고 (모든 페이로드를 기계적으로 실행하라는 의미가 아님 — 후보의 라벨/sink/컨텍스트에 맞는 페이로드를 선별 적용)
 4. guidelines-phase2.md 지침 1 및 지침 3에 따라 결과 파일을 `<PHASE1_RESULTS_DIR>/<scanner-name>-phase2.md`에 저장하고 요약을 반환. DISCARD로 skip한 후보는 manifest에 포함하지 않고 반환 텍스트에만 "DISCARD skip: N건" 표기
 
 이미 읽은 파일은 다시 읽지 마세요.
