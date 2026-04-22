@@ -14,6 +14,16 @@ grep_patterns:
   - "ldap_bind\\s*\\("
   - "ldap"
   - "LDAP"
+  - "searcher\\.Filter"
+  - "DirectorySearcher"
+  - "LdapQuery"
+  - "escape_filter_chars"
+  - "BasicAttribute"
+  - "SearchControls"
+  - "go-ldap"
+  - "gopkg\\.in/ldap"
+  - "InitialLdapContext"
+  - "SearchRequest"
 ---
 
 > ## 핵심 원칙: "LDAP 필터가 변경되지 않으면 취약점이 아니다"

@@ -15,6 +15,16 @@ grep_patterns:
   - "format\\.csv"
   - "CSV\\.generate"
   - "CSV\\.open"
+  - "setCellValue"
+  - "setCellFormula"
+  - "write_string"
+  - "write_formula"
+  - "cell\\.formula"
+  - "cell\\.value"
+  - "csv\\.QUOTE_"
+  - "Content-Disposition.*csv"
+  - "Content-Disposition.*xlsx"
+  - "createCell"
 ---
 
 > ## 핵심 원칙: "수식이 CSV에 포함되지 않으면 취약점이 아니다"

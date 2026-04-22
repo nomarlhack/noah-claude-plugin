@@ -11,6 +11,16 @@ grep_patterns:
   - "REXML::XPath"
   - "lxml\\.etree\\.xpath"
   - "XPathFactory"
+  - "SelectNodes"
+  - "SelectSingleNode"
+  - "XPathNavigator"
+  - "XPathExpression"
+  - "\\.findall\\s*\\("
+  - "\\.findtext\\s*\\("
+  - "xmlXPathEval"
+  - "JXPathContext"
+  - "XPathBuilder"
+  - "createExpression"
 ---
 
 > ## 핵심 원칙: "쿼리 로직이 변경되지 않으면 취약점이 아니다"

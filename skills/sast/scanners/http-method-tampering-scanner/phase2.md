@@ -73,6 +73,10 @@ curl --http2 "https://target/admin" -X PATCH
 | Case-sensitive method 검증 | `get`/`Get`/`GET` 변형 — 대소문자 혼합 |
 | HTTP/1.1 method 검증 | HTTP/2 `:method` pseudo-header 다른 값 — `--http2 -X PATCH` |
 | Method override 헤더 일부만 차단 | `X-HTTP-Method-Override` 차단 → `X-Method-Override`/`X-HTTP-Method` 시도 |
+| 405 응답 → path 변형으로 다른 라우터 진입 | 대소문자 (`/Admin`/`/ADMIN`), trailing 변형 (`/admin/`, `/admin.`), `%2e` 인코딩 (`/admin%2e`), 더블 슬래시 (`//admin`), URL fragment (`/admin#`) |
+| Spring/Tomcat path 정규화 후 라우팅 | matrix parameter 우회 (`/admin;jsessionid=x`, `/admin;param=v`), `;/` Tomcat path-segment trick |
+| WebDAV 차단 (`PROPFIND` 405) | XML body로 `<propfind xmlns="DAV:"><prop><displayname/></prop></propfind>` 보내면 일부 환경 통과 |
+| WebDAV `MKCOL`/`MOVE`/`COPY`/`PROPPATCH` 차단 | 일부 만 화이트리스트되어 다른 method 잔존 — 전수 시도 (`LOCK`, `UNLOCK`, `REPORT`) |
 
 #### 검증 테스트
 ```bash

