@@ -1,25 +1,21 @@
-**도구 선택:** curl만 사용. Playwright 미사용.
+### 정찰 페이로드
 
-#### 기본 원칙
-- 모든 테스트는 **서버 응답 동작**으로 판정
-- 쓰기 작업 안전 수칙: 테스트 전용 리소스 생성 후 대상
-- 각 라벨 phase1 후보별 개별 테스트
-- **비교 기준 수립 필수**: 정상 요청 응답 먼저 캡처
+#### 정상 요청 baseline 캡처
 
----
+각 라벨 테스트 전 정상 응답을 먼저 캡처해 비교 기준 수립.
 
-## 라벨별 테스트
-
-### `VALIDATION_MISMATCH` — 클라이언트 검증 우회
-
-#### 정상 요청 (baseline)
 ```bash
 curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
   -H "Content-Type: application/json" -H "Cookie: <session>" \
   -d '{"email":"valid@example.com","age":25,"name":"TestUser"}'
 ```
 
-#### 검증 규칙 위반 페이로드
+---
+
+### 기본 페이로드
+
+#### `VALIDATION_MISMATCH` — 클라이언트 검증 우회
+
 ```bash
 # 형식 위반 (이메일)
 -d '{"email":"not-an-email","age":25,"name":"TestUser"}'
@@ -46,9 +42,9 @@ curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
 | 400/422 + 검증 에러 | 안전 |
 | 500 + DB 제약조건 에러 | 확인됨 (서버 검증 누락, DB 의존) |
 
-### `TYPE_CONFUSION` — 타입 혼동
+#### `TYPE_CONFUSION` — 타입 혼동
 
-#### 기대 타입과 다른 타입 페이로드
+기대 타입과 다른 타입:
 ```bash
 # 문자열 → 배열 (NoSQLi 결합 가능 — nosqli-scanner)
 -d '{"username":["admin"],"password":"test"}'
@@ -72,7 +68,7 @@ curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
 -d '{"count":9999999999999999999,"name":"x"}'
 ```
 
-#### JS 강제 변환 악용
+JS 강제 변환 악용:
 ```bash
 # 빈 문자열 (falsy)
 -d '{"token":"","admin":""}'
@@ -94,7 +90,7 @@ curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
 | 400/422 + 타입 에러 | 안전 |
 | 500 + 타입 에러 stack trace | 확인됨 (서비스 장애 게이트) |
 
-### `NULL_SAFETY` — Null/Undefined 처리
+#### `NULL_SAFETY` — Null/Undefined 처리
 
 ```bash
 # null 값
@@ -123,9 +119,9 @@ curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
 | 500 + NullPointerException/TypeError stack | 확인됨 (서비스 장애) |
 | 400/422 + "field is required"/"must not be null" | 안전 |
 
-### `SCHEMA_DEFECT` — 스키마 검증 결함
+#### `SCHEMA_DEFECT` — 스키마 검증 결함
 
-#### 미정의 필드 주입
+미정의 필드 주입:
 ```bash
 -d '{"name":"test","email":"x@x.com","role":"admin","isAdmin":true,"__internal_flag":true,"_id":"override","createdAt":"1900-01-01"}'
 
@@ -136,12 +132,12 @@ curl -s -w "\nHTTP_CODE:%{http_code}" -X POST "https://target/api/<endpoint>" \
 -d '{"items":[{"id":1,"hidden_admin":true}]}'
 ```
 
-#### 필수 필드 누락
+필수 필드 누락:
 ```bash
 -d '{"optional_field":"value"}'
 ```
 
-#### Content-Type 불일치
+Content-Type 불일치:
 ```bash
 # JSON endpoint에 form-urlencoded
 curl -X POST "https://target/api/<endpoint>" \
@@ -183,10 +179,11 @@ curl -X POST "https://target/api/<endpoint>" \
 
 ### 참고사항
 
+- 모든 테스트는 **서버 응답 동작**으로 판정 — 클라이언트 검증은 무시
+- 각 라벨 phase1 후보별 개별 테스트, 정상 응답을 비교 기준으로 캡처 후 진행
+- 쓰기 작업은 테스트 전용 리소스 생성 후 대상 (비파괴적 원칙)
 - Mass assignment 경계: `role`/`isAdmin`/`admin` 변경 시 본 스캐너는 `SCHEMA_DEFECT`, cross-scanner는 business-logic `PRIV_ESCALATION`, idor `MASS_ASSIGNMENT` — 중복 가능성 보고서 명시
 - NoSQLi 경계: MongoDB 연산자(`$gt`/`$ne`/`$regex`) 포함 응답은 `TYPE_CONFUSION` 아닌 nosqli-scanner 영역
-- 비파괴적 원칙: 상태 변경 API는 테스트 전용 리소스 생성 후 대상
-- 정상 비교 필수: 비정상 응답을 정상 응답과 diff 비교
 - Unicode 정규화 누락 (NFC/NFD)은 이메일/username 중복 허용 게이트
 - Zero-width/invisible 문자는 검증 우회 변형
 - Case sensitivity 차이는 이메일 중복 검증 우회

@@ -1,13 +1,3 @@
-**도구 선택:** curl만 사용. Playwright 불필요.
-
-#### [필수] 동적 테스트 전 가드 스크립트
-```bash
-python3 <NOAH_SAST_DIR>/tools/phase2_actuator_check.py "<테스트URL>" && curl -sI "<테스트URL>"
-```
-exit 1 시 curl 미실행. `/actuator/shutdown` 절대 호출 금지.
-
----
-
 ### 정찰 페이로드
 
 #### Spring Boot 식별 (헤더/응답 fingerprint)
@@ -49,9 +39,15 @@ curl -sI "https://target/h2-console/"
 
 ---
 
-## 라벨별 테스트
+### 기본 페이로드
 
-### `TRACE_ENABLED`
+모든 actuator endpoint 호출 전 가드 스크립트 통과 필수:
+```bash
+python3 <NOAH_SAST_DIR>/tools/phase2_actuator_check.py "<테스트URL>" && curl -sI "<테스트URL>"
+```
+exit 1 시 curl 미실행. `/actuator/shutdown` 절대 호출 금지.
+
+#### `TRACE_ENABLED`
 
 ```bash
 curl -sI -X TRACE https://target/<path>
@@ -62,7 +58,7 @@ curl -sI -X TRACE https://target/<path>
 | 200 + `Content-Type: message/http` | 확인됨 |
 | 405/501 | 안전 |
 
-### `WHITELABEL_ENABLED`
+#### `WHITELABEL_ENABLED`
 
 ```bash
 curl -s "https://target/nonexistent_$(date +%s)"
@@ -72,7 +68,7 @@ curl -s "https://target/nonexistent_$(date +%s)"
 |---|---|
 | `Whitelabel Error Page` 문자열 | 확인됨 |
 
-### `STACKTRACE_EXPOSED`
+#### `STACKTRACE_EXPOSED`
 
 ```bash
 curl -s "https://target/nonexistent_$(date +%s)"
@@ -83,7 +79,7 @@ curl -s "https://target/<path>?param[=broken"
 |---|---|
 | `java.lang.`, `at org.springframework`, `.java:` 등 stack trace | 확인됨 |
 
-### `SWAGGER_ENABLED`
+#### `SWAGGER_ENABLED`
 
 ```bash
 for path in "/swagger-ui.html" "/swagger-ui/index.html" "/v3/api-docs" "/v2/api-docs" "/api-docs" "/swagger" "/redoc"; do
@@ -95,7 +91,7 @@ done
 |---|---|
 | 200 OK (하나라도) | 확인됨 |
 
-### `ACTUATOR_EXPOSED`
+#### `ACTUATOR_EXPOSED`
 
 ```bash
 python3 <NOAH_SAST_DIR>/tools/phase2_actuator_check.py "https://target/actuator" && \
@@ -106,9 +102,9 @@ python3 <NOAH_SAST_DIR>/tools/phase2_actuator_check.py "https://target/actuator"
 |---|---|
 | 200 + JSON에 `_links` | 확인됨 |
 
-### `ACTUATOR_OVEREXPOSED` (불필요 endpoint 노출)
+#### `ACTUATOR_OVEREXPOSED` (불필요 endpoint 노출)
 
-**shutdown/refresh endpoint는 절대 호출 금지.** 가드 스크립트 통과한 endpoint만:
+shutdown/refresh endpoint는 절대 호출 금지. 가드 스크립트 통과한 endpoint만:
 ```bash
 for ep in env beans configprops mappings prometheus heapdump threaddump httptrace metrics info health; do
   python3 <NOAH_SAST_DIR>/tools/phase2_actuator_check.py "https://target/actuator/${ep}" && \
@@ -126,7 +122,7 @@ done
 | `health` | 일반적으로 안전 |
 | `info` | 일반적으로 안전 |
 
-### `H2_CONSOLE_ENABLED`
+#### `H2_CONSOLE_ENABLED`
 
 ```bash
 curl -sI "https://target/h2-console"
@@ -137,7 +133,7 @@ curl -sI "https://target/h2-console/"
 |---|---|
 | 200 또는 302 redirect | 확인됨 |
 
-### Spring4Shell (CVE-2022-22965)
+#### Spring4Shell (CVE-2022-22965)
 
 ```bash
 # Spring Framework 5.2/5.3 + JDK 9+ + RequestMapping 객체 바인딩 환경
@@ -146,7 +142,7 @@ curl -X POST "https://target/api/x" \
 # 응답 유무로 미패치 환경 추정 (정확 검증은 위험 — 코드 변경 없는 sandbox만)
 ```
 
-### Log4Shell (CVE-2021-44228)
+#### Log4Shell (CVE-2021-44228)
 
 ```bash
 # 사용자 입력이 로깅되는 모든 헤더/필드에 JNDI 페이로드
@@ -158,23 +154,10 @@ done
 
 ---
 
-## 동적 검증 불가 항목
-
-Phase 1 결과 그대로 유지:
-
-| 항목 | 사유 |
-|---|---|
-| `DAEMON_ROOT` | 런타임 프로세스 권한 — 원격 테스트 불가 |
-| `LOG_PERMISSION` | 파일시스템 권한 — 원격 불가 |
-| `ADMIN_MBEAN_ENABLED` | JMX 포트 접근 필요 |
-| `DEVTOOLS_PROD` | 빌드 설정 분석 결과 유지 |
-| `OUTDATED_DEPS` | 버전 분석 결과 유지 |
-
----
-
 ### 참고사항
 
 - `/actuator/shutdown`에 대한 HTTP 요청은 절대 수행 금지 — phase2_actuator_check.py 가드 필수
+- 동적 검증 불가 항목 (Phase 1 결과 그대로 유지): `DAEMON_ROOT` (런타임 프로세스 권한), `LOG_PERMISSION` (파일시스템 권한), `ADMIN_MBEAN_ENABLED` (JMX 포트 접근 필요), `DEVTOOLS_PROD` (빌드 설정), `OUTDATED_DEPS` (버전 분석)
 - actuator endpoint는 shutdown/refresh 외에도 `env`, `beans`, `configprops`, `mappings`, `prometheus`, `heapdump`, `threaddump` 등이 민감
 - `heapdump`/`threaddump` 노출은 메모리 내 시크릿/토큰 유출 가능 — 영향도 격상
 - Spring Boot 3.x는 2.x와 기본값 일부 다름 — 마이그레이션 환경 특히 주의

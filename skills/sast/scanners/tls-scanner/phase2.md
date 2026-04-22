@@ -1,13 +1,6 @@
-**도구 선택:** `openssl s_client` + curl. Playwright 미사용.
+### 기본 페이로드
 
-#### 기본 원칙
-- 모든 판정은 **실제 TLS 핸드셰이크 결과** 기반
-- 각 테스트는 `timeout 10` 적용
-- HSTS는 Test 7에서 (전송 계층 보안)
-
----
-
-## Test 1: 프로토콜 버전 (`TLS_WEAK_VERSION` / `TLS_DOWNGRADE`)
+#### `TLS_WEAK_VERSION` / `TLS_DOWNGRADE` — 프로토콜 버전
 
 ```bash
 echo | timeout 10 openssl s_client -connect target:443 -ssl3 2>&1 | grep -E "Protocol|alert|handshake failure"
@@ -22,7 +15,7 @@ echo | timeout 10 openssl s_client -connect target:443 -tls1_3 2>&1 | grep -E "P
 | SSLv3/TLS 1.0/TLS 1.1 핸드셰이크 성공 | 확인됨 |
 | `alert protocol version` / `handshake failure` | 안전 (해당 프로토콜 거부) |
 
-## Test 2: Cipher Suite (`TLS_WEAK_CIPHER` / `TLS_NO_PFS` / `TLS_PADDING_ORACLE`)
+#### `TLS_WEAK_CIPHER` / `TLS_NO_PFS` / `TLS_PADDING_ORACLE` — Cipher Suite
 
 ```bash
 # NULL/익명
@@ -44,7 +37,7 @@ echo | timeout 10 openssl s_client -connect target:443 2>&1 | grep -E "Cipher   
 echo | timeout 10 openssl s_client -connect target:443 -cipher 'AES128-SHA:AES256-SHA' 2>&1 | grep Cipher
 ```
 
-## Test 3: 인증서 체인 (`TLS_NO_CERT_VERIFY` / `TLS_TRUST_ALL` / `TLS_WEAK_KEY`)
+#### `TLS_NO_CERT_VERIFY` / `TLS_TRUST_ALL` / `TLS_WEAK_KEY` — 인증서 체인
 
 ```bash
 echo | timeout 10 openssl s_client -connect target:443 -showcerts 2>&1 | grep -E "Verify return code|subject=|issuer=|notAfter"
@@ -60,14 +53,14 @@ echo | timeout 10 openssl s_client -connect target:443 2>&1 | openssl x509 -noou
 | `Public-Key: (1024 bit)` 이하 (RSA) | 확인됨 (`TLS_WEAK_KEY`) |
 | `ASN1 OID: prime192v1` 이하 (ECDSA) | 확인됨 (`TLS_WEAK_KEY`) |
 
-## Test 4: Heartbleed (`TLS_HEARTBLEED_VER`, CVE-2014-0160)
+#### `TLS_HEARTBLEED_VER` (CVE-2014-0160)
 
 ```bash
 echo | timeout 10 openssl s_client -connect target:443 -tlsextdebug 2>&1 | grep -i "heartbeat"
 echo | timeout 10 openssl s_client -connect target:443 2>&1 | grep -i "Server.*OpenSSL"
 ```
 
-## Test 5: TLS 압축 (`TLS_COMPRESSION`, CRIME)
+#### `TLS_COMPRESSION` (CRIME)
 
 ```bash
 echo | timeout 10 openssl s_client -connect target:443 2>&1 | grep "Compression:"
@@ -77,7 +70,7 @@ echo | timeout 10 openssl s_client -connect target:443 2>&1 | grep "Compression:
 |---|---|
 | `Compression: zlib` 또는 NONE 외 | 확인됨 |
 
-## Test 6: TLS Renegotiation
+#### `TLS_RENEG_INSECURE` — Renegotiation
 
 ```bash
 echo "R" | timeout 10 openssl s_client -connect target:443 2>&1 | grep -E "Secure Renegotiation|renegotiation"
@@ -87,7 +80,7 @@ echo "R" | timeout 10 openssl s_client -connect target:443 2>&1 | grep -E "Secur
 |---|---|
 | `Secure Renegotiation IS NOT supported` | 확인됨 |
 
-## Test 7: SSL Stripping 방어 (HSTS + HTTP→HTTPS)
+#### `HSTS_MISSING` / `HSTS_SHORT_MAXAGE` — SSL Stripping 방어
 
 ```bash
 # HTTP→HTTPS 리다이렉트
@@ -104,7 +97,7 @@ curl -sI "https://target/" | grep -i '^strict-transport-security:'
 | HSTS `max-age` < 31536000 | 확인됨 (`HSTS_SHORT_MAXAGE`) |
 | HSTS `max-age` ≥ 31536000 | 안전 |
 
-## TLS 1.3 0-RTT (early data)
+#### `TLS13_EARLY_DATA` — 0-RTT
 
 ```bash
 echo | timeout 10 openssl s_client -connect target:443 -tls1_3 2>&1 | grep -i "early"
@@ -118,10 +111,11 @@ echo | timeout 10 openssl s_client -connect target:443 -tls1_3 2>&1 | grep -i "e
 
 ### 참고사항
 
+- 모든 판정은 **실제 TLS 핸드셰이크 결과** 기반 — 각 테스트는 `timeout 10` 적용
 - `openssl s_client` 미설치 시 `[도구 한계]` — 설치 시도 금지
 - 비표준 포트 (`:8443` 등)는 Phase 1에서 확인된 포트로 테스트
 - SNI 요구 환경: `-servername <host>` 옵션 필수
-- 로컬 openssl이 `-tls1_3` 미지원 시 해당 Test만 건너뛰고 사유 기재
+- 로컬 openssl이 `-tls1_3` 미지원 시 해당 라벨만 건너뛰고 사유 기재
 - 공유 호스팅에서 SNI 누락 시 default certificate 반환 — 다른 사이트 인증서 노출
 - OCSP stapling 미활성은 privacy/DoS 영향 — 필수는 아니나 권장
 - HSTS `preload` directive는 브라우저 HSTS preload list 포함 요건 — 신규 도메인은 주의

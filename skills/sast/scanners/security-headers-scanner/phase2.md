@@ -1,24 +1,17 @@
-**도구 선택:** 응답 헤더 점검이 본질 — curl만 사용. Playwright는 사용하지 않는다.
+### 정찰 페이로드
 
-#### 기본 원칙
-- 모든 판정은 **실제 응답 헤더** 기반
-- 코드/설정에 있어도 응답에 없으면 확인됨, 반대도 성립
-- 각 라벨 검증은 phase1 후보 **path별로 반복** (루트 1회로 전체 판정 금지)
-- Cache-Control은 **인증 세션 쿠키 동반** 요청만 유효
-- CORS는 정상 GET + 공격자 Origin GET + Preflight OPTIONS **3회 비교** 필수
-
----
-
-## 라벨별 테스트
-
-### 정찰 — 후보 path별 헤더 일괄 조회
+#### 후보 path별 헤더 일괄 조회
 
 ```bash
 # phase1 후보의 각 URL에 대해 한 번씩 실행
 curl -sIv "https://target/<path>" 2>&1 | grep -iE '^< (content-security-policy|content-security-policy-report-only|strict-transport-security|x-frame-options|x-content-type-options|referrer-policy|permissions-policy|feature-policy|access-control-|cache-control|pragma|expires|cross-origin-)'
 ```
 
-### `CSP_MISSING` / `CSP_UNSAFE_INLINE` / `CSP_UNSAFE_EVAL` / `CSP_WILDCARD` / `CSP_REPORT_ONLY`
+---
+
+### 기본 페이로드
+
+#### `CSP_MISSING` / `CSP_UNSAFE_INLINE` / `CSP_UNSAFE_EVAL` / `CSP_WILDCARD` / `CSP_REPORT_ONLY`
 
 ```bash
 curl -sI "https://target/<html-path>" | grep -i '^content-security-policy:'
@@ -32,7 +25,7 @@ curl -sI "https://target/<html-path>" | grep -i '^content-security-policy:'
 | `default-src` 또는 `script-src`에 단독 `*` | 확인됨 (`CSP_WILDCARD`) |
 | `Content-Security-Policy-Report-Only`만 (강제 CSP 부재) | 확인됨 (`CSP_REPORT_ONLY`) |
 
-### `CORS_WILDCARD_CRED` / `CORS_REFLECT` / `CORS_NULL`
+#### `CORS_WILDCARD_CRED` / `CORS_REFLECT` / `CORS_NULL`
 
 3회 요청 비교:
 ```bash
@@ -59,7 +52,7 @@ curl -sI -X OPTIONS \
 | 공격자 Origin 반사 + Credentials 허용 | 확인됨 (`CORS_REFLECT`) |
 | `Access-Control-Allow-Origin: null` 반사 + Credentials | 확인됨 (`CORS_NULL`) |
 
-### `CLICKJACK_UNPROTECTED`
+#### `CLICKJACK_UNPROTECTED`
 
 ```bash
 curl -sI "https://target/<html-path>" | grep -iE '^(x-frame-options|content-security-policy):'
@@ -70,7 +63,7 @@ curl -sI "https://target/<html-path>" | grep -iE '^(x-frame-options|content-secu
 | `X-Frame-Options` 부재 AND CSP `frame-ancestors` 부재 | 확인됨 |
 | `X-Frame-Options: ALLOW-FROM ...` (비표준) | 확인됨 (`CLICKJACK_ALLOWFROM`) |
 
-### `MIME_SNIFF`
+#### `MIME_SNIFF`
 
 ```bash
 # 사용자 업로드 URL (파일 업로드 후 응답에서 URL 추출)
@@ -81,7 +74,7 @@ curl -sI "https://target/<user-upload-url>" | grep -i '^x-content-type-options:'
 |---|---|
 | 출력 없음 또는 `nosniff` 외 값 | 확인됨 |
 
-### `REFERRER_LEAK` / `REFERRER_UNSAFE`
+#### `REFERRER_LEAK` / `REFERRER_UNSAFE`
 
 ```bash
 curl -sI "https://target/" | grep -i '^referrer-policy:'
@@ -93,7 +86,7 @@ curl -sI "https://target/" | grep -i '^referrer-policy:'
 | `unsafe-url` 또는 `no-referrer-when-downgrade` | 확인됨 (`REFERRER_UNSAFE`) |
 | `strict-origin-when-cross-origin` 이상 | 안전 |
 
-### `PERMISSIONS_MISSING`
+#### `PERMISSIONS_MISSING`
 
 ```bash
 curl -sI "https://target/" | grep -iE '^(permissions-policy|feature-policy):'
@@ -103,7 +96,7 @@ curl -sI "https://target/" | grep -iE '^(permissions-policy|feature-policy):'
 |---|---|
 | 출력 없음 + 민감 기능(카메라/마이크/위치) 사용 | 확인됨 |
 
-### `CACHE_SENSITIVE`
+#### `CACHE_SENSITIVE`
 
 ```bash
 # 인증 세션 쿠키 동반 필수
@@ -115,7 +108,7 @@ curl -sI -H "Cookie: <세션쿠키>" "https://target/<auth-required-path>" | gre
 | 인증 응답에 `Cache-Control` 부재이거나 `public`/`max-age>0` | 확인됨 |
 | `no-store` 또는 `private, no-cache` | 안전 |
 
-### `COOP_MISSING` / `CORP_MISSING` (Cross-Origin)
+#### `COOP_MISSING` / `CORP_MISSING` (Cross-Origin)
 
 ```bash
 curl -sI "https://target/" | grep -iE '^cross-origin-(opener|embedder|resource)-policy:'
@@ -126,7 +119,7 @@ curl -sI "https://target/" | grep -iE '^cross-origin-(opener|embedder|resource)-
 | SharedArrayBuffer 사용 + COOP/COEP 없음 | 확인됨 |
 | `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp` | 안전 |
 
-### `CLEAR_SITE_DATA_MISSING` (로그아웃)
+#### `CLEAR_SITE_DATA_MISSING` (로그아웃)
 
 ```bash
 curl -sI -X POST "https://target/logout" -H "Cookie: <세션>" | grep -i 'clear-site-data'
