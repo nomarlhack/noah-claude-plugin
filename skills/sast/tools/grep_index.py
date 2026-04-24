@@ -77,6 +77,8 @@ EXCLUDE_DIRS = [
     "coverage", ".nyc_output", ".pytest_cache", ".mypy_cache", ".tox",
     ".eggs", "*.egg-info", ".terraform", ".serverless",
     ".parcel-cache", ".turbo", ".svn", ".hg", "storybook-static",
+    # Android: 로케일/리소스 중복 컷 — 기본 values/, drawable/는 유지
+    "values-*", "drawable-*", "mipmap-*", "raw",
 ]
 
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
