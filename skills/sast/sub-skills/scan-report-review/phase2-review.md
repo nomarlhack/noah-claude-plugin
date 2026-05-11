@@ -121,7 +121,7 @@ Phase 1 판정과 Phase 2 확정 status가 다르면 `phase1_eval_state.conflict
 
      | observations[0] marker | 부여할 tag | 케이스 (SKILL.md Step 8-3 매트릭스) |
      |------------------------|----------|-----------------------------------|
-     | `"endpoint_unverified — <사유>"` | `"LLM endpoint 미확보"` | probe 실패로 endpoints 빈 산출물 |
+     | `"endpoint_unverified — <사유>"` | `"LLM endpoint 미확보"` | `endpoint_unverified` — endpoints 빈 산출물 |
      | `"endpoint_confirmed_no_attack — <사유>"` | `"LLM endpoint 확인됨"` | (Y, N) connectivity-only 모드 |
      | `"endpoint_static_only — <사유>"` | `"LLM endpoint 정적 식별"` | (N, N) static-only 모드 |
 

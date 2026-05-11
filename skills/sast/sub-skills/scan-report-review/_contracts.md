@@ -163,7 +163,7 @@ Phase 2 결과 파일(`<scanner>-phase2.md`) 끝에 포함되는 JSON 블록.
 7. `도구 한계` — curl/Playwright 등 도구 실패로 검증 시도 자체가 부분 실패.
 8. `정보 부족` — 외부에서 받아야 할 정보(OOB 콜백 URL 등)가 없어 검증 미완.
 
-LLM 그룹 후보의 분기는 명확하다. Step 8-3 사전 단계가 (probe 실패 / connectivity-only / static-only) 중 하나면 placeholder Phase 2 결과 파일이 생성되어 1~3번이 부여된다. 사전 단계가 `full`로 성공한 경우 LLM 후보는 일반 Phase 2 본 검증 흐름을 타며 결과는 `confirmed` / `safe` / (5~8번 candidate tag) 중 하나로 결정된다 — 1~3번이 다시 부여되지 않는다.
+LLM 그룹 후보의 분기는 명확하다. Step 8-3 사전 단계가 (`endpoint_unverified` / `endpoint_confirmed_no_attack` / `endpoint_static_only`) 중 하나면 placeholder Phase 2 결과 파일이 생성되어 1~3번이 부여된다. 사전 단계가 `full`로 성공한 경우 LLM 후보는 일반 Phase 2 본 검증 흐름을 타며 결과는 `confirmed` / `safe` / (5~8번 candidate tag) 중 하나로 결정된다 — 1~3번이 다시 부여되지 않는다.
 
 ---
 

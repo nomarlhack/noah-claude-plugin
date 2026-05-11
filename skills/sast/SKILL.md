@@ -434,7 +434,7 @@ master-list.json 후보 중 `prereq_group == "llm"`인 항목이 1건 이상 존
 
   | 케이스 | marker (`observations[0]` 형식) | 부여될 tag |
   |--------|-------------------------------|-----------|
-  | probe 실패 (`endpoints: []`) | `"endpoint_unverified — <probe-agent 반환의 종합 실패 사유>"` | `"LLM endpoint 미확보"` |
+  | `endpoint_unverified` (`endpoints: []`) | `"endpoint_unverified — <probe-agent 반환의 종합 실패 사유>"` | `"LLM endpoint 미확보"` |
   | (Y, N) `connectivity-only` 모드 성공 | `"endpoint_confirmed_no_attack — <route/채널/multiturn 요약>"` | `"LLM endpoint 확인됨"` |
   | (N, N) `static-only` 모드 성공 | `"endpoint_static_only — <정적 route/채널 후보 요약>"` | `"LLM endpoint 정적 식별"` |
 
