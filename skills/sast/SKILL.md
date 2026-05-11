@@ -393,7 +393,7 @@ python3 <NOAH_SAST_DIR>/tools/phase1_review_assert.py \
 
 **LLM 그룹 사전 단계 실행 절차:**
 
-LLM 그룹에 후보가 1건 이상 존재하는 경우(Phase 1 결과 기준) Step 8-1에서 결정된 `URL_PROVIDED` × `ATTACK_CONSENT` 매트릭스에 따라 분기한다.
+master-list.json 후보 중 `prereq_group == "llm"`인 항목이 1건 이상 존재하면(스캐너 멤버십의 단일 진실 원천은 각 스캐너 `phase1.md` frontmatter의 `prereq_group` 필드, `phase1_build_master_list.py`가 prebake) Step 8-1에서 결정된 `URL_PROVIDED` × `ATTACK_CONSENT` 매트릭스에 따라 분기한다.
 
 | `URL_PROVIDED` | `ATTACK_CONSENT` | probe 모드 | 후속 단계 (Step 8-4) | 후보 tag |
 |---|---|---|---|---|
@@ -486,7 +486,7 @@ LLM 그룹에 후보가 1건 이상 존재하는 경우(Phase 1 결과 기준) S
 sandbox 도메인: <SANDBOX_DOMAIN>
 ```
 
-**LLM 그룹 스캐너의 추가 입력.** LLM 4개 스캐너(`prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner`)는 Step 8-3 사전 단계 산출물을 추가 변수로 받는다. Phase 2 에이전트 프롬프트 끝에 다음 줄을 덧붙인다:
+**LLM 그룹 스캐너의 추가 입력.** master-list.json 후보의 `prereq_group == "llm"`인 스캐너(현재 4종: `prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner` — 단일 진실 원천은 각 스캐너의 `phase1.md` frontmatter)는 Step 8-3 사전 단계 산출물을 추가 변수로 받는다. Phase 2 에이전트 프롬프트 끝에 다음 줄을 덧붙인다:
 
 ```
 LLM endpoint: <LLM_PROBE_DIR>/llm_endpoint.json (Step 8-3 사전 단계 산출물 — chat endpoint의 base_url/route/headers/request_schema/response_path/multiturn_mode가 확정되어 있음. Phase 2 에이전트는 이 파일만 읽고 코드 재분석 없이 동적 테스트를 수행한다)

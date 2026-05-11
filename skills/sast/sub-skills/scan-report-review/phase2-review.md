@@ -117,7 +117,7 @@ Phase 1 판정과 Phase 2 확정 status가 다르면 `phase1_eval_state.conflict
 2. 커버리지 규약 + 해시 비교로 대상 후보 집합 결정.
 3. 각 후보에 대해 Phase 2 결과 파일 Read하여 manifest 추출.
 4. §10-A Phase 2 우선 원칙 적용 → status/tag 할당.
-   - **LLM 그룹 placeholder 인식 (3가지 변형)**: scanner가 LLM 그룹 4개(`prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner`) 중 하나이고, Phase 2 manifest의 `results[*].evidence.observations` 첫 항목으로 다음 marker가 등장하면 해당 스캐너의 모든 LLM 후보에 일괄 tag를 부여한다. `status`는 항상 `candidate`, `safe_category`는 `null` 유지, `verified_defense` 기록 금지(`safe`가 아님). `evidence_summary`에는 marker 뒤의 사유를 그대로 옮긴다.
+   - **LLM 그룹 placeholder 인식 (3가지 변형)**: master-list.json 후보의 `prereq_group == "llm"`이고 Phase 2 manifest의 `results[*].evidence.observations` 첫 항목으로 다음 marker가 등장하면 해당 후보에 일괄 tag를 부여한다. `status`는 항상 `candidate`, `safe_category`는 `null` 유지, `verified_defense` 기록 금지(`safe`가 아님). `evidence_summary`에는 marker 뒤의 사유를 그대로 옮긴다. (스캐너 멤버십은 각 스캐너 `phase1.md` frontmatter의 `prereq_group`이 단일 진실 원천 — 하드코딩 목록을 참조하지 않는다.)
 
      | observations[0] marker | 부여할 tag | 케이스 (SKILL.md Step 8-3 매트릭스) |
      |------------------------|----------|-----------------------------------|

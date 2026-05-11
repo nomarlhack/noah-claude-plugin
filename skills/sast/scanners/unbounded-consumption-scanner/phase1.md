@@ -1,5 +1,6 @@
 ---
 id_prefix: UC
+prereq_group: llm
 grep_patterns:
   - "openai"
   - "anthropic"

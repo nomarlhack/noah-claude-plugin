@@ -64,10 +64,11 @@ if args.merge and out_path.is_file():
         print(f"WARNING: --merge 실패, 새로 생성: {e}", file=sys.stderr)
         existing_by_id = {}
 
-def _build_candidate_dict(cid, scanner, cand, md, existing_by_id):
+def _build_candidate_dict(cid, scanner, cand, md, existing_by_id, prereq_group=None):
     base = {
         "id": cid,
         "scanner": scanner,
+        "prereq_group": prereq_group,
         "title": cand.get("title", ""),
         "file": cand.get("file", ""),
         "line": cand.get("line", 0),
@@ -117,19 +118,37 @@ MANIFEST_RE = re.compile(
 )
 CANDIDATE_HEADER_RE = re.compile(r"^## ([A-Z][A-Z0-9]*-\d+):\s*", re.M)
 ID_PREFIX_RE = re.compile(r"^id_prefix:\s*([A-Z][A-Z0-9]*)\s*$", re.M)
+PREREQ_GROUP_RE = re.compile(r"^prereq_group:\s*([a-z][a-z0-9_-]*)\s*$", re.M)
+
+
+def _scanner_phase1_path(scanner_name: str) -> Path | None:
+    import os as _os
+    here = Path(_os.path.dirname(_os.path.abspath(__file__))).parent
+    p = here / "scanners" / scanner_name / "phase1.md"
+    return p if p.is_file() else None
 
 
 def _read_scanner_prefix(scanner_name: str) -> str | None:
     """스캐너의 phase1.md frontmatter에서 id_prefix를 읽는다.
     ai-discovery 등 스캐너가 아닌 결과 파일은 None 반환."""
-    # grep_index.py와 동일 위치 규약
-    import os as _os
-    here = Path(_os.path.dirname(_os.path.abspath(__file__))).parent
-    phase1_md = here / "scanners" / scanner_name / "phase1.md"
-    if not phase1_md.is_file():
+    phase1_md = _scanner_phase1_path(scanner_name)
+    if phase1_md is None:
         return None
     try:
         m = ID_PREFIX_RE.search(phase1_md.read_text(encoding="utf-8"))
+        return m.group(1) if m else None
+    except OSError:
+        return None
+
+
+def _read_scanner_prereq_group(scanner_name: str) -> str | None:
+    """스캐너의 phase1.md frontmatter에서 prereq_group을 읽는다.
+    선언이 없으면 None 반환 (사전 단계 불필요)."""
+    phase1_md = _scanner_phase1_path(scanner_name)
+    if phase1_md is None:
+        return None
+    try:
+        m = PREREQ_GROUP_RE.search(phase1_md.read_text(encoding="utf-8"))
         return m.group(1) if m else None
     except OSError:
         return None
@@ -215,6 +234,7 @@ for md in md_files:
     prefix_re = (
         re.compile(rf"^{re.escape(expected_prefix)}-\d+$") if expected_prefix else None
     )
+    scanner_prereq_group = _read_scanner_prereq_group(scanner)
 
     for cand in cands:
         cid = cand.get("id", "UNKNOWN")
@@ -277,6 +297,7 @@ for md in md_files:
                 cand=cand,
                 md=md,
                 existing_by_id=existing_by_id,
+                prereq_group=scanner_prereq_group,
             )
         )
 

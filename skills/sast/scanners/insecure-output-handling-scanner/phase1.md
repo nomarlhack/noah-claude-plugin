@@ -1,5 +1,6 @@
 ---
 id_prefix: IOH
+prereq_group: llm
 grep_patterns:
   - "openai"
   - "anthropic"

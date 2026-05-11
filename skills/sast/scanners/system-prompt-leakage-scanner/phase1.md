@@ -1,5 +1,6 @@
 ---
 id_prefix: SPL
+prereq_group: llm
 grep_patterns:
   - "system_prompt"
   - "system_message"
