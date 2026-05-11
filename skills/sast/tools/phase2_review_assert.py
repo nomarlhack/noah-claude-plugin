@@ -74,9 +74,9 @@ def main() -> int:
         "차단",
         "동적 분석 생략",
         # LLM 그룹(prereq_group == "llm") 사전 단계 결과별 tag — _contracts.md §3 / §5
-        "동적 검증 불가(LLM endpoint 미확보)",
-        "endpoint 확인됨, 동적 검증 생략",
-        "정적 endpoint 식별만, 동적 검증 생략",
+        "LLM endpoint 미확보",
+        "LLM endpoint 확인됨",
+        "LLM endpoint 정적 식별",
     }
     cand_no_tag = [
         c["id"] for c in candidates

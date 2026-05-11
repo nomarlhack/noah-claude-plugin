@@ -398,8 +398,8 @@ master-list.json 후보 중 `prereq_group == "llm"`인 항목이 1건 이상 존
 | `URL_PROVIDED` | `ATTACK_CONSENT` | probe 모드 | 후속 단계 (Step 8-4) | 후보 tag |
 |---|---|---|---|---|
 | Y | Y | `full` (정적 + 동적 + system override) | Phase 2 진행 | phase2-review 평가 결과 |
-| Y | N | `connectivity-only` (정적 + 동적, system override 검증 포함, 공격 페이로드 X) | Phase 2 skip | `"endpoint 확인됨, 동적 검증 생략"` |
-| N | N | `static-only` (정적 단서 추출만, 동적 호출 X) | Phase 2 skip | `"정적 endpoint 식별만, 동적 검증 생략"` |
+| Y | N | `connectivity-only` (정적 + 동적, system override 검증 포함, 공격 페이로드 X) | Phase 2 skip | `"LLM endpoint 확인됨"` |
+| N | N | `static-only` (정적 단서 추출만, 동적 호출 X) | Phase 2 skip | `"LLM endpoint 정적 식별"` |
 | N | Y | — | (사용자 재확인 후 위 셋 중 하나로 정정) | — |
 
 **실행 단계:**
@@ -434,9 +434,9 @@ master-list.json 후보 중 `prereq_group == "llm"`인 항목이 1건 이상 존
 
   | 케이스 | marker (`observations[0]` 형식) | 부여될 tag |
   |--------|-------------------------------|-----------|
-  | probe 실패 (`endpoints: []`) | `"endpoint_unverified — <probe-agent 반환의 종합 실패 사유>"` | `"동적 검증 불가(LLM endpoint 미확보)"` |
-  | (Y, N) `connectivity-only` 모드 성공 | `"endpoint_confirmed_no_attack — <route/채널/multiturn 요약>"` | `"endpoint 확인됨, 동적 검증 생략"` |
-  | (N, N) `static-only` 모드 성공 | `"endpoint_static_only — <정적 route/채널 후보 요약>"` | `"정적 endpoint 식별만, 동적 검증 생략"` |
+  | probe 실패 (`endpoints: []`) | `"endpoint_unverified — <probe-agent 반환의 종합 실패 사유>"` | `"LLM endpoint 미확보"` |
+  | (Y, N) `connectivity-only` 모드 성공 | `"endpoint_confirmed_no_attack — <route/채널/multiturn 요약>"` | `"LLM endpoint 확인됨"` |
+  | (N, N) `static-only` 모드 성공 | `"endpoint_static_only — <정적 route/채널 후보 요약>"` | `"LLM endpoint 정적 식별"` |
 
   파일 본문 (manifest만 포함, 본문 분석 섹션은 비움):
 

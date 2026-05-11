@@ -121,9 +121,9 @@ Phase 1 판정과 Phase 2 확정 status가 다르면 `phase1_eval_state.conflict
 
      | observations[0] marker | 부여할 tag | 케이스 (SKILL.md Step 8-3 매트릭스) |
      |------------------------|----------|-----------------------------------|
-     | `"endpoint_unverified — <사유>"` | `"동적 검증 불가(LLM endpoint 미확보)"` | probe 실패로 endpoints 빈 산출물 |
-     | `"endpoint_confirmed_no_attack — <사유>"` | `"endpoint 확인됨, 동적 검증 생략"` | (Y, N) connectivity-only 모드 |
-     | `"endpoint_static_only — <사유>"` | `"정적 endpoint 식별만, 동적 검증 생략"` | (N, N) static-only 모드 |
+     | `"endpoint_unverified — <사유>"` | `"LLM endpoint 미확보"` | probe 실패로 endpoints 빈 산출물 |
+     | `"endpoint_confirmed_no_attack — <사유>"` | `"LLM endpoint 확인됨"` | (Y, N) connectivity-only 모드 |
+     | `"endpoint_static_only — <사유>"` | `"LLM endpoint 정적 식별"` | (N, N) static-only 모드 |
 
      세 변형 모두 phase2-review writer 권한이며, 메인 에이전트가 직접 status/tag를 셋팅하지 않는다.
 5. safe 판정 시 방어 코드 Read → `verified_defense` 기록.
