@@ -150,7 +150,20 @@ Phase 2 결과 파일(`<scanner>-phase2.md`) 끝에 포함되는 JSON 블록.
 | candidate | LLM endpoint 확인됨 | evidence_summary + Phase 2 manifest의 `observations`에 endpoint 명세 요약 (route/채널/multiturn_mode/system_overridable) | `prereq_group == "llm"` 후보 한정 (스캐너 멤버십은 phase1.md frontmatter). SKILL.md Step 8-3 매트릭스 (Y, N) — sandbox URL은 제공됐으나 동적 공격 테스트는 거부된 경로. probe-agent가 `connectivity-only` 모드로 endpoint를 확보했으나 공격 페이로드 시도는 수행되지 않음. verified_defense 기록 금지. |
 | candidate | LLM endpoint 정적 식별 | evidence_summary + Phase 2 manifest의 `observations`에 정적 endpoint 단서 (route 후보/채널 후보/인증 미들웨어 유무) | `prereq_group == "llm"` 후보 한정 (스캐너 멤버십은 phase1.md frontmatter). SKILL.md Step 8-3 매트릭스 (N, N) — sandbox URL/세션 미제공 + 동적 공격 거부 경로. probe-agent가 `static-only` 모드로 코드 정적 단서만 추출. `verified: false`, `static_only: true`로 산출물이 표기됨. verified_defense 기록 금지. |
 
-**복합 태그**: 두 태그가 동시에 해당하면 각 태그의 필수 필드를 **union**하여 요구한다.
+**단일 태그 원칙**: 한 후보의 `tag` 필드는 단일 값(스칼라 문자열)이다. 후보가 둘 이상의 태그 조건을 동시에 만족하면 아래 **태그 우선순위**에 따라 한 개만 부여한다. 부여되지 못한 다른 태그의 사유는 `evidence_summary`에 함께 기술하여 정보 손실을 막는다.
+
+**태그 우선순위** (위에서 아래 순으로 평가, 첫 매칭 부여):
+
+1. `LLM endpoint 미확보` — 사전 단계가 endpoint 확보에 실패한 경우. 이후 Phase 2 검증 자체가 의미 없으므로 다른 태그보다 우선.
+2. `LLM endpoint 정적 식별` — (N, N) static-only 모드. 동적 호출 자체가 없었음.
+3. `LLM endpoint 확인됨` — (Y, N) connectivity-only 모드. 공격 페이로드는 시도하지 않음.
+4. `동적 분석 생략` — 사용자가 동적 테스트를 명시적으로 거부한 경로(메인 에이전트가 직접 설정). LLM 그룹에서는 1~3번이 이미 같은 의미를 표현하므로 비-LLM 스캐너에 한정.
+5. `차단` — Phase 2 검증을 시도했으나 WAF/게이트웨이 등이 모든 변형을 차단.
+6. `환경 제한` — sandbox 환경 자체의 제한으로 일부 페이로드 수행 불가.
+7. `도구 한계` — curl/Playwright 등 도구 실패로 검증 시도 자체가 부분 실패.
+8. `정보 부족` — 외부에서 받아야 할 정보(OOB 콜백 URL 등)가 없어 검증 미완.
+
+LLM 그룹 후보의 분기는 명확하다. Step 8-3 사전 단계가 (probe 실패 / connectivity-only / static-only) 중 하나면 placeholder Phase 2 결과 파일이 생성되어 1~3번이 부여된다. 사전 단계가 `full`로 성공한 경우 LLM 후보는 일반 Phase 2 본 검증 흐름을 타며 결과는 `confirmed` / `safe` / (5~8번 candidate tag) 중 하나로 결정된다 — 1~3번이 다시 부여되지 않는다.
 
 ---
 

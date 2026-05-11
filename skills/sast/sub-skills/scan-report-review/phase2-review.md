@@ -116,7 +116,7 @@ Phase 1 판정과 Phase 2 확정 status가 다르면 `phase1_eval_state.conflict
 1. master-list.json Read, `_contracts.md §6` C1 lint 경로 준수 확인.
 2. 커버리지 규약 + 해시 비교로 대상 후보 집합 결정.
 3. 각 후보에 대해 Phase 2 결과 파일 Read하여 manifest 추출.
-4. §10-A Phase 2 우선 원칙 적용 → status/tag 할당.
+4. §10-A Phase 2 우선 원칙 적용 → status/tag 할당. **두 개 이상의 candidate tag 조건이 동시에 해당하면 `_contracts.md §5`의 "태그 우선순위"에 따라 한 개만 부여하고, 부여되지 못한 다른 사유는 `evidence_summary`에 함께 기술한다.**
    - **LLM 그룹 placeholder 인식 (3가지 변형)**: master-list.json 후보의 `prereq_group == "llm"`이고 Phase 2 manifest의 `results[*].evidence.observations` 첫 항목으로 다음 marker가 등장하면 해당 후보에 일괄 tag를 부여한다. `status`는 항상 `candidate`, `safe_category`는 `null` 유지, `verified_defense` 기록 금지(`safe`가 아님). `evidence_summary`에는 marker 뒤의 사유를 그대로 옮긴다. (스캐너 멤버십은 각 스캐너 `phase1.md` frontmatter의 `prereq_group`이 단일 진실 원천 — 하드코딩 목록을 참조하지 않는다.)
 
      | observations[0] marker | 부여할 tag | 케이스 (SKILL.md Step 8-3 매트릭스) |
