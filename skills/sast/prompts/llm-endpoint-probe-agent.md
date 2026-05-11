@@ -14,7 +14,7 @@
 
 ## 목적
 
-4개 LLM 스캐너의 Phase 2 진입 전에 **실제로 채팅 왕복이 성공하는 chat endpoint를 확보**한다. 정적 라우트 식별만으로 끝내지 않고, 헬퍼 스크립트(`<NOAH_SAST_DIR>/tools/llm_channel_probe.py`)를 통한 동적 시도로 채널 유형·schema·인증·멀티턴·system override까지 확정한다. 본 단계가 성공한 경우에만 LLM 그룹의 Phase 2가 디스패치된다.
+4개 LLM 스캐너의 Phase 2 진입 전에 **실제로 채팅 왕복이 성공하는 LLM endpoint를 확보**한다. 정적 라우트 식별만으로 끝내지 않고, 헬퍼 스크립트(`<NOAH_SAST_DIR>/tools/llm_channel_probe.py`)를 통한 동적 시도로 채널 유형·schema·인증·멀티턴·system override까지 확정한다. 본 단계가 성공한 경우에만 LLM 그룹의 Phase 2가 디스패치된다.
 
 ## 원칙
 
@@ -62,7 +62,7 @@ stdout으로 한 줄 JSON이 반환된다:
 먼저 다음 파일을 Read:
 - `<NOAH_SAST_DIR>/prompts/guidelines-phase2.md` (도메인 분류, 세션 갱신, HTTP 에러 대응 규칙)
 
-### 1) Discovery — chat 라우트 후보 + 채널 유형 식별 (정적)
+### 1) Discovery — LLM endpoint 후보 + 채널 유형 식별 (정적)
 
 `<PROJECT_ROOT>` 코드를 분석하여 후보 endpoint를 최대 5개까지 수집한다. 각 후보마다 (route 또는 ws URL) + (예상 channel) + (정적 단서 메타) 세트로 기록한다.
 

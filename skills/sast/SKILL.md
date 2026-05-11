@@ -365,7 +365,7 @@ python3 <NOAH_SAST_DIR>/tools/phase1_review_assert.py \
 
 사용자가 제공한 sandbox 도메인은 `SANDBOX_DOMAINS`에 추가하여 scan-report 서브에이전트로 전달한다. `ATTACK_CONSENT=거부` 경로에서 `**테스트 환경**` 필드는 (URL_PROVIDED=Y면) 제공된 sandbox URL, (URL_PROVIDED=N이면) "해당 없음"으로 기재한다. POC curl 호스트는 URL_PROVIDED=N에서만 `<TARGET_HOST>` 플레이스홀더를 유지한다.
 
-**LLM 그룹 사전 단계 안내 (LLM 그룹이 활성인 경우만 한 줄 첨부)** — `URL_PROVIDED=Y`이면 위 1·2의 sandbox URL과 세션이 Step 8-3 chat endpoint probe 및 LLM 스캐너 Phase 2의 헬퍼 호출에 그대로 재사용된다. chat endpoint 호스트가 사용자 제공 base URL과 다를 수 있음(예: HTTP API는 `api.sandbox`, chat WS는 `chat.sandbox`/별도 게이트웨이)을 사용자에게 한 줄 안내한다. 별도 호스트는 probe-agent가 정적 분석으로 추출하므로 사용자 추가 입력은 없다. `URL_PROVIDED=N`이면 LLM endpoint는 정적 식별만 가능하다는 점도 한 줄로 안내.
+**LLM 그룹 사전 단계 안내 (LLM 그룹이 활성인 경우만 한 줄 첨부)** — `URL_PROVIDED=Y`이면 위 1·2의 sandbox URL과 세션이 Step 8-3 LLM endpoint probe 및 LLM 스캐너 Phase 2의 헬퍼 호출에 그대로 재사용된다. LLM endpoint 호스트가 사용자 제공 base URL과 다를 수 있음(예: HTTP API는 `api.sandbox`, 채팅 WS는 `chat.sandbox`/별도 게이트웨이)을 사용자에게 한 줄 안내한다. 별도 호스트는 probe-agent가 정적 분석으로 추출하므로 사용자 추가 입력은 없다. `URL_PROVIDED=N`이면 LLM endpoint는 정적 식별만 가능하다는 점도 한 줄로 안내.
 
 #### Step 8-2: 도구 권한 사전 확인
 
@@ -489,10 +489,10 @@ sandbox 도메인: <SANDBOX_DOMAIN>
 **LLM 그룹 스캐너의 추가 입력.** master-list.json 후보의 `prereq_group == "llm"`인 스캐너(현재 4종: `prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner` — 단일 진실 원천은 각 스캐너의 `phase1.md` frontmatter)는 Step 8-3 사전 단계 산출물을 추가 변수로 받는다. Phase 2 에이전트 프롬프트 끝에 다음 줄을 덧붙인다:
 
 ```
-LLM endpoint: <LLM_PROBE_DIR>/llm_endpoint.json (Step 8-3 사전 단계 산출물 — chat endpoint의 base_url/route/headers/request_schema/response_path/multiturn_mode가 확정되어 있음. Phase 2 에이전트는 이 파일만 읽고 코드 재분석 없이 동적 테스트를 수행한다)
+LLM endpoint: <LLM_PROBE_DIR>/llm_endpoint.json (Step 8-3 사전 단계 산출물 — LLM endpoint의 base_url/route/headers/request_schema/response_path/multiturn_mode가 확정되어 있음. Phase 2 에이전트는 이 파일만 읽고 코드 재분석 없이 동적 테스트를 수행한다)
 ```
 
-다중 endpoint가 확정된 경우 각 endpoint에 대해 Phase 2를 반복 실행한다(각 실행마다 endpoint index를 프롬프트에 명시). Step 8-3 사전 단계가 실패했거나 endpoint 미확보면 본 LLM 그룹 Phase 2는 디스패치하지 않고 `endpoint_unverified` 처리 절차(Step 8-3 참조)를 따른다.
+다중 endpoint가 확정된 경우 각 endpoint에 대해 Phase 2를 반복 실행한다(각 실행마다 endpoint index를 프롬프트에 명시). Step 8-3 사전 단계가 실패했거나 LLM endpoint 미확보면 본 LLM 그룹 Phase 2는 디스패치하지 않고 `endpoint_unverified` 처리 절차(Step 8-3 참조)를 따른다.
 
 **AI 자율 탐색 후보(AI-N)의 동적 분석:**
 - AI 후보가 기존 스캐너 카테고리(XSS, SQLi 등)에 속하면, 해당 스캐너의 Phase 2 에이전트 프롬프트에 AI 후보 정보를 함께 전달한다.

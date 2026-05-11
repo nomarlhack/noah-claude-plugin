@@ -385,7 +385,7 @@ stdout(단일 JSON 라인)에서 `status`/`model_text`/`conversation_id`/`events
 
 ### Endpoint 미확보 처리
 
-`llm_endpoint.json`의 `endpoints`가 비어 있으면 Phase 2 동적 테스트를 수행하지 않는다. Phase 2 결과 파일은 manifest만 포함하고 각 후보의 `evidence_summary`에 `endpoint_unverified — chat endpoint not reachable`를 기록한다. `phase2-review`는 이를 인지하여 `status: candidate` + `tag: "LLM endpoint 미확보"`로 처리한다.
+`llm_endpoint.json`의 `endpoints`가 비어 있으면 Phase 2 동적 테스트를 수행하지 않는다. Phase 2 결과 파일은 manifest만 포함하고 각 후보의 `evidence_summary`에 `endpoint_unverified — LLM endpoint not reachable`를 기록한다. `phase2-review`는 이를 인지하여 `status: candidate` + `tag: "LLM endpoint 미확보"`로 처리한다.
 
 ### 페이로드 안전성
 

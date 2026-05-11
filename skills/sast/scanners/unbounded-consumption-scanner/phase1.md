@@ -47,7 +47,7 @@ grep_patterns:
   - "redis"
 ---
 
-> **Phase 2 진입 조건**: 본 스캐너는 LLM 그룹에 속하며, Phase 2 동적 검증은 Step 8-3 그룹 사전 단계(`llm-endpoint-probe-agent`)가 chat endpoint를 확보한 경우에만 진입한다. Phase 2 입력 contract는 `<LLM_PROBE_DIR>/llm_endpoint.json` 단일 파일이다.
+> **Phase 2 진입 조건**: 본 스캐너는 LLM 그룹에 속하며, Phase 2 동적 검증은 Step 8-3 그룹 사전 단계(`llm-endpoint-probe-agent`)가 LLM endpoint를 확보한 경우에만 진입한다. Phase 2 입력 contract는 `<LLM_PROBE_DIR>/llm_endpoint.json` 단일 파일이다.
 
 > ## 핵심 원칙: "비용·자원 한도가 사용자/세션 단위로 강제되지 않으면 후보다"
 >
@@ -69,7 +69,7 @@ Unbounded Consumption sink는 "외부 입력이 LLM 호출의 (1) 빈도 (2) 입
 
 ## Source-first 추가 패턴
 
-- chat endpoint의 메시지 길이/이력 길이
+- LLM endpoint의 메시지 길이/이력 길이
 - 업로드 문서 본문 길이, URL fetch 결과 본문 길이
 - 검색/요약 쿼리의 결과 수 파라미터(`top_k`, `n`)
 - 에이전트 step 상한(`max_iterations`), tool 호출 재귀 깊이
