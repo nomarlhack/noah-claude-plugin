@@ -199,6 +199,24 @@ if [ "$SCANNER_COUNT" -lt 45 ]; then
   ERRORS=$((ERRORS+1))
 fi
 
+# LLM 그룹 사전 단계 / Phase 2 의존 — 채널 어댑터 헬퍼 + 의존성
+LLM_PROBE="$INSTALL_DIR/skills/sast/tools/llm_channel_probe.py"
+LLM_AGENT="$INSTALL_DIR/skills/sast/prompts/llm-endpoint-probe-agent.md"
+if [ -f "$LLM_PROBE" ] && [ -f "$LLM_AGENT" ]; then
+  if command -v python3 >/dev/null 2>&1; then
+    if python3 -c "import websocket, requests" 2>/dev/null; then
+      ok "LLM 그룹 채널 어댑터 의존성 동작 확인"
+    else
+      warn "websocket-client/requests import 실패 — LLM 그룹 동적 검증이 비활성화됩니다."
+      warn "수동 설치: python3 -m pip install --user websocket-client requests"
+      ERRORS=$((ERRORS+1))
+    fi
+  fi
+else
+  warn "LLM 그룹 사전 단계 파일 누락 (llm_channel_probe.py 또는 llm-endpoint-probe-agent.md)"
+  ERRORS=$((ERRORS+1))
+fi
+
 if [ "$ERRORS" -gt 0 ]; then
   warn "설치 검증에서 ${ERRORS}건의 경고가 발생했습니다."
 else

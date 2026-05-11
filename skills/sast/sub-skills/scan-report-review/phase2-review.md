@@ -117,6 +117,7 @@ Phase 1 판정과 Phase 2 확정 status가 다르면 `phase1_eval_state.conflict
 2. 커버리지 규약 + 해시 비교로 대상 후보 집합 결정.
 3. 각 후보에 대해 Phase 2 결과 파일 Read하여 manifest 추출.
 4. §10-A Phase 2 우선 원칙 적용 → status/tag 할당.
+   - **LLM endpoint 미확보 placeholder 인식**: scanner가 LLM 그룹 4개(`prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner`) 중 하나이고, Phase 2 manifest의 `results[*].evidence.observations`에 `"endpoint_unverified"` 문자열이 포함되거나 manifest가 사실상 placeholder(`results` 비어 있거나 evidence가 사유 문자열 한 줄)인 경우, 해당 스캐너의 모든 LLM 후보에 `status: candidate` + `tag: "동적 검증 불가(LLM endpoint 미확보)"`를 부여한다. `evidence_summary`에는 placeholder가 기록한 사유를 그대로 옮긴다. 본 케이스는 `verified_defense` 기록 금지(`safe`가 아님), `safe_category`는 `null` 유지.
 5. safe 판정 시 방어 코드 Read → `verified_defense` 기록.
 6. Phase 1↔Phase 2 불일치 발견 시 `conflicts`에 감사 로그 기록 + 필요 시 `reopen=true` 선택적 set.
 7. **reopen reset 규칙**:

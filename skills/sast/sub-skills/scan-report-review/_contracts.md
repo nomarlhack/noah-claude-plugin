@@ -52,7 +52,7 @@
   "source": "...",
   "sink": "...",
   "status": "confirmed" | "candidate" | "safe",
-  "tag": null | "도구 한계" | "정보 부족" | "환경 제한" | "차단" | "동적 분석 생략",
+  "tag": null | "도구 한계" | "정보 부족" | "환경 제한" | "차단" | "동적 분석 생략" | "동적 검증 불가(LLM endpoint 미확보)",
   "evidence_summary": "판정 근거 요약 (≤2KB)",
   "verified_defense": null | {"file": "...", "lines": "40-52", "content_hash": "sha256:..."},
   "rederivation_performed": true | false,
@@ -144,6 +144,7 @@ Phase 2 결과 파일(`<scanner>-phase2.md`) 끝에 포함되는 JSON 블록.
 | candidate | 환경 제한 | commands, responses, observations (제한 유형 명시) | — |
 | candidate | 차단 | commands, responses, blocking_layer_hint | verified_defense 기록 금지 (safe 경로) |
 | candidate | 동적 분석 생략 | evidence_summary (사용자 거부 사유) | phase2-review writer 금지 — 사용자가 동적 테스트를 명시적으로 거부한 경로에서 메인 에이전트만 설정 |
+| candidate | 동적 검증 불가(LLM endpoint 미확보) | evidence_summary (`endpoint_unverified — <상세 사유>`) | LLM 그룹 4개 스캐너 한정. SKILL.md Step 8-3 그룹 사전 단계가 endpoint를 확보하지 못한 경우 메인 에이전트가 placeholder phase2 결과 파일을 생성하고, `phase2-review`가 이를 인식해 본 tag를 부여한다. verified_defense 기록 금지(안전 판정 아님). |
 
 **복합 태그**: 두 태그가 동시에 해당하면 각 태그의 필수 필드를 **union**하여 요구한다.
 

@@ -161,8 +161,8 @@ noah-8719/
 │   └── sast/
 │       ├── SKILL.md               # 오케스트레이터 (실행 프로세스 상세)
 │       ├── scanners/              # 46개 취약점 스캐너 (각 phase1.md + phase2.md)
-│       ├── prompts/               # 서브 에이전트 지시 문서
-│       ├── tools/                 # Python 유틸리티 스크립트
+│       ├── prompts/               # 서브 에이전트 지시 문서 (LLM 그룹 사전 단계 포함)
+│       ├── tools/                 # Python 유틸리티 스크립트 (LLM 채널 어댑터 포함)
 │       ├── sub-skills/            # 내부 서브스킬
 │       │   ├── scan-report/       # 보고서 생성
 │       │   ├── scan-report-review/# 보고서 정확성 검증
