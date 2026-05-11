@@ -52,6 +52,8 @@ grep_patterns:
   - "RAG"
 ---
 
+> **Phase 2 진입 조건**: 본 스캐너는 LLM 그룹에 속하며, Phase 2 동적 검증은 Step 8-3 그룹 사전 단계(`llm-endpoint-probe-agent`)가 chat endpoint를 확보한 경우에만 진입한다. Phase 2 입력 contract는 `<LLM_PROBE_DIR>/llm_endpoint.json` 단일 파일이다.
+
 > ## 핵심 원칙: "신뢰 경계가 깨지지 않으면 취약점이 아니다"
 >
 > LLM이 답을 잘못/이상하게 한다는 사실만으로는 취약점이 아니다. 비신뢰 입력이 모델의 지시 영역(system/instruction)이나 도구·권한 경계를 넘어 의도된 정책을 우회해야 한다. 모델 환각·표현 품질·정확도·편향 등 안전성(safety) 문제는 본 스캐너 범위 밖이다.

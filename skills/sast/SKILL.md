@@ -244,7 +244,7 @@ python3 <NOAH_SAST_DIR>/tools/phase1_build_master_list.py <PHASE1_RESULTS_DIR> <
 2. **의사 테스트**: 한 후보의 권장 조치만 적용해도 다른 후보가 해소되면 통합한다. `master-list.json`을 Edit하여 한쪽 후보를 `candidates` 배열에서 제거하고, 남은 쪽의 `scanner` 필드에 양쪽 스캐너를 모두 기록한다.
 3. 의사 테스트가 "아니오"이거나 불확실하면 분리 유지한다.
 
-생성된 `<PHASE1_RESULTS_DIR>/master-list.json`은 AI 자율 탐색(Step 6), 동적 분석(Step 8-3), 연계 분석(Step 10), 리포팅(Step 12) 전체에서 **단일 진실 원천(single source of truth)**으로 사용한다. **마스터 목록에 있는 후보는 동적 분석에서 "안전"으로 판정되지 않는 한, 반드시 최종 보고서에 포함되어야 한다.**
+생성된 `<PHASE1_RESULTS_DIR>/master-list.json`은 AI 자율 탐색(Step 6), 동적 분석(Step 8-4), 연계 분석(Step 10), 리포팅(Step 12) 전체에서 **단일 진실 원천(single source of truth)**으로 사용한다. **마스터 목록에 있는 후보는 동적 분석에서 "안전"으로 판정되지 않는 한, 반드시 최종 보고서에 포함되어야 한다.**
 
 ### Step 6: AI 자율 분석
 
@@ -273,7 +273,7 @@ Phase 1 마스터 목록: <PHASE1_RESULTS_DIR>/master-list.json (Read 도구로 
 
 **결과 파일 저장 및 마스터 목록 갱신:**
 
-에이전트가 `<PHASE1_RESULTS_DIR>/ai-discovery.md`에 결과를 저장하고 후보 건수 요약을 반환한다. 이 파일은 하류의 동적 분석(Step 8-3), 연계 분석(Step 10), 보고서(Step 12)에서 Phase 1 스캐너 결과 파일과 동일하게 참조된다.
+에이전트가 `<PHASE1_RESULTS_DIR>/ai-discovery.md`에 결과를 저장하고 후보 건수 요약을 반환한다. 이 파일은 하류의 동적 분석(Step 8-4), 연계 분석(Step 10), 보고서(Step 12)에서 Phase 1 스캐너 결과 파일과 동일하게 참조된다.
 
 **`[INCOMPLETE]` 후속 탐색**: 반환에 `[INCOMPLETE]`이 포함된 경우, 탐색이 컨텍스트 한계로 중단된 것이다. 메인 에이전트는 반환의 "미탐색 영역" 정보를 활용하여 후속 탐색 에이전트를 디스패치한다. 후속 에이전트 프롬프트에는:
 - 동일한 `ai-discovery-agent.md` Read 지시
@@ -339,7 +339,7 @@ python3 <NOAH_SAST_DIR>/tools/phase1_review_assert.py \
 - `1`: 평가 미완료 또는 eval MD 고아 상태 → phase1-review 재호출
 - `3`: 비차단 경고 (rederivation 편향 등) → 로그만 남기고 진행
 
-**Phase 2 진입 시 사용할 Phase 1 결과 경로**: `<PHASE1_RESULTS_DIR>/evaluation/<scanner>-eval.md` (Phase 1 원본 MD가 아님). 이후 Step 8-3(Phase 2) 에이전트 프롬프트는 eval MD를 Phase 1 결과로 참조한다 (`sub-skills/scan-report-review/_contracts.md §6` C1 lint 강제).
+**Phase 2 진입 시 사용할 Phase 1 결과 경로**: `<PHASE1_RESULTS_DIR>/evaluation/<scanner>-eval.md` (Phase 1 원본 MD가 아님). 이후 Step 8-4(Phase 2) 에이전트 프롬프트는 eval MD를 Phase 1 결과로 참조한다 (`sub-skills/scan-report-review/_contracts.md §6` C1 lint 강제).
 
 ### Step 8: 동적 분석
 
@@ -370,7 +370,49 @@ python3 <NOAH_SAST_DIR>/tools/phase1_review_assert.py \
    - **동적 테스트 거부 경로**: **`Bash(python3:*)`만 확인**한다(보고서 생성에 필요). `curl`/`node`/`npx` 확인은 생략한다.
 3. 해당 경로에서 필요한 권한이 누락되어 있으면 사용자에게 추가 여부를 묻고, 동의하면 직접 `settings.json`에 추가한다.
 
-#### Step 8-3: 동적 분석 (개별 스캐너의 Phase 2 실행)
+#### Step 8-3: 그룹 사전 단계 (Group Prerequisite — 조건부 실행)
+
+**개념.** 일부 스캐너 그룹은 Phase 2 동적 검증 전에 그룹 단위 사전 단계를 통과해야 한다. 사전 단계는 그룹의 모든 스캐너 Phase 2가 공유하는 입력 산출물을 만든다. 사전 단계가 정의되지 않은 그룹은 본 단계를 건너뛰고 곧장 Step 8-4로 진행한다. 비-LLM 스캐너는 본 단계의 영향을 받지 않는다.
+
+**현재 정의된 그룹 사전 단계:**
+
+| 그룹 | 사전 단계 에이전트 | 산출물 (입력 contract) |
+|------|---------------------|------------------------|
+| `llm` | `prompts/llm-endpoint-probe-agent.md` | `<LLM_PROBE_DIR>/llm_endpoint.json` (+ `llm_endpoint_probe.jsonl` 디버그 로그) |
+
+**LLM 그룹 사전 단계 실행 절차:**
+
+LLM 그룹에 후보가 1건 이상 존재하는 경우(Phase 1 결과 기준) 다음을 수행한다.
+
+1. probe 결과 디렉토리 생성:
+   ```bash
+   echo "/tmp/llm_probe_$(basename <PROJECT_ROOT>)_$(date +%s)"
+   ```
+   출력값을 `LLM_PROBE_DIR` 변수로 보관한다.
+
+2. Agent 도구로 사전 단계 에이전트를 디스패치한다. 변수는 resolve된 실제 경로 문자열로 치환:
+
+   ```
+   <NOAH_SAST_DIR>/prompts/llm-endpoint-probe-agent.md를 Read 도구로 읽고 그 안의 절차를 정확히 따르세요.
+   변수: NOAH_SAST_DIR=<NOAH_SAST_DIR>, PROJECT_ROOT=<PROJECT_ROOT>, PHASE1_RESULTS_DIR=<PHASE1_RESULTS_DIR>, LLM_PROBE_DIR=<LLM_PROBE_DIR>
+   세션 정보: <SESSION_INFO>
+   sandbox 도메인: <SANDBOX_DOMAIN>
+   ```
+
+3. 에이전트 반환 후 `<LLM_PROBE_DIR>/llm_endpoint.json`을 Read하여 `endpoints` 배열을 확인한다.
+
+**성공/실패 처리:**
+
+- `endpoints`가 1개 이상 확정되면 LLM 그룹의 Step 8-4(Phase 2) 진입. 4개 LLM 스캐너 Phase 2 에이전트 프롬프트에는 `LLM_PROBE_DIR` 변수와 `llm_endpoint.json` 경로를 함께 전달한다. 다중 endpoint면 각 endpoint에 대해 Phase 2를 반복한다.
+- `endpoints`가 비어 있으면 LLM 그룹의 Phase 2를 skip한다. 메인 에이전트는 LLM 4개 스캐너의 Phase 1 후보 status를 `phase2-review`가 `endpoint_unverified`로 표기할 수 있도록, Phase 2 결과 파일 대신 placeholder 결과 파일을 생성한다:
+  ```
+  <PHASE1_RESULTS_DIR>/<llm-scanner>-phase2.md  ← evidence_summary에 "endpoint_unverified — chat endpoint not reachable"를 기록한 manifest만 포함
+  ```
+  비-LLM 스캐너의 Phase 2는 본 실패의 영향을 받지 않고 정상 진행한다.
+
+**상한.** probe 에이전트의 내부 상한(라우트 ≤ 5, 변형 ≤ 8, 멀티턴 ≤ 3, 전체 호출 ≤ 30)은 `llm-endpoint-probe-agent.md`에 정의되어 있으므로 메인 에이전트가 별도 강제하지 않는다.
+
+#### Step 8-4: 동적 분석 (개별 스캐너의 Phase 2 실행)
 
 사용자가 필요한 정보를 제공하면, 후보가 발견된 모든 스캐너에 대해 동적 분석을 수행한다. 스캐너당 1 에이전트 원칙을 따른다. 메인 에이전트는 Phase 2 에이전트 프롬프트 본문을 인라인으로 복사하지 않고, 아래 형식의 짧은 프롬프트를 사용하되 변수를 resolve된 실제 경로 문자열로 치환한다.
 
@@ -384,6 +426,14 @@ python3 <NOAH_SAST_DIR>/tools/phase1_review_assert.py \
 세션 정보: <SESSION_INFO>
 sandbox 도메인: <SANDBOX_DOMAIN>
 ```
+
+**LLM 그룹 스캐너의 추가 입력.** LLM 4개 스캐너(`prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner`)는 Step 8-3 사전 단계 산출물을 추가 변수로 받는다. Phase 2 에이전트 프롬프트 끝에 다음 줄을 덧붙인다:
+
+```
+LLM endpoint: <LLM_PROBE_DIR>/llm_endpoint.json (Step 8-3 사전 단계 산출물 — chat endpoint의 base_url/route/headers/request_schema/response_path/multiturn_mode가 확정되어 있음. Phase 2 에이전트는 이 파일만 읽고 코드 재분석 없이 동적 테스트를 수행한다)
+```
+
+다중 endpoint가 확정된 경우 각 endpoint에 대해 Phase 2를 반복 실행한다(각 실행마다 endpoint index를 프롬프트에 명시). Step 8-3 사전 단계가 실패했거나 endpoint 미확보면 본 LLM 그룹 Phase 2는 디스패치하지 않고 `endpoint_unverified` 처리 절차(Step 8-3 참조)를 따른다.
 
 **AI 자율 탐색 후보(AI-N)의 동적 분석:**
 - AI 후보가 기존 스캐너 카테고리(XSS, SQLi 등)에 속하면, 해당 스캐너의 Phase 2 에이전트 프롬프트에 AI 후보 정보를 함께 전달한다.

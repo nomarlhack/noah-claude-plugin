@@ -104,6 +104,18 @@ else
   warn "python3이 없습니다. 보고서 생성 기능이 제한될 수 있습니다."
 fi
 
+# LLM 채널 어댑터 의존성 (websocket-client, requests)
+# tools/llm_channel_probe.py가 ws-stomp/ws-raw/sse 등 채널 검증에 사용
+if command -v python3 >/dev/null 2>&1; then
+  info "LLM 채널 어댑터 의존성 설치 (websocket-client, requests)..."
+  if python3 -m pip install --user --quiet websocket-client requests 2>/dev/null; then
+    ok "LLM 채널 어댑터 의존성 설치 완료"
+  else
+    warn "websocket-client/requests 설치 실패. LLM 그룹 동적 검증이 제한될 수 있습니다."
+    warn "수동 설치: python3 -m pip install --user websocket-client requests"
+  fi
+fi
+
 # Claude Code 확인
 if [ ! -d "$HOME/.claude" ]; then
   error "\$HOME/.claude 디렉토리가 없습니다. Claude Code가 설치되어 있는지 확인하세요."
@@ -182,8 +194,8 @@ ERRORS=0
 [ -d "$INSTALL_DIR/skills/sast/tools" ]    || { warn "skills/sast/tools/ 누락"; ERRORS=$((ERRORS+1)); }
 
 SCANNER_COUNT=$(ls -d "$INSTALL_DIR/skills/sast/scanners"/*-scanner 2>/dev/null | wc -l | tr -d ' ')
-if [ "$SCANNER_COUNT" -lt 40 ]; then
-  warn "스캐너가 ${SCANNER_COUNT}개뿐입니다. (기대값: 41개)"
+if [ "$SCANNER_COUNT" -lt 45 ]; then
+  warn "스캐너가 ${SCANNER_COUNT}개뿐입니다. (기대값: 46개)"
   ERRORS=$((ERRORS+1))
 fi
 

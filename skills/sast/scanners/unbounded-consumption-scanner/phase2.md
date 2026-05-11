@@ -1,3 +1,5 @@
+> **입력 contract**: 본 Phase 2 에이전트는 코드를 재분석하지 않는다. Step 8-3 사전 단계 산출물 `<LLM_PROBE_DIR>/llm_endpoint.json`만 읽고 동적 테스트를 수행한다. 멀티턴 시퀀스·변형 반복·판정 규칙은 `guidelines-phase2.md` 지침 12를 따른다.
+
 ### 기본 페이로드
 
 #### 호출 빈도 (Rate)
