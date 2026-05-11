@@ -67,7 +67,17 @@ def main() -> int:
         return 1
 
     # 3. candidate 판정은 tag 필드 필수 + tag enum 검증
-    allowed_tags = {"도구 한계", "정보 부족", "환경 제한", "차단", "동적 분석 생략"}
+    allowed_tags = {
+        "도구 한계",
+        "정보 부족",
+        "환경 제한",
+        "차단",
+        "동적 분석 생략",
+        # LLM 그룹(prereq_group == "llm") 사전 단계 결과별 tag — _contracts.md §3 / §5
+        "동적 검증 불가(LLM endpoint 미확보)",
+        "endpoint 확인됨, 동적 검증 생략",
+        "정적 endpoint 식별만, 동적 검증 생략",
+    }
     cand_no_tag = [
         c["id"] for c in candidates
         if c["status"] == "candidate"
