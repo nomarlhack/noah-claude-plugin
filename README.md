@@ -50,13 +50,14 @@ flowchart TD
     S7 -->|CONFIRM / OVERRIDE| Check{후보 발견?}
     ML_Safe --> Check
     Check -->|0건| S12["Step 12: 보고서 생성\n+ safe 분류 자동 섹션"]
-    Check -->|1건+| S81["Step 8-1: 동적 테스트 정보 요청"]
-    S81 --> UserReply{사용자 응답}
-    UserReply -->|정보 제공| S82["Step 8-2: 도구 권한 확인"]
-    UserReply -->|거부| S83
-    S82 --> S83["Step 8-3: 그룹 사전 단계\n(LLM endpoint probe, 조건부)"]
-    S83 -->|동적 동의| S84["Step 8-4: Phase 2 실행\n(Tier A/B/C 병렬)"]
-    S83 -->|동적 거부| S12
+    Check -->|1건+| S81["Step 8-1: 동적 테스트 정보 요청\n(URL_PROVIDED + ATTACK_CONSENT 분리)"]
+    S81 --> S82["Step 8-2: 도구 권한 확인"]
+    S82 --> LLMCheck{LLM 그룹 활성?\nprereq_group=='llm' 후보 1건+}
+    LLMCheck -->|Yes| S83["Step 8-3: 그룹 사전 단계\nLLM endpoint probe\nprobe_mode: full / connectivity-only / static-only"]
+    LLMCheck -->|No| AttackCheck
+    S83 --> AttackCheck{동적 공격 동의?\nATTACK_CONSENT}
+    AttackCheck -->|Y + probe_mode=full| S84["Step 8-4: Phase 2 실행\n(Tier A/B/C 병렬)"]
+    AttackCheck -->|N or probe skip| S12
     S84 --> S9["Step 9: 동적 분석 리뷰\n(phase2-review)"]
     S9 -->|불일치 감사 로그| Conflicts["phase1_eval_state.conflicts\n(append-only)"]
     Conflicts --> ChainCheck
@@ -83,7 +84,8 @@ flowchart TD
     style Check fill:#533483,stroke:#533483,color:#fff
     style ChainCheck fill:#533483,stroke:#533483,color:#fff
     style ReviewCheck fill:#533483,stroke:#533483,color:#fff
-    style UserReply fill:#533483,stroke:#533483,color:#fff
+    style LLMCheck fill:#533483,stroke:#533483,color:#fff
+    style AttackCheck fill:#533483,stroke:#533483,color:#fff
 ```
 
 ## 개요
