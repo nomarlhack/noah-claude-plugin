@@ -81,7 +81,7 @@ Phase 1과 완전히 다른 Sink/취약점 유형을 발견한 경우 이 절차
 
 파일 끝에 아래 형식의 manifest를 포함한다:
 
-```
+````
 <!-- NOAH-SAST MANIFEST v1 -->
 ```json
 {
@@ -95,7 +95,7 @@ Phase 1과 완전히 다른 Sink/취약점 유형을 발견한 경우 이 절차
 }
 ```
 <!-- /NOAH-SAST MANIFEST -->
-```
+````
 
 **`exploration_status`는 manifest에 반드시 포함한다.** 3단계 탐색 정상 완료 시 `"complete"`, `[INCOMPLETE]` 반환 시 `"incomplete"`. 누락하면 재dispatch 대상으로 판정된다.
 

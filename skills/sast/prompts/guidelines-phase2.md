@@ -53,7 +53,7 @@ Phase 2 결과는 아래 형식의 테이블을 포함하여 반환한다.
 
 모든 테스트 완료 후, 결과를 `<PHASE1_RESULTS_DIR>/<scanner-name>-phase2.md`에 Write 도구로 저장한다. 파일 형식:
 
-```markdown
+````markdown
 # <scanner-name> Phase 2 결과
 
 ## <ID>: <후보 제목>
@@ -103,7 +103,7 @@ Phase 2 결과는 아래 형식의 테이블을 포함하여 반환한다.
 }
 ```
 <!-- /NOAH-SAST PHASE2 MANIFEST -->
-```
+````
 
 **[필수] status 필드를 manifest에 기록하지 않는다.** status 할당은 `scan-report-review`가 `mode=phase2-review`로 호출될 때 수행한다 (writer 권한 — `_contracts.md §1`).
 

@@ -440,7 +440,7 @@ LLM 그룹에 후보가 1건 이상 존재하는 경우(Phase 1 결과 기준) S
 
   파일 본문 (manifest만 포함, 본문 분석 섹션은 비움):
 
-  ```
+  ````
   # <llm-scanner> — Phase 2 결과
 
   ## <케이스별 제목>
@@ -463,7 +463,7 @@ LLM 그룹에 후보가 1건 이상 존재하는 경우(Phase 1 결과 기준) S
   }
   ```
   <!-- /NOAH-SAST PHASE2 MANIFEST -->
-  ```
+  ````
 
   각 후보 ID마다 동일한 `evidence.observations`를 반복한다. 자세한 분기는 `sub-skills/scan-report-review/phase2-review.md §Step 진행 4` 및 `_contracts.md §5` 참조.
 
