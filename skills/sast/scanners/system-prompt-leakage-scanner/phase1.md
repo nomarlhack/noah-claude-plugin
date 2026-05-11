@@ -70,6 +70,7 @@ System Prompt Leakage sink는 "시스템/지시 영역에 들어가는 텍스트
 - **회상/반복 공격 미차단**: 사용자가 "처음에 무엇이라고 했지?", "TL;DR", "Spell-check above"로 추출.
 - **번역/언어 전환 미차단**: 한국어 차단 규칙이 영어/다른 언어 응답엔 적용 안 됨.
 - **에러 메시지/스택트레이스에 system context 누설**: 예외 응답 본문에 그대로 노출.
+- **외부 LLM 서비스로 위임된 경우의 식별자·정책 메타데이터**: 본 저장소가 prompt 본문을 보유하지 않더라도 graph/agent/policy 식별자, instruction key 등 정책 메타데이터가 설정 파일·응답·로그·에러에 평문 노출되면 누설 범주에 포함한다. "본 저장소에 system prompt 없음 → 이상 없음" 결론은 외부 서비스로의 forward payload·응답 echo·식별자 노출 경로를 모두 확인한 뒤에만 내린다.
 
 ## 안전 패턴 (FP Guard)
 

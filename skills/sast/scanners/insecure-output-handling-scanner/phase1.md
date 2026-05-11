@@ -75,7 +75,7 @@ Insecure Output Handling sink는 "LLM 응답 텍스트가 컨텍스트별 인코
 | OS 명령 | `subprocess`/`child_process`/`execSync`/`spawn`/`os.system`/`shell_exec` + 모델 응답 |
 | 역직렬화 | `pickle.loads`/`Marshal.load`/`yaml.load`(unsafe)/`ObjectInputStream` + 모델 응답 |
 | SQL/NoSQL | 모델 응답을 그대로 SQL 문자열로 사용 또는 ORM raw 쿼리에 삽입 |
-| HTML/DOM | `innerHTML`/`dangerouslySetInnerHTML`/`v-html`/`document.write`/sanitize 없는 마크다운 렌더 |
+| HTML/DOM | `innerHTML`/`dangerouslySetInnerHTML`/`v-html`/`document.write`/sanitize 없는 마크다운·리치텍스트 렌더. 라이브러리 기본 sanitize가 적용되어도 **커스텀 노드/컴포넌트로 링크·이미지·임베드 핸들러를 재정의**하거나, **auto-link·표·인용 등 markdown 구조 요소**를 통해 우회되는 경로 포함 |
 | 템플릿 | `render_template_string`/`Mustache`/`Handlebars` 등에 모델 응답 직접 삽입 |
 | 파일 시스템 | 모델이 결정한 경로로 read/write — path traversal |
 | 도구/함수 dispatch | 모델이 정한 tool name/argument를 권한·스키마 검증 없이 호출 |
@@ -101,6 +101,10 @@ Insecure Output Handling sink는 "LLM 응답 텍스트가 컨텍스트별 인코
 - **에이전트 체인의 다음 step input** — 한 도구 출력의 자연어가 다음 system context로 흘러 인젝션 + 실행 결합.
 - **CSV/PDF/엑셀 export**에 모델 응답이 그대로 삽입 → CSV 인젝션·XSS 파일.
 - **로그/모니터링**에 응답 원문 저장 → 후속 시스템(검색·알림)에서 2차 렌더.
+- **렌더 라이브러리의 sanitize 옵션은 호출처(callsite)마다 다를 수 있다** — 동일한 렌더 컴포넌트/함수가 여러 곳에서 호출되면 각 호출처의 옵션 조합을 모두 점검한다. 한 호출처가 위험 옵션을 켜고 있으면 회귀·재사용 시 다른 호출처로 전이될 수 있다.
+- **응답 전달 채널은 sink 의미론에 영향을 주지 않는다** — REST 외 WebSocket/SSE/메시지 큐/푸시 등 어떤 전송 경로로 응답이 도착하든, 최종 렌더·실행 지점이 sink 기준이다.
+- **링크/이미지 sanitize는 URL 속성에 한정된다** — `href`/`src` 자체는 라이브러리가 검증해도, 클릭/로드 핸들러를 별도 코드로 가로채 URL을 처리하면 기본 보호는 작동하지 않는다.
+- **렌더 함수·컴포넌트 호출 자체가 sink는 아니다** — 동일한 마크다운/HTML 변환이 (a) 사용자 화면 노출, (b) plain text 정규화·스트립·길이 계산, (c) 내부 로그·DB 저장 후 외부 노출 없이 종결 등 다양한 의미로 사용된다. 호출 결과가 **사용자에게 도달하는 UI**(브라우저 DOM, SSR 응답 본문, 이메일/푸시/PDF 본문 등)로 흐르는지 데이터 흐름을 확인한 뒤 sink로 판정한다. 호출이 보인다는 이유만으로 후보로 등록하지 않는다.
 
 ## 안전 패턴 (FP Guard)
 
@@ -128,7 +132,7 @@ Insecure Output Handling sink는 "LLM 응답 텍스트가 컨텍스트별 인코
 |---|---|
 | 모델 응답이 `eval`/`exec`/`subprocess` 등 코드/명령 실행에 도달 | 후보 (라벨: `EXEC`) |
 | 모델 응답이 SQL/NoSQL 쿼리 문자열에 직접 삽입 | 후보 (라벨: `SQLI`) |
-| 모델 응답이 `innerHTML`/`dangerouslySetInnerHTML`/마크다운 렌더에 sanitize 없이 도달 | 후보 (라벨: `XSS`) |
+| 모델 응답이 `innerHTML`/`dangerouslySetInnerHTML`/마크다운·리치텍스트 렌더에 sanitize 없이 도달 **+ 렌더 결과가 사용자에게 노출되는 UI로 흐름** | 후보 (라벨: `XSS`) |
 | 모델이 결정한 tool/function 호출이 권한·스키마 검증 없이 실행 | 후보 (라벨: `TOOL_DISPATCH`) |
 | 응답에 외부 URL/이미지가 포함되어 클라이언트가 자동 fetch | 후보 (라벨: `EXFIL_RENDER`) |
 | 모델 응답이 안전한 컨텍스트(plain text 렌더, 로그 only, parameterized 쿼리 등)에만 사용 | 제외 |
@@ -139,3 +143,4 @@ Insecure Output Handling sink는 "LLM 응답 텍스트가 컨텍스트별 인코
 - 모델이 "그런 답을 줄 수도 있다"는 가능성만으로는 부족하다. 응답이 도달하는 sink 코드가 실제로 존재해야 한다.
 - 사용자 입력이 LLM을 거치지 않고 sink에 직접 들어가는 케이스는 기존 SQLi/XSS/RCE 스캐너 영역으로 분리한다.
 - 응답을 plain text로 표시만 하고 추가 처리가 없는 경로는 후보로 다루지 않는다.
+- **렌더 호출이 보인다는 사실만으로는 부족하다** — 렌더 결과가 (a) 사용자 화면 DOM, (b) 외부로 송신되는 응답 본문/이메일/푸시 등 외부 노출 sink에 실제로 흘러야 한다. plain text 변환·검색 색인·길이 계산·내부 로그 종결 등 외부 노출이 없는 경로는 제외한다. 도달성을 확인할 수 없으면 "후보 (도달성 미확인)"로 보수적으로 등록하되, 사유에 흐름 추적이 멈춘 지점을 명시한다.
