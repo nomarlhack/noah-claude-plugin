@@ -290,7 +290,7 @@ WAF 차단 시그니처: `403` + 응답 본문에 Cloudflare/AWS WAF/Akamai/ModS
 
 ## 지침 12: LLM 그룹 스캐너 Phase 2 절차
 
-LLM 4개 스캐너(`prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner`)에만 적용되는 절차이다. 비-LLM 스캐너의 Phase 2 절차에는 영향이 없다.
+`prereq_group == "llm"`로 선언된 스캐너(현재 4종: `prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner` — 단일 진실 원천은 각 스캐너 `phase1.md` frontmatter)에만 적용되는 절차이다. 비-LLM 스캐너의 Phase 2 절차에는 영향이 없다.
 
 ### 입력 contract
 

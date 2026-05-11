@@ -233,6 +233,45 @@ def has_dep_any(*names):
         return True
     return False
 
+# --- prereq_group 동적 로드 (스캐너 frontmatter의 단일 진실 원천) ---
+# 각 스캐너의 phase1.md frontmatter에 `prereq_group: <name>`이 선언된 경우,
+# 그 스캐너는 사전 단계가 필요한 특수 그룹에 속한다. check_exclude의 그룹별
+# 의존성 게이트도 본 캐시를 참조한다.
+
+_PREREQ_GROUP_RE = re.compile(r"^prereq_group:\s*([a-z][a-z0-9_-]*)\s*$", re.M)
+
+
+def _load_declared_prereq_groups():
+    """scanners/*/phase1.md frontmatter에서 prereq_group을 수집하여
+    {group_name: [scanner_name, ...]} 형태로 반환."""
+    result: dict[str, list[str]] = {}
+    scanners_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scanners")
+    if not os.path.isdir(scanners_dir):
+        return result
+    for entry in sorted(os.listdir(scanners_dir)):
+        phase1 = os.path.join(scanners_dir, entry, "phase1.md")
+        if not os.path.isfile(phase1):
+            continue
+        try:
+            with open(phase1, encoding="utf-8") as f:
+                head = f.read(4096)  # frontmatter는 파일 상단
+        except OSError:
+            continue
+        m = _PREREQ_GROUP_RE.search(head)
+        if not m:
+            continue
+        grp = m.group(1)
+        result.setdefault(grp, []).append(entry)
+    return result
+
+
+_declared_prereq_groups = _load_declared_prereq_groups()
+# reverse map: scanner_name → group_name. check_exclude에서 그룹별 게이트 분기에 사용.
+_scanner_prereq_group: dict[str, str] = {
+    s: g for g, members in _declared_prereq_groups.items() for s in members
+}
+
+
 def check_exclude(scanner):
     """grep 0건일 때 아키텍처 조건으로 제외 가능한지 확인. 제외 시 사유 반환, 포함 시 None."""
     if scanner == "xss-scanner":
@@ -485,12 +524,7 @@ def check_exclude(scanner):
             "build.gradle", "build.gradle.kts",
         ):
             return "Android 프로젝트 아님 (AndroidManifest.xml/Kotlin/Java/Gradle 없음)"
-    elif scanner in (
-        "prompt-injection-scanner",
-        "system-prompt-leakage-scanner",
-        "insecure-output-handling-scanner",
-        "unbounded-consumption-scanner",
-    ):
+    elif _scanner_prereq_group.get(scanner) == "llm":
         if not has_dep_any(
             # Python
             "openai", "anthropic", "google-generativeai", "google-genai",
@@ -585,39 +619,9 @@ BASE_GROUPS = {
 }
 
 
-# --- prereq_group 동적 로드 (스캐너 frontmatter의 단일 진실 원천) ---
-# 각 스캐너의 phase1.md frontmatter에 `prereq_group: <name>`이 선언된 경우,
-# 그 스캐너는 사전 단계가 필요한 특수 그룹에 속한다. 일반 편성 그룹과 별도 관리.
-
-_PREREQ_GROUP_RE = re.compile(r"^prereq_group:\s*([a-z][a-z0-9_-]*)\s*$", re.M)
-
-
-def _load_declared_prereq_groups():
-    """scanners/*/phase1.md frontmatter에서 prereq_group을 수집하여
-    {group_name: [scanner_name, ...]} 형태로 반환."""
-    result: dict[str, list[str]] = {}
-    scanners_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scanners")
-    if not os.path.isdir(scanners_dir):
-        return result
-    for entry in sorted(os.listdir(scanners_dir)):
-        phase1 = os.path.join(scanners_dir, entry, "phase1.md")
-        if not os.path.isfile(phase1):
-            continue
-        try:
-            with open(phase1, encoding="utf-8") as f:
-                head = f.read(4096)  # frontmatter는 파일 상단
-        except OSError:
-            continue
-        m = _PREREQ_GROUP_RE.search(head)
-        if not m:
-            continue
-        grp = m.group(1)
-        result.setdefault(grp, []).append(entry)
-    return result
-
-
 # 선언된 prereq_group을 BASE_GROUPS에 합성. 동일 키가 있으면 덮어쓰지 않고 경고만.
-for _grp, _members in _load_declared_prereq_groups().items():
+# (함수 정의는 모듈 상단에서 check_exclude보다 먼저 호출되어 _scanner_prereq_group를 채움)
+for _grp, _members in _declared_prereq_groups.items():
     if _grp in BASE_GROUPS:
         print(
             f"WARNING: prereq_group '{_grp}'이 BASE_GROUPS에 이미 존재합니다. "
