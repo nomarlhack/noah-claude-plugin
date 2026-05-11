@@ -52,7 +52,7 @@
   "source": "...",
   "sink": "...",
   "status": "confirmed" | "candidate" | "safe",
-  "tag": null | "도구 한계" | "정보 부족" | "환경 제한" | "차단" | "동적 분석 생략" | "동적 검증 불가(LLM endpoint 미확보)",
+  "tag": null | "도구 한계" | "정보 부족" | "환경 제한" | "차단" | "동적 분석 생략" | "동적 검증 불가(LLM endpoint 미확보)" | "endpoint 확인됨, 동적 검증 생략" | "정적 endpoint 식별만, 동적 검증 생략",
   "evidence_summary": "판정 근거 요약 (≤2KB)",
   "verified_defense": null | {"file": "...", "lines": "40-52", "content_hash": "sha256:..."},
   "rederivation_performed": true | false,
@@ -145,6 +145,8 @@ Phase 2 결과 파일(`<scanner>-phase2.md`) 끝에 포함되는 JSON 블록.
 | candidate | 차단 | commands, responses, blocking_layer_hint | verified_defense 기록 금지 (safe 경로) |
 | candidate | 동적 분석 생략 | evidence_summary (사용자 거부 사유) | phase2-review writer 금지 — 사용자가 동적 테스트를 명시적으로 거부한 경로에서 메인 에이전트만 설정 |
 | candidate | 동적 검증 불가(LLM endpoint 미확보) | evidence_summary (`endpoint_unverified — <상세 사유>`) | LLM 그룹 4개 스캐너 한정. SKILL.md Step 8-3 그룹 사전 단계가 endpoint를 확보하지 못한 경우 메인 에이전트가 placeholder phase2 결과 파일을 생성하고, `phase2-review`가 이를 인식해 본 tag를 부여한다. verified_defense 기록 금지(안전 판정 아님). |
+| candidate | endpoint 확인됨, 동적 검증 생략 | evidence_summary + Phase 2 manifest의 `observations`에 endpoint 명세 요약 (route/채널/multiturn_mode/system_overridable) | LLM 그룹 4개 스캐너 한정. SKILL.md Step 8-3 매트릭스 (Y, N) — sandbox URL은 제공됐으나 동적 공격 테스트는 거부된 경로. probe-agent가 `connectivity-only` 모드로 endpoint를 확보했으나 공격 페이로드 시도는 수행되지 않음. verified_defense 기록 금지. |
+| candidate | 정적 endpoint 식별만, 동적 검증 생략 | evidence_summary + Phase 2 manifest의 `observations`에 정적 endpoint 단서 (route 후보/채널 후보/인증 미들웨어 유무) | LLM 그룹 4개 스캐너 한정. SKILL.md Step 8-3 매트릭스 (N, N) — sandbox URL/세션 미제공 + 동적 공격 거부 경로. probe-agent가 `static-only` 모드로 코드 정적 단서만 추출. `verified: false`, `static_only: true`로 산출물이 표기됨. verified_defense 기록 금지. |
 
 **복합 태그**: 두 태그가 동시에 해당하면 각 태그의 필수 필드를 **union**하여 요구한다.
 

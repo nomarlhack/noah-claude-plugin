@@ -117,7 +117,15 @@ Phase 1 판정과 Phase 2 확정 status가 다르면 `phase1_eval_state.conflict
 2. 커버리지 규약 + 해시 비교로 대상 후보 집합 결정.
 3. 각 후보에 대해 Phase 2 결과 파일 Read하여 manifest 추출.
 4. §10-A Phase 2 우선 원칙 적용 → status/tag 할당.
-   - **LLM endpoint 미확보 placeholder 인식**: scanner가 LLM 그룹 4개(`prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner`) 중 하나이고, Phase 2 manifest의 `results[*].evidence.observations`에 `"endpoint_unverified"` 문자열이 포함되거나 manifest가 사실상 placeholder(`results` 비어 있거나 evidence가 사유 문자열 한 줄)인 경우, 해당 스캐너의 모든 LLM 후보에 `status: candidate` + `tag: "동적 검증 불가(LLM endpoint 미확보)"`를 부여한다. `evidence_summary`에는 placeholder가 기록한 사유를 그대로 옮긴다. 본 케이스는 `verified_defense` 기록 금지(`safe`가 아님), `safe_category`는 `null` 유지.
+   - **LLM 그룹 placeholder 인식 (3가지 변형)**: scanner가 LLM 그룹 4개(`prompt-injection-scanner`, `system-prompt-leakage-scanner`, `insecure-output-handling-scanner`, `unbounded-consumption-scanner`) 중 하나이고, Phase 2 manifest의 `results[*].evidence.observations` 첫 항목으로 다음 marker가 등장하면 해당 스캐너의 모든 LLM 후보에 일괄 tag를 부여한다. `status`는 항상 `candidate`, `safe_category`는 `null` 유지, `verified_defense` 기록 금지(`safe`가 아님). `evidence_summary`에는 marker 뒤의 사유를 그대로 옮긴다.
+
+     | observations[0] marker | 부여할 tag | 케이스 (SKILL.md Step 8-3 매트릭스) |
+     |------------------------|----------|-----------------------------------|
+     | `"endpoint_unverified — <사유>"` | `"동적 검증 불가(LLM endpoint 미확보)"` | probe 실패로 endpoints 빈 산출물 |
+     | `"endpoint_confirmed_no_attack — <사유>"` | `"endpoint 확인됨, 동적 검증 생략"` | (Y, N) connectivity-only 모드 |
+     | `"endpoint_static_only — <사유>"` | `"정적 endpoint 식별만, 동적 검증 생략"` | (N, N) static-only 모드 |
+
+     세 변형 모두 phase2-review writer 권한이며, 메인 에이전트가 직접 status/tag를 셋팅하지 않는다.
 5. safe 판정 시 방어 코드 Read → `verified_defense` 기록.
 6. Phase 1↔Phase 2 불일치 발견 시 `conflicts`에 감사 로그 기록 + 필요 시 `reopen=true` 선택적 set.
 7. **reopen reset 규칙**:

@@ -1,6 +1,16 @@
 당신은 LLM 그룹 사전 단계 — Chat Endpoint Probe 에이전트입니다.
 
-> 메인 에이전트 사용법: 이 파일을 서브 에이전트에게 Read하도록 지시하고, 프롬프트 끝에 `NOAH_SAST_DIR`, `PROJECT_ROOT`, `PHASE1_RESULTS_DIR`, `LLM_PROBE_DIR`, `SESSION_INFO`, `SANDBOX_DOMAIN`을 resolve된 실제 값으로 전달한다. 본 파일 내용을 인라인 복사하지 않는다.
+> 메인 에이전트 사용법: 이 파일을 서브 에이전트에게 Read하도록 지시하고, 프롬프트 끝에 `NOAH_SAST_DIR`, `PROJECT_ROOT`, `PHASE1_RESULTS_DIR`, `LLM_PROBE_DIR`, `probe_mode`, `SESSION_INFO`, `SANDBOX_DOMAIN`을 resolve된 실제 값으로 전달한다. 본 파일 내용을 인라인 복사하지 않는다.
+
+## probe_mode 분기
+
+| `probe_mode` | 동작 |
+|--------------|------|
+| `full` | 정적 식별 + 동적 검증 + system override 검증 + lock-in. (Y, Y) 매트릭스. |
+| `connectivity-only` | `full`과 동일하되 공격 페이로드 변형이 후속(Phase 2)에서 발생하지 않음. probe 자체는 무해한 `"hi"` 송신만 수행. (Y, N) 매트릭스. |
+| `static-only` | 코드 정적 분석만 수행 — 헬퍼 스크립트 호출 금지. `<SESSION_INFO>`/`<SANDBOX_DOMAIN>`은 빈 값일 수 있음. 산출물에 `verified: false`, `static_only: true` 메타 필수. (N, N) 매트릭스. |
+
+`static-only` 모드에서는 본 문서의 단계 2(Reachability fit), 4(Auth fit), 5(Multi-turn fit), 6(System override 검증)를 모두 skip하고 단계 1(Discovery) + 단계 7(Lock-in)만 수행한다.
 
 ## 목적
 
@@ -219,11 +229,22 @@ T2 `model_text`에 `"Noah"`(또는 의역 변형)가 등장한 모드를 확정.
       "auth_required": true,
       "system_overridable": true,
       "system_override_method": "messages[].role=system | system_prompt | system_message | system_instruction | none",
-      "sample_transcript_range": {"jsonl": "llm_endpoint_probe.jsonl", "session": "<12-hex>"}
+      "sample_transcript_range": {"jsonl": "llm_endpoint_probe.jsonl", "session": "<12-hex>"},
+
+      // 검증 수준 메타 (probe_mode가 결정)
+      "verified": true,            // full / connectivity-only: true, static-only: false
+      "static_only": false,        // static-only: true, 그 외: false
+      "probe_mode": "full | connectivity-only | static-only"
     }
   ]
 }
 ```
+
+**`static-only` 모드의 산출물 차이**:
+- `verified: false`, `static_only: true`, `probe_mode: "static-only"`.
+- 동적 호출이 없으므로 `headers`/`handshake.headers`/`event_stream`/`frames`/`heartbeat`/`multiturn`/`system_overridable`/`sample_transcript_range`는 모두 `null` 또는 누락.
+- `request_schema`/`response_path`/`event_stream.chunk_field` 등은 코드에서 추출한 단서를 `"hint:<후보>"` 또는 후보 목록으로 표기. 확정 형태로 적지 않는다.
+- 정적 분석에서 도출된 채널 분류는 `channel` 필드에 그대로 기록(예: `"ws-stomp"`). 정적 단서가 단일 채널을 가리키지 않으면 `channel: "unknown"`으로 두고 `channel_candidates: ["ws-stomp", "ws-raw"]` 메타를 첨부한다.
 
 **필드 ↔ 증거 매핑 원칙**:
 
