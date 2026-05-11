@@ -1,6 +1,6 @@
 # noah-8719
 
-> Claude Code 보안 분석 플러그인. 41개 취약점 스캐너 + AI 자율 탐색으로 정적 분석 + 동적 테스트 + 보고서 생성.
+> Claude Code 보안 분석 플러그인. 46개 취약점 스캐너 + AI 자율 탐색으로 정적 분석 + 동적 테스트 + 보고서 생성.
 
 ## 설치
 
@@ -143,6 +143,11 @@ Noah SAST는 Claude Code의 **스킬(Skill)** 시스템 위에 구축된 통합 
 | 39 | cookie-security-scanner | Cookie Security (Secure, HttpOnly, Persistent 등) | auth-protocol |
 | 40 | tls-scanner | TLS/SSL Misconfiguration | infra-config |
 | 41 | validation-logic-scanner | Validation Logic Mismatch | business-logic |
+| 42 | prompt-injection-scanner | LLM Prompt Injection (Direct/Indirect) | llm |
+| 43 | system-prompt-leakage-scanner | LLM System Prompt Leakage | llm |
+| 44 | insecure-output-handling-scanner | LLM Insecure Output Handling | llm |
+| 45 | unbounded-consumption-scanner | LLM Unbounded Consumption | llm |
+| 46 | android-deeplink-scanner | Android Deeplink / WebView | mobile |
 
 ## 디렉토리 구조
 
@@ -155,7 +160,7 @@ noah-8719/
 ├── skills/
 │   └── sast/
 │       ├── SKILL.md               # 오케스트레이터 (실행 프로세스 상세)
-│       ├── scanners/              # 41개 취약점 스캐너 (각 phase1.md + phase2.md)
+│       ├── scanners/              # 46개 취약점 스캐너 (각 phase1.md + phase2.md)
 │       ├── prompts/               # 서브 에이전트 지시 문서
 │       ├── tools/                 # Python 유틸리티 스크립트
 │       ├── sub-skills/            # 내부 서브스킬

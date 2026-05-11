@@ -1,11 +1,11 @@
 ---
 name: sast
-description: "41개 취약점 스캐너 + AI 자율 탐색을 실행하고 결과를 통합 보고서로 작성하는 스킬. XSS, SSRF, SQLi, CSRF, TLS, 비즈니스 로직 등 모든 취약점 유형을 소스코드 분석, AI 자율 탐색, 동적 테스트로 점검한다. 사용자가 'noah-8719:sast', 'sast', '소스코드 취약점 스캔' 등을 요청할 때 이 스킬을 사용한다."
+description: "46개 취약점 스캐너 + AI 자율 탐색을 실행하고 결과를 통합 보고서로 작성하는 스킬. XSS, SSRF, SQLi, CSRF, TLS, 비즈니스 로직, LLM 취약점 등 모든 취약점 유형을 소스코드 분석, AI 자율 탐색, 동적 테스트로 점검한다. 사용자가 'noah-8719:sast', 'sast', '소스코드 취약점 스캔' 등을 요청할 때 이 스킬을 사용한다."
 ---
 
 # Noah SAST — 통합 취약점 스캐너
 
-41개 개별 취약점 스캐너와 AI 자율 탐색을 실행하고, 모든 결과를 하나의 통합 보고서로 작성하는 스킬이다.
+46개 개별 취약점 스캐너와 AI 자율 탐색을 실행하고, 모든 결과를 하나의 통합 보고서로 작성하는 스킬이다.
 
 > `[필수]`는 writer 권한 위반·보안 사고 등 위반 시 치명적 결과를 초래하는 항목에만 붙인다. 태그 없는 항목도 모두 준수 의무이며, 태그는 우선순위가 아닌 경고 수위 표시다.
 
@@ -45,7 +45,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/sast
     phase1-group-agent.md          ← Phase 1 그룹 에이전트 프롬프트
     ai-discovery-agent.md          ← AI 자율 취약점 탐색 에이전트 프롬프트
     phase2-agent.md                ← Phase 2 동적 테스트 에이전트 프롬프트
-  scanners/                        ← 41개 취약점 스캐너
+  scanners/                        ← 46개 취약점 스캐너
     xss-scanner/
     sqli-scanner/
     ...
@@ -184,6 +184,8 @@ python3 <NOAH_SAST_DIR>/tools/select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_RO
 | data-export | csv-injection |
 | protocol-check | graphql, websocket, soapaction-spoofing, ldap-injection, xpath-injection |
 | business-logic | business-logic, validation-logic |
+| llm | prompt-injection, system-prompt-leakage, insecure-output-handling, unbounded-consumption |
+| mobile | android-deeplink |
 
 과부하 시 분할 예시: `auth-protocol`이 분할되면 → `auth-protocol-1` (jwt, oauth, saml) + `auth-protocol-2` (csrf, idor).
 

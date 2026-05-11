@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""select_scanners.py — grep 인덱스 + 프로젝트 파일 기반 41개 스캐너 자동 선별.
+"""select_scanners.py — grep 인덱스 + 프로젝트 파일 기반 46개 스캐너 자동 선별.
 
 Usage:
     python3 select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_ROOT> [--write-expected-file=PATH]
@@ -72,7 +72,10 @@ SCANNERS = [
     "websocket-scanner", "subdomain-takeover-scanner", "idor-scanner",
     "business-logic-scanner", "security-headers-scanner",
     "springboot-hardening-scanner", "cookie-security-scanner",
-    "tls-scanner", "validation-logic-scanner"
+    "tls-scanner", "validation-logic-scanner",
+    "prompt-injection-scanner", "system-prompt-leakage-scanner",
+    "insecure-output-handling-scanner", "unbounded-consumption-scanner",
+    "android-deeplink-scanner",
 ]
 
 pkg = read_pkg_json()
@@ -474,6 +477,36 @@ def check_exclude(scanner):
         pass  # TLS 설정은 모든 웹 프로젝트에 해당
     elif scanner == "validation-logic-scanner":
         pass  # 유효성 검사 로직은 모든 웹 프로젝트에 해당
+    elif scanner == "android-deeplink-scanner":
+        if not has_file(
+            "AndroidManifest.xml",
+            "*.kt", "*.kts",
+            "*.java",
+            "build.gradle", "build.gradle.kts",
+        ):
+            return "Android 프로젝트 아님 (AndroidManifest.xml/Kotlin/Java/Gradle 없음)"
+    elif scanner in (
+        "prompt-injection-scanner",
+        "system-prompt-leakage-scanner",
+        "insecure-output-handling-scanner",
+        "unbounded-consumption-scanner",
+    ):
+        if not has_dep_any(
+            # Python
+            "openai", "anthropic", "google-generativeai", "google-genai",
+            "vertexai", "google-cloud-aiplatform", "cohere", "mistralai",
+            "replicate", "together", "groq", "litellm", "ollama",
+            "huggingface-hub", "transformers", "langchain", "langchain-core",
+            "langchain-openai", "langchain-anthropic", "langgraph",
+            "llama-index", "llama-index-core", "haystack-ai", "semantic-kernel",
+            # Node.js
+            "openai", "@anthropic-ai/sdk", "@google/generative-ai",
+            "@google-cloud/vertexai", "cohere-ai", "@mistralai/mistralai",
+            "replicate", "together-ai", "groq-sdk", "litellm", "ollama",
+            "@huggingface/inference", "langchain", "@langchain/core",
+            "@langchain/openai", "@langchain/anthropic", "llamaindex",
+        ):
+            return "LLM SDK/프레임워크 의존성 없음"
     # open-redirect, crlf, path-traversal, http-method-tampering, host-header,
     # css-injection, redos, http-smuggling, idor: 아키텍처만으로 제외하기 어려움 → 포함
     return None
@@ -548,6 +581,13 @@ BASE_GROUPS = {
     "data-export": ["csv-injection-scanner"],
     "protocol-check": ["graphql-scanner", "websocket-scanner", "soapaction-spoofing-scanner", "ldap-injection-scanner", "xpath-injection-scanner"],
     "business-logic": ["business-logic-scanner", "validation-logic-scanner"],
+    "llm": [
+        "prompt-injection-scanner",
+        "system-prompt-leakage-scanner",
+        "insecure-output-handling-scanner",
+        "unbounded-consumption-scanner",
+    ],
+    "mobile": ["android-deeplink-scanner"],
 }
 
 # 의미적 서브그룹 (과부하 그룹 분할 시 사용)
