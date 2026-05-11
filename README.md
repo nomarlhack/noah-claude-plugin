@@ -56,8 +56,8 @@ flowchart TD
     LLMCheck -->|Yes| S83["Step 8-3: 그룹 사전 단계\nLLM endpoint probe\nprobe_mode: full / connectivity-only / static-only"]
     LLMCheck -->|No| AttackCheck
     S83 --> AttackCheck{동적 공격 동의?\nATTACK_CONSENT}
-    AttackCheck -->|Y + probe_mode=full| S84["Step 8-4: Phase 2 실행\n(Tier A/B/C 병렬)"]
-    AttackCheck -->|N or probe skip| S12
+    AttackCheck -->|Yes| S84["Step 8-4: Phase 2 실행 (Tier A/B/C 병렬)\n- LLM 스캐너: probe 결과로 분기 (full+endpoint OK → 본 검증, 그 외 → placeholder)\n- 비-LLM 스캐너: 정상 본 검증 (LLM probe 결과 무관)"]
+    AttackCheck -->|No| S12
     S84 --> S9["Step 9: 동적 분석 리뷰\n(phase2-review)"]
     S9 -->|불일치 감사 로그| Conflicts["phase1_eval_state.conflicts\n(append-only)"]
     Conflicts --> ChainCheck
