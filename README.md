@@ -110,6 +110,70 @@ Noah SAST는 Claude Code의 **스킬(Skill)** 시스템 위에 구축된 통합 
 | **오탐 방지** | Sink-first + Source-first 병행 분석, phase1-review/phase2-review의 blind eval + Phase 2 증거 기반 판정, 보고서 조립 후 본문 품질 개선 (체크리스트 10항목) |
 | **다중 언어 지원** | Node.js, Python, Ruby, Java, Go 매니페스트에서 의존성을 파싱하여 스캐너 선별 |
 
+## 정탐/오탐 판단 기준
+
+후보의 최종 상태는 `master-list.json`의 `status` 필드로 결정되며, **`scan-report-review` 서브스킬이 단일 writer**입니다. Phase 1·Phase 2 에이전트는 증거만 수집하고 상태를 직접 할당하지 않습니다.
+
+### 1) status 3종
+
+| status | 의미 | 결정 시점 |
+|--------|------|----------|
+| `confirmed` | 동적 테스트 또는 결정적 증거로 취약점이 실증됨 | phase2-review |
+| `candidate` | 동적 검증이 미완·차단·생략된 상태(상태 미확정) | phase1-review / phase2-review |
+| `safe` | 명시적 방어 또는 영향도 부재로 후보 폐기 | phase1-review / phase2-review |
+
+### 2) safe 분류 (`safe_category` 6종)
+
+`status=safe`이면 반드시 분류 명시 — 단순 "안전"이 아닌 **왜 안전한지**를 표현합니다.
+
+| 값 | 정의 | 대표 근거 |
+|----|------|---------|
+| `no_external_path` | 공격자가 해당 코드로 HTTP 요청을 보낼 수 없음 | dev-only 프록시, 서버 번들 비노출, 내부 전용 라우트 |
+| `defense_verified` | 공격 페이로드를 실제 전송했으나 방어 코드가 차단 | nginx 차단, 프레임워크 이스케이프, 게이트웨이 재작성 |
+| `not_applicable` | 공격 경로는 존재하나 취약점의 핵심 요건이 부재 | 민감정보 0건, 공개 자원이라 보호 대상 아님 |
+| `false_positive` | Phase 1이 지적한 코드가 실제로는 취약점 sink가 아님 | 설정 지시자 오인, 다른 메커니즘으로 방어 존재 |
+| `platform_default_defense` | 대상 브라우저·런타임·HTTP 표준이 동등 효과 방어 제공 | IETF RFC 표준 기본 차단, 주요 브라우저 최근 2개 메이저 기본값 |
+| `architectural_rationale_only` | 다른 후보의 경로 증명용 독립 항목 (자체 조치 대상 아님) | chain 분석의 영향 경로 증거 |
+
+### 3) candidate 태그 (`tag` enum)
+
+`status=candidate`는 반드시 사유 태그를 동반합니다. 두 태그 조건이 동시 해당하면 아래 **우선순위**에 따라 한 개만 부여하고, 부여되지 못한 사유는 `evidence_summary`에 함께 기술합니다.
+
+| 우선순위 | tag | 의미 | 적용 그룹 |
+|---------|-----|------|---------|
+| 1 | `LLM endpoint 미확보` | LLM probe 실패로 endpoints 빈 산출물 | LLM 그룹 한정 |
+| 2 | `LLM endpoint 정적 식별` | (N, N) static-only 모드 — 동적 호출 없음 | LLM 그룹 한정 |
+| 3 | `LLM endpoint 확인됨` | (Y, N) connectivity-only — 공격 페이로드 미시도 | LLM 그룹 한정 |
+| 4 | `동적 분석 생략` | 사용자가 동적 테스트 명시적 거부 | 비-LLM 그룹 |
+| 5 | `차단` | WAF/게이트웨이 등이 모든 변형 차단 | 공통 |
+| 6 | `환경 제한` | sandbox 환경 제한으로 일부 페이로드 수행 불가 | 공통 |
+| 7 | `도구 한계` | curl/Playwright 등 도구 실패로 검증 부분 실패 | 공통 |
+| 8 | `정보 부족` | 외부 콜백 URL 등 필요 정보 없어 검증 미완 | 공통 |
+
+### 4) 판정 워크플로 (3단계)
+
+```
+Phase 1 (스캐너 정적 탐색)
+   ↓ 후보 도출
+phase1-review (blind eval)
+   ↓ ✓ 유지 (CONFIRM/OVERRIDE) → Phase 2 진입
+   ↓ ✗ 폐기 (DISCARD)          → status=safe + safe_category (조기 종료, Phase 2 낭비 방지)
+Phase 2 (동적 검증)
+   ↓ 증거 수집 (status 부여 X)
+phase2-review (증거 해석)
+   ↓ confirmed / candidate+tag / safe+safe_category 확정
+```
+
+### 5) 핵심 판정 원칙
+
+- **Source 도달성 의미 기반 판정** — *"이 값을 외부 행위자가 의도적으로 다르게 만들 방법이 코드 외부에 존재하는가?"* 한 줄 질문으로 평가. 패턴 목록·enum 의존 금지. 입증 불가는 불명확 케이스로 **보수적으로 유지**.
+- **부재 주장 검증** — "검증 없음"을 주장하려면 sink ±30줄 + 호출자 체인 + 프레임워크 내장 방어 + 전역 필터까지 Read로 실제 확인. 함수명이 아닌 효과 기준.
+- **Phase 2 우선 원칙** — Phase 1 정적 주장과 Phase 2 동적 증거가 모순되면 항상 Phase 2 증거로 status 확정. 불일치는 `phase1_eval_state.conflicts`에 append-only 감사 로그로만 기록.
+- **blind eval** — phase1-review/phase2-review는 Phase 1 결과의 "후보 사유"를 보지 않고 코드와 evidence만으로 독립 판정 (편향 차단). 판정이 Phase 1과 일치하면 CONFIRM, 다르면 OVERRIDE·DISCARD.
+- **단일 writer 권한** — `confirmed`/`candidate`/`safe` 부여는 phase2-review만, `phase1_validated`/`phase1_discarded_reason`은 phase1-review만, `tag="동적 분석 생략"`은 사용자 거부 경로의 메인 에이전트만. 권한 위반은 assert 스크립트가 차단.
+
+상세 규칙은 `skills/sast/sub-skills/scan-report-review/_principles.md`(판정 원칙)와 `_contracts.md`(writer 권한·스키마·매트릭스) 참조.
+
 ## 스캐너 목록
 
 | # | 스캐너 | 취약점 유형 | 그룹 |
