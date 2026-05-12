@@ -52,13 +52,20 @@ flowchart TD
     Check -->|0건| S12["Step 12: 보고서 생성\n+ safe 분류 자동 섹션"]
     Check -->|1건+| S81["Step 8-1: 동적 테스트 정보 요청\n(URL_PROVIDED + ATTACK_CONSENT 분리)"]
     S81 --> S82["Step 8-2: 도구 권한 확인"]
-    S82 --> LLMCheck{LLM 그룹 활성?\nprereq_group=='llm' 후보 1건+}
-    LLMCheck -->|Yes| S83["Step 8-3: 그룹 사전 단계\nLLM endpoint probe\nprobe_mode: full / connectivity-only / static-only"]
-    LLMCheck -->|No| AttackCheck
-    S83 --> AttackCheck{동적 공격 동의?\nATTACK_CONSENT}
-    AttackCheck -->|Yes| S84["Step 8-4: Phase 2 실행 (Tier A/B/C 병렬)\n- LLM 스캐너: probe 결과로 분기 (full+endpoint OK → 본 검증, 그 외 → placeholder)\n- 비-LLM 스캐너: 정상 본 검증 (LLM probe 결과 무관)"]
-    AttackCheck -->|No| S12
-    S84 --> S9["Step 9: 동적 분석 리뷰\n(phase2-review)"]
+    S82 --> AttackCheck{ATTACK_CONSENT\n동적 공격 동의?}
+
+    AttackCheck -->|Yes| LLMCheckY{LLM 그룹 활성?}
+    LLMCheckY -->|Yes| S83Full["Step 8-3: LLM endpoint probe\nprobe_mode = full\n(정적 + 동적 + system override)"]
+    LLMCheckY -->|No| S84Plain["Step 8-4: Phase 2 실행\n비-LLM 스캐너만 본 검증"]
+    S83Full --> S84Mixed["Step 8-4: Phase 2 실행 (Tier A/B/C 병렬)\n- LLM 스캐너: probe 성공 → 본 검증 / 실패 → placeholder\n- 비-LLM 스캐너: 정상 본 검증 (LLM probe 결과 무관)"]
+
+    AttackCheck -->|No| LLMCheckN{LLM 그룹 활성?}
+    LLMCheckN -->|Yes| S83Lite["Step 8-3: LLM endpoint probe\nprobe_mode = connectivity-only or static-only\n(URL_PROVIDED 여부로 자동 선택)"]
+    LLMCheckN -->|No| S12
+    S83Lite --> S12
+
+    S84Plain --> S9["Step 9: 동적 분석 리뷰\n(phase2-review)"]
+    S84Mixed --> S9
     S9 -->|불일치 감사 로그| Conflicts["phase1_eval_state.conflicts\n(append-only)"]
     Conflicts --> ChainCheck
     S9 --> ChainCheck{"안전 제외\n후보 2건+?"}
@@ -84,8 +91,9 @@ flowchart TD
     style Check fill:#533483,stroke:#533483,color:#fff
     style ChainCheck fill:#533483,stroke:#533483,color:#fff
     style ReviewCheck fill:#533483,stroke:#533483,color:#fff
-    style LLMCheck fill:#533483,stroke:#533483,color:#fff
     style AttackCheck fill:#533483,stroke:#533483,color:#fff
+    style LLMCheckY fill:#533483,stroke:#533483,color:#fff
+    style LLMCheckN fill:#533483,stroke:#533483,color:#fff
 ```
 
 ## 개요
