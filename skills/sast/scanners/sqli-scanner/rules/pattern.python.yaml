@@ -1,0 +1,36 @@
+rules:
+  - id: noah-python-sqli-sink-pattern
+    severity: WARNING
+    languages:
+      - python
+    message: |
+      Python SQL sink — cursor.execute/Model.objects.raw/extra/session.execute(text(...))/
+      Django RawSQL/SQLAlchemy text(). 인자가 사용자 입력과 문자열 결합/포맷되면 SQL Injection.
+      파라미터화(%s 튜플, :param 딕셔너리)는 안전.
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\bcursor\.execute\s*\('
+          - pattern-regex: '\bcursor\.executemany\s*\('
+          - pattern-regex: '\.objects\.raw\s*\('
+          - pattern-regex: '\.objects\.extra\s*\('
+          - pattern-regex: '\bconnection\.execute\s*\('
+          - pattern-regex: '\bsession\.execute\s*\('
+          - pattern-regex: '\bsa\.text\s*\('
+          - pattern-regex: '\bsqlalchemy\.text\s*\('
+          - pattern-regex: '\bRawSQL\s*\('
+          - pattern-regex: 'f"\s*SELECT'
+          - pattern-regex: "f'\\s*SELECT"
+          - pattern-regex: 'f"\s*INSERT'
+          - pattern-regex: 'f"\s*UPDATE'
+          - pattern-regex: 'f"\s*DELETE'
+          - pattern-regex: '\.execute_arraydml\s*\('
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [python, django, sqlalchemy]

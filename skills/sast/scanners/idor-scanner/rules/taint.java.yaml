@@ -1,0 +1,135 @@
+rules:
+  - id: noah-java-idor-missing-owner-gate-taint
+    severity: WARNING
+    languages:
+      - java
+    mode: taint
+    message: |
+      외부입력→리소스접근→소유권게이트부재 (IDOR 검토 후보). 컨트롤러가 @PathVariable/
+      @RequestParam/@RequestBody로 받은 식별자(이름·타입 무관)를 repository/service 조회·
+      조작 호출에 전달하는데, 같은 처리 경로에 소유권 게이트(요청자 accountId/userId vs
+      리소스 소유자 비교, @PreAuthorize/@PostAuthorize, AOP 인가)가 보이지 않음.
+      [중요] IDOR은 "검증의 부재"라 taint가 sanitizer를 못 잡으면 FP가 된다. 본 룰 매치는
+      "검토 후보"이며, 소유권 검증이 service 계층 깊이/AOP/커스텀에 있으면 phase1.md
+      절차로 직접 확인 후 제외하라(이름 카탈로그로 거르지 말 것).
+    pattern-sources:
+      # 이름 무관 — 어노테이션이 외부 입력의 표지. accessKey/seq/code/path 등 전부 포함.
+      # Spring Web 표준 외부 입력 표면 전수 — path/query/body/header/cookie/multipart/model.
+      # 특정 이름(accountId 등) 카탈로그 금지. 어노테이션이 곧 신뢰 경계.
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @PathVariable $T $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @PathVariable(...) $T $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @RequestParam $T $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @RequestParam(...) $T $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @RequestBody $T $X, ...) { ... }
+      # 헤더 source — 게이트웨이가 덮어쓰지 못하는 사용자 제어 헤더(예: X-User-Id, accountId-header
+      # 등 커스텀 식별자 헤더). 게이트웨이가 인증 후 주입하는 신뢰 헤더와 구조적으로 구분 불가하므로
+      # 후보로 올린 뒤 phase1.md 절차로 "게이트웨이 덮어쓰기 여부"를 확인하여 안전 분기 처리한다.
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @RequestHeader $T $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @RequestHeader(...) $T $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @CookieValue $T $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @CookieValue(...) $T $X, ...) { ... }
+      # query/form → DTO 명시 바인딩 (Spring MVC 관용구). DTO 객체 자체가 source.
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @ModelAttribute $T $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @ModelAttribute(...) $T $X, ...) { ... }
+      # multipart 입력 — 식별자 필드가 파일과 함께 멀티파트로 전송되는 경우.
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @RequestPart $T $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $RT $M(..., @RequestPart(...) $T $X, ...) { ... }
+    pattern-sinks:
+      # 리소스 조회/조작 — 이름 카탈로그가 아니라 호출 형태(메서드 인자로 식별자 전달)
+      - pattern: $REPO.findById($X)
+      - pattern: $REPO.findById($X, ...)
+      - pattern: $REPO.getById($X)
+      - pattern: $REPO.getReferenceById($X)
+      - pattern: $REPO.findOne($X)
+      - pattern: $REPO.delete($X)
+      - pattern: $REPO.deleteById($X)
+      - pattern: $SVC.$GET($X)
+      - pattern: $SVC.$GET($ACCT, $X)
+      - pattern: $SVC.$GET(..., $X, ...)
+    pattern-sanitizers:
+      # 소유권 게이트 — 이게 있으면 안전. 코드베이스 관용구를 계속 추가해야 FP 감소.
+      - pattern: $OWNER.equals($X)
+      - pattern: $X.equals($OWNER)
+      - pattern: Objects.equals($OWNER, $X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if (!$OWNER.equals(...)) { throw ...; }
+              ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($OWNER != ...) { throw ...; }
+              ...
+      # Spring Security 메서드 인가
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              @PreAuthorize("...") $RT $M(...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              @PostAuthorize("...") $RT $M(...) { ... }
+      # 커스텀 AOP 인가 어노테이션은 코드베이스마다 이름이 달라 룰에 고정하지 않는다.
+      # (특정 이름을 sanitizer로 박으면 그 프로젝트에만 맞는 편향이 된다.) taint가
+      # 못 거르므로 후보로 올라가며, phase1.md 절차대로 에이전트가 service/AOP 계층을
+      # Read해 실제 인가 어노테이션을 확인한 뒤 제외한다(재현율 우선 — FN보다 FP가 낫다).
+      # 명시적 소유권 검증 호출
+      - pattern: checkOwner($X, ...)
+      - pattern: validateOwnership($X, ...)
+      - pattern: $V.verifyOwner(..., $X, ...)
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-639: Authorization Bypass Through User-Controlled Key (IDOR)"
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Broken Access Control
+      owasp:
+        - "A01:2021 Broken Access Control"
+      technology:
+        - java
+        - spring

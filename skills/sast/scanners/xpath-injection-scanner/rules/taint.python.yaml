@@ -1,0 +1,36 @@
+rules:
+  - id: noah-python-xpath-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력이 lxml/ElementTree xpath/findall 식에 문자열 결합으로
+      들어가면 XPath Injection. 안전: XPath 변수 바인딩, 화이트리스트.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form.get($K, ...)
+    pattern-sinks:
+      - pattern: $TREE.xpath($X)
+      - pattern: $TREE.xpath($X, ...)
+      - pattern: $TREE.find($X)
+      - pattern: $TREE.findall($X)
+      - pattern: $TREE.findtext($X)
+      - pattern: etree.XPath($X)
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $TREE.xpath($EXPR, $VAR=$X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-643: XPath Injection"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [python, lxml]

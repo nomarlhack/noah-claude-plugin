@@ -1,0 +1,48 @@
+rules:
+  - id: noah-javascript-cmdi-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js child_process.exec/execSync/spawn({shell:true})에 req.* 사용자 입력이
+      직접 들어가면 OS Command Injection. spawn(cmd, [args]) 형태로 인자 배열 분리 +
+      shell:false가 안전. shell-quote 라이브러리로 escape.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.params
+      - pattern: req.params.$X
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: ctx.query
+      - pattern: ctx.request.body
+    pattern-sinks:
+      - pattern: exec($X, ...)
+      - pattern: execSync($X, ...)
+      - pattern: child_process.exec($X, ...)
+      - pattern: child_process.execSync($X, ...)
+      - pattern: execaCommand($X, ...)
+      - patterns:
+          - pattern-either:
+              - pattern: 'spawn($X, ..., { shell: true })'
+              - pattern: 'spawnSync($X, ..., { shell: true })'
+              - pattern: 'child_process.spawn($X, ..., { shell: true })'
+      - pattern: shelljs.exec($X)
+    pattern-sanitizers:
+      - pattern: shellQuote.quote([$X])
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ([...].includes($X)) { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-78: OS Command Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Command Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [nodejs, express, fastify]

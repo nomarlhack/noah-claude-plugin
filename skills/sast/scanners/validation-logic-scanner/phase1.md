@@ -1,38 +1,6 @@
 ---
 id_prefix: VAL
-grep_patterns:
-  # Loose equality (type confusion sink)
-  - "==\\s*null"
-  - "!=\\s*null"
-  - "==\\s*undefined"
-  - "!=\\s*undefined"
-  - "==\\s*false"
-  - "==\\s*true"
-  - "==\\s*0\\b"
-  - "==\\s*''"
-  - "==\\s*\"\""
-  # Validation framework (validation boundary detection)
-  - "Joi\\."
-  - "\\.validate\\s*\\("
-  - "ValidationPipe"
-  - "@Valid\\b"
-  - "express-validator"
-  - "class-validator"
-  - "checkSchema"
-  - "ajv"
-  # Client-side validation indicators
-  - "checkValidity"
-  - "setCustomValidity"
-  # Schema/DTO configuration
-  - "additionalProperties"
-  - "stripUnknown"
-  - "allowUnknown"
-  - "forbidNonWhitelisted"
-  - "@IsOptional"
-  - "@IsNotEmpty"
-  # Null/type check patterns
-  - "typeof\\s+\\w+"
-  - "instanceof\\s+"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "검증이 없는 것 자체가 취약점이 아니라, 검증 불일치로 인해 의도하지 않은 동작이 발생할 수 있어야 후보다"

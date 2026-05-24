@@ -1,30 +1,6 @@
 ---
 id_prefix: HSMG
-grep_patterns:
-  - "Transfer-Encoding"
-  - "Content-Length"
-  - "chunked"
-  - "proxy_pass"
-  - "ProxyPass"
-  - "http-proxy-middleware"
-  - "proxy_http_version"
-  - "changeOrigin"
-  - "http-reuse"
-  - "keepalive_timeout"
-  - "upstream"
-  - "LimitRequestBody"
-  - "upstream_keepalive"
-  - "Expect"
-  - "Upgrade:"
-  - "HTTP2-Settings"
-  - "h2c"
-  - "--insecure-http-parser"
-  - "gunicorn"
-  - "uvicorn"
-  - "puma"
-  - "tomcat"
-  - "envoy"
-  - "haproxy"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "요청 경계 불일치가 발생해야 취약점이다"

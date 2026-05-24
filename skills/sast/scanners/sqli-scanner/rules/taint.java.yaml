@@ -1,0 +1,101 @@
+rules:
+  - id: noah-java-spring-sqli-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java + Spring 컨트롤러 입력(@RequestParam/@PathVariable/@RequestBody)이
+      JdbcTemplate/EntityManager/Statement 등 SQL sink로 문자열 결합되어 들어가면 SQLi.
+      안전: PreparedStatement.setString, named parameter map.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestHeader $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestHeader(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @CookieValue(...) $X, ...) { ... }
+
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $JDBC.query("..." + $V, ...)
+              - pattern: $JDBC.query($V + "...", ...)
+              - pattern: $JDBC.query(String.format(...), ...)
+              - pattern: $JDBC.queryForObject("..." + $V, ...)
+              - pattern: $JDBC.queryForList("..." + $V, ...)
+              - pattern: $JDBC.update("..." + $V, ...)
+              - pattern: $JDBC.execute("..." + $V, ...)
+          - pattern-not: $JDBC.query("...", $PARAMS)
+      - patterns:
+          - pattern-either:
+              - pattern: $EM.createNativeQuery("..." + $V, ...)
+              - pattern: $EM.createNativeQuery(String.format(...), ...)
+              - pattern: $EM.createQuery("..." + $V, ...)
+              - pattern: $EM.createQuery(String.format(...), ...)
+      - patterns:
+          - pattern-either:
+              - pattern: $STMT.executeQuery("..." + $V)
+              - pattern: $STMT.executeQuery(String.format(...))
+              - pattern: $STMT.executeUpdate("..." + $V)
+              - pattern: $STMT.execute("..." + $V)
+          - pattern-not: $STMT.executeQuery("...")
+
+    pattern-sanitizers:
+      - pattern: Integer.parseInt($X)
+      - pattern: Long.parseLong($X)
+      - pattern: Double.parseDouble($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              PreparedStatement $PS = $CONN.prepareStatement("...");
+              ...
+              $PS.setString($I, $X);
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              PreparedStatement $PS = $CONN.prepareStatement("...");
+              ...
+              $PS.setInt($I, $X);
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              MapSqlParameterSource $PARAMS = new MapSqlParameterSource();
+              $PARAMS.addValue($K, $X);
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [java, spring, jpa, jdbc]

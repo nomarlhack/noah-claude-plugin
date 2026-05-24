@@ -1,0 +1,42 @@
+rules:
+  - id: noah-kotlin-csvi-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      csv-injection-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'json2csv'
+      - pattern-regex: 'csv-stringify'
+      - pattern-regex: 'csv-writer'
+      - pattern-regex: 'exceljs'
+      - pattern-regex: 'xlsx'
+      - pattern-regex: 'csv\.writer'
+      - pattern-regex: 'pandas\.to_csv\s*\('
+      - pattern-regex: 'openpyxl'
+      - pattern-regex: 'xlsxwriter'
+      - pattern-regex: 'fputcsv\s*\('
+      - pattern-regex: 'text/csv'
+      - pattern-regex: 'format\.csv'
+      - pattern-regex: 'CSV\.generate'
+      - pattern-regex: 'CSV\.open'
+      - pattern-regex: 'setCellValue'
+      - pattern-regex: 'setCellFormula'
+      - pattern-regex: 'write_string'
+      - pattern-regex: 'write_formula'
+      - pattern-regex: 'cell\.formula'
+      - pattern-regex: 'cell\.value'
+      - pattern-regex: 'csv\.QUOTE_'
+      - pattern-regex: 'Content-Disposition.*csv'
+      - pattern-regex: 'Content-Disposition.*xlsx'
+      - pattern-regex: 'createCell'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-1236: CSV Formula Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

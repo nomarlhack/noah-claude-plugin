@@ -1,0 +1,52 @@
+rules:
+  - id: noah-python-cmdi-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 사용자 입력이 os.system/subprocess.run/Popen(shell=True)/os.popen
+      등에 직접 들어가면 OS Command Injection. shlex.quote 또는 shell=False + 리스트
+      인자로 안전 처리.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json
+      - pattern: request.data
+      - pattern: request.body
+    pattern-sinks:
+      - pattern: os.system($X)
+      - pattern: os.popen($X)
+      - pattern: subprocess.call($X, ..., shell=True)
+      - pattern: subprocess.run($X, ..., shell=True)
+      - pattern: subprocess.Popen($X, ..., shell=True)
+      - pattern: subprocess.check_output($X, ..., shell=True)
+      - patterns:
+          - pattern-either:
+              - pattern: subprocess.call($X)
+              - pattern: subprocess.run($X)
+              - pattern: subprocess.Popen($X)
+          - pattern-not: subprocess.call([...])
+          - pattern-not: subprocess.run([...])
+          - pattern-not: subprocess.Popen([...])
+      - pattern: commands.getoutput($X)
+    pattern-sanitizers:
+      - pattern: shlex.quote($X)
+      - pattern: re.match($P, $X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X in $WHITELIST:
+                  ...
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-78: OS Command Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Command Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [python, django, flask, fastapi]

@@ -1,0 +1,74 @@
+rules:
+  - id: noah-javascript-proto-pathwalk-pattern
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    message: |
+      커스텀 path walk 패턴 — `obj[k] = obj[k] || {}; obj = obj[k]` 루프로 dot-name을
+      객체로 복원하는 코드. Object.create(null) 초기값 + __proto__/constructor/prototype
+      키 차단이 없으면 사용자 제어 키로 Object.prototype을 오염시킬 수 있다.
+      대표 예: recoverDotNameObject, expandDotKeys, unflatten 류 함수. multipart fields/
+      bodyParser/qs 결과를 split('.')로 분해하여 walk하는 모든 코드가 대상.
+      안전 패턴: (1) Object.create(null) 초기값, (2) ['__proto__','constructor','prototype']
+      키 차단, (3) Map 사용, (4) Object.fromEntries + 명시 allowlist 재작성.
+    patterns:
+      - pattern-either:
+          # forEach 기반 walk
+          - pattern: |
+              $KEYS.forEach(($K, $I, ...) => {
+                ...
+                $CUR[$K] = $CUR[$K] || {};
+                $CUR = $CUR[$K];
+                ...
+              })
+          - pattern: |
+              $KEYS.forEach(function ($K, $I, ...) {
+                ...
+                $CUR[$K] = $CUR[$K] || {};
+                $CUR = $CUR[$K];
+                ...
+              })
+          # for...of 기반 walk
+          - pattern: |
+              for (const $K of $KEYS) {
+                ...
+                $CUR[$K] = $CUR[$K] || {};
+                $CUR = $CUR[$K];
+                ...
+              }
+          - pattern: |
+              for (let $K of $KEYS) {
+                ...
+                $CUR[$K] = $CUR[$K] || {};
+                $CUR = $CUR[$K];
+                ...
+              }
+          # for(;;) 인덱스 기반 walk
+          - pattern: |
+              for (let $I = 0; $I < $KEYS.length; $I++) {
+                ...
+                $CUR[$KEYS[$I]] = $CUR[$KEYS[$I]] || {};
+                $CUR = $CUR[$KEYS[$I]];
+                ...
+              }
+          # reduce 기반 walk (전역 오염 변형)
+          - pattern: |
+              $KEYS.reduce(($ACC, $K) => $ACC[$K] = $ACC[$K] || {}, $INIT)
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-1321: Prototype Pollution"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Prototype Pollution
+      owasp:
+        - A08:2021 Software and Data Integrity Failures
+      technology:
+        - nodejs
+        - javascript
+        - typescript

@@ -1,0 +1,25 @@
+rules:
+  # 고정밀 HTML sink 룰 (capability sub-rule). broad phase1-pattern과 분리되어
+  # decision-framework §2-D 기계 OBLIGATION 게이트의 "능력형 매치" 집계 대상이 된다.
+  # rule_id가 `-sink`로 끝나 semgrep_index가 ast tier로 분류하고, 의무 감사가
+  # `capability_via_sink_rule` 정책 하에 이 룰 매치만 능력형으로 카운트한다.
+  - id: noah-javascript-xss-innerhtml-sink
+    severity: WARNING
+    languages: [javascript]
+    message: |
+      HTML sink 능력형 매치 (innerHTML/outerHTML/insertAdjacentHTML/document.write/
+      jQuery .html()/dangerouslySetInnerHTML). 매치 = HTML 주입 능력 실재.
+      source가 사용자 제어이고 escape/sanitize가 없으면 XSS. Safe-by-Proof §2-D —
+      클래스 일괄 제외 금지, 매치별/동질 하위클래스로 O4 증거 제시.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-79: Improper Neutralization of Input During Web Page Generation"]
+    patterns:
+      - pattern-either:
+          - pattern: $X.innerHTML = $Y
+          - pattern: $X.outerHTML = $Y
+          - pattern: $X.insertAdjacentHTML($POS, $Y)
+          - pattern: document.write($Y)
+          - pattern: document.writeln($Y)
+          - pattern: $EL.html($Y)
+          - pattern: dangerouslySetInnerHTML={$Y}

@@ -116,6 +116,16 @@ if command -v python3 >/dev/null 2>&1; then
   fi
 fi
 
+# semgrep 확인 — `rules/` 디렉토리를 가진 스캐너의 Phase 1 인덱싱에 사용
+# (현재 sqli-scanner가 semgrep 룰 기반. 나머지 스캐너는 grep 패턴 사용 — semgrep 없어도 동작)
+if command -v semgrep >/dev/null 2>&1; then
+  SEMGREP_VER=$(semgrep --version 2>/dev/null | head -1 | tr -d '[:space:]')
+  ok "semgrep 확인 (v$SEMGREP_VER)"
+else
+  warn "semgrep이 없습니다. semgrep 룰 기반 스캐너(sqli 등)의 Phase 1 인덱싱이 비활성화됩니다."
+  warn "설치: brew install semgrep   또는   python3 -m pip install --user semgrep"
+fi
+
 # Claude Code 확인
 if [ ! -d "$HOME/.claude" ]; then
   error "\$HOME/.claude 디렉토리가 없습니다. Claude Code가 설치되어 있는지 확인하세요."
@@ -194,8 +204,8 @@ ERRORS=0
 [ -d "$INSTALL_DIR/skills/sast/tools" ]    || { warn "skills/sast/tools/ 누락"; ERRORS=$((ERRORS+1)); }
 
 SCANNER_COUNT=$(ls -d "$INSTALL_DIR/skills/sast/scanners"/*-scanner 2>/dev/null | wc -l | tr -d ' ')
-if [ "$SCANNER_COUNT" -lt 45 ]; then
-  warn "스캐너가 ${SCANNER_COUNT}개뿐입니다. (기대값: 46개)"
+if [ "$SCANNER_COUNT" -lt 46 ]; then
+  warn "스캐너가 ${SCANNER_COUNT}개뿐입니다. (기대값: 47개)"
   ERRORS=$((ERRORS+1))
 fi
 

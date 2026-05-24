@@ -1,0 +1,38 @@
+rules:
+  - id: noah-javascript-ssti-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js에서 req.* 입력이 ejs.render / pug.render / nunjucks.renderString /
+      Handlebars.compile 등 템플릿 컴파일 함수에 들어가면 SSTI → RCE.
+      안전: 템플릿 파일 경로 기반 렌더링, 사용자 입력은 데이터로만 전달.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.params
+      - pattern: req.body
+      - pattern: req.body.$X
+    pattern-sinks:
+      - pattern: ejs.render($X, ...)
+      - pattern: pug.render($X, ...)
+      - pattern: pug.compile($X)
+      - pattern: nunjucks.renderString($X, ...)
+      - pattern: Handlebars.compile($X)
+      - pattern: handlebars.compile($X)
+      - pattern: _.template($X)
+      - pattern: lodash.template($X)
+      - pattern: vm.runInNewContext($X, ...)
+    pattern-sanitizers: []
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-94: Server-Side Template Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [nodejs, ejs, pug, nunjucks, handlebars]

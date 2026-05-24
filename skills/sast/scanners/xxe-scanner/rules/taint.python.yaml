@@ -1,0 +1,40 @@
+rules:
+  - id: noah-python-xxe-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력 XML이 lxml.etree.fromstring/parse에 resolve_entities=True
+      (기본) 파서로 들어가면 XXE. 안전: defusedxml 사용, lxml resolve_entities=False +
+      no_network=True.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.data
+      - pattern: request.body
+      - pattern: request.files[$K]
+    pattern-sinks:
+      - pattern: etree.fromstring($X)
+      - pattern: etree.fromstring($X, ...)
+      - pattern: etree.parse($X)
+      - pattern: etree.XML($X)
+      - pattern: lxml.etree.fromstring($X)
+      - pattern: xml.etree.ElementTree.fromstring($X)
+      - pattern: xml.etree.ElementTree.parse($X)
+      - pattern: minidom.parseString($X)
+      - pattern: minidom.parse($X)
+      - pattern: sax.parseString($X, ...)
+    pattern-sanitizers:
+      - pattern: defusedxml.ElementTree.fromstring($X)
+      - pattern: defusedxml.lxml.fromstring($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-611: XML External Entity"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [XXE]
+      owasp: ["A05:2021 Security Misconfiguration"]
+      technology: [python, lxml]

@@ -1,0 +1,15 @@
+rules:
+  - id: noah-kotlin-cmdi-shell-sink
+    severity: WARNING
+    languages: [kotlin]
+    message: |
+      OS 명령 실행 sink 능력형 매치 (Runtime.getRuntime().exec). Safe-by-Proof §2-D.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-78: Improper Neutralization of Special Elements used in an OS Command"]
+    patterns:
+      - pattern: Runtime.getRuntime().exec($X)
+      - metavariable-pattern:
+          metavariable: $X
+          patterns:
+            - pattern-not: "\"...\""

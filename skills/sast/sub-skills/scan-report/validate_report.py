@@ -53,22 +53,37 @@ html_path = f"{report_name}.html"
 
 errors = []
 
-# 1. MD POC 건수 검증
+import re as _re
+
+
+def _strip_chain_section(text: str) -> str:
+    """`## 연계 시나리오` 섹션을 제거한 본문 반환.
+    이 섹션의 체인별 통합 POC는 후보별 POC 카운트와 별개로 취급한다."""
+    return _re.sub(
+        r"^## 연계 시나리오.*?(?=^## |\Z)", "", text, count=1, flags=_re.M | _re.S
+    )
+
+
+# 1. MD POC 건수 검증 (연계 시나리오 섹션의 체인별 POC는 제외)
 if os.path.exists(md_path):
     with open(md_path, encoding="utf-8") as f:
         md_content = f.read()
-    md_poc = md_content.count("재현 방법 및 POC")
+    md_poc = _strip_chain_section(md_content).count("재현 방법 및 POC")
     if md_poc != expected:
         errors.append(f"MD POC {md_poc}건 != 기대 {expected}건 (누락 {expected - md_poc}건)")
 else:
     errors.append(f"{md_path} 파일 없음")
     md_content = ""
 
-# 2. HTML POC 건수 검증
+# 2. HTML POC 건수 검증 (연계 시나리오 섹션 제외)
 if os.path.exists(html_path):
     with open(html_path, encoding="utf-8") as f:
         html_content = f.read()
-    html_poc = html_content.count("재현 방법 및 POC")
+    # HTML도 헤더 텍스트 기반으로 동일 영역 제외
+    html_stripped = _re.sub(
+        r"<h2[^>]*>연계 시나리오</h2>.*?(?=<h2|\Z)", "", html_content, count=1, flags=_re.S
+    )
+    html_poc = html_stripped.count("재현 방법 및 POC")
     if html_poc != expected:
         errors.append(f"HTML POC {html_poc}건 != 기대 {expected}건 (누락 {expected - html_poc}건)")
 else:

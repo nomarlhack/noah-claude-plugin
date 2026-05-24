@@ -81,6 +81,7 @@ TEMPLATE_VAR_REGEX = {
     "{SCANNER_NAME}": r"[A-Za-z0-9가-힣/][A-Za-z0-9가-힣/\s\-]*",
     "{VULN_TITLE}": r".+",
     "{TITLE}": r".+",
+    "{IDS}": r"[A-Z][A-Z0-9_]*-\d+(?:\s*~\s*[A-Z][A-Z0-9_]*-\d+)?",
 }
 
 
@@ -270,8 +271,10 @@ def check_md(path: str) -> list[str]:
 
         # (B) 블랙리스트 backup: 스펙 통과 후에도 내부 규약 용어 검사
         # 예: `{VULN_TITLE}` 템플릿은 자유 텍스트 허용이라 DISCARD가 들어올 수 있음
+        # NOTE: 내부 라벨(DISCARD/OVERRIDE/CONFIRM)은 대문자 키워드 전용이라 case-sensitive로 검사.
+        # 영어 일반 단어 'Override'(예: "X-HTTP-Method-Override")는 정상 후보 제목에 등장 가능.
         for pattern, label in BANNED_PATTERNS:
-            hit = re.search(pattern, heading, re.IGNORECASE)
+            hit = re.search(pattern, heading)
             if hit:
                 violations.append(
                     f"{path}:{line_no} (h{level}): 금지 토큰 '{label}' → \"{heading}\""

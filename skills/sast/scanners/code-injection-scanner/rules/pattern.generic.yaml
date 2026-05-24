@@ -1,0 +1,39 @@
+rules:
+  - id: noah-codeinj-phase1-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      code-injection-scanner Phase 1 동적 코드 실행 sink 패턴 (언어 무관).
+      후보 수집용 — 정탐 판정은 인자가 사용자 입력/저장값에 도달하는지(Source 도달성),
+      정적 리터럴/json 파싱이 아닌지 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: '\beval\s*\('
+      - pattern-regex: '\bassert\s*\('
+      - pattern-regex: '\bcreate_function\s*\('
+      - pattern-regex: '\bnew\s+Function\s*\('
+      - pattern-regex: '\bsetTimeout\s*\(\s*[''"]'
+      - pattern-regex: '\bsetInterval\s*\(\s*[''"]'
+      - pattern-regex: '\bvm\.runInNewContext\s*\('
+      - pattern-regex: '\bvm\.runInThisContext\s*\('
+      - pattern-regex: '\bexec\s*\('
+      - pattern-regex: '\bcompile\s*\('
+      - pattern-regex: '\binstance_eval\b'
+      - pattern-regex: '\bclass_eval\b'
+      - pattern-regex: '\bScriptEngine\b'
+      - pattern-regex: '\bGroovyShell\b'
+      - pattern-regex: 'preg_replace\s*\(\s*[''"][^''"]*[''"]e[^''"]*[''"]'
+      - pattern-regex: '\bcall_user_func\s*\('
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Code Injection
+      owasp:
+        - A03:2021 Injection

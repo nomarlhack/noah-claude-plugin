@@ -1,32 +1,6 @@
 ---
 id_prefix: HMT
-grep_patterns:
-  - "method-override"
-  - "X-HTTP-Method-Override"
-  - "X-Method-Override"
-  - "_method"
-  - "app\\.all\\s*\\("
-  - "Rack::MethodOverride"
-  - "limit_except"
-  - "<Limit"
-  - "<LimitExcept"
-  - "http_method_names"
-  - "@RequestMapping"
-  - "@GetMapping"
-  - "@PostMapping"
-  - "@PutMapping"
-  - "@DeleteMapping"
-  - "@PatchMapping"
-  - "require_http_methods"
-  - "require_POST"
-  - "require_GET"
-  - "csrf_exempt"
-  - "method=\\["
-  - "methods=\\["
-  - "@api_route"
-  - "@route\\s*\\("
-  - "router\\.(get|post|put|delete|patch|all)"
-  - "AllowAnyMethod"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "메서드 변경으로 보안이 우회되어야 취약점이다"

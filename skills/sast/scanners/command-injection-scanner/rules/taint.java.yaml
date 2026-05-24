@@ -1,0 +1,45 @@
+rules:
+  - id: noah-java-cmdi-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Runtime.exec(String) / ProcessBuilder("sh", "-c", $X)에 Spring 컨트롤러
+      입력이 결합되어 들어가면 OS Command Injection. ProcessBuilder(List<String>) +
+      개별 토큰 분리가 안전.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+    pattern-sinks:
+      - pattern: Runtime.getRuntime().exec($X)
+      - pattern: Runtime.getRuntime().exec($X, ...)
+      - pattern: new ProcessBuilder($X)
+      - pattern: new ProcessBuilder("sh", "-c", $X)
+      - pattern: new ProcessBuilder("bash", "-c", $X)
+    pattern-sanitizers:
+      - pattern: $X.matches($P)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-78: OS Command Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Command Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [java, spring]

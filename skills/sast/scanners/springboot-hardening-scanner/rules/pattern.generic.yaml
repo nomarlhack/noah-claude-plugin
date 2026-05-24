@@ -1,0 +1,45 @@
+rules:
+  - id: noah-spring-phase1-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      springboot-hardening-scanner Phase 1 sink/source 패턴 매치.
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'spring\.mvc\.dispatch-trace-request'
+      - pattern-regex: 'dispatch-trace-request'
+      - pattern-regex: 'server\.error\.whitelabel'
+      - pattern-regex: 'whitelabel'
+      - pattern-regex: 'server\.error\.include-stacktrace'
+      - pattern-regex: 'include-stacktrace'
+      - pattern-regex: 'springdoc'
+      - pattern-regex: 'swagger'
+      - pattern-regex: 'api-docs'
+      - pattern-regex: 'management\.endpoints'
+      - pattern-regex: 'management\.endpoint'
+      - pattern-regex: 'actuator'
+      - pattern-regex: 'spring-boot-starter-actuator'
+      - pattern-regex: 'spring\.application\.admin\.enabled'
+      - pattern-regex: 'spring\.devtools'
+      - pattern-regex: 'spring-boot-devtools'
+      - pattern-regex: 'devtools\.remote\.secret'
+      - pattern-regex: 'spring\.h2\.console'
+      - pattern-regex: 'h2database'
+      - pattern-regex: 'h2\.console\.enabled'
+      - pattern-regex: 'server\.tomcat\.accesslog'
+      - pattern-regex: 'server\.jetty\.accesslog'
+      - pattern-regex: 'server\.undertow\.accesslog'
+      - pattern-regex: 'EndpointRequest'
+      - pattern-regex: 'management\.server\.port'
+      - pattern-regex: 'enabled-by-default'
+      - pattern-regex: 'shutdown\.enabled'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-16: Spring Boot Hardening"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

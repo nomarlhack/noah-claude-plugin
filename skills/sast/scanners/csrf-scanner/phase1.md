@@ -1,26 +1,6 @@
 ---
 id_prefix: CSRF
-grep_patterns:
-  - "csrf_exempt"
-  - "skip_before_action.*verify_authenticity_token"
-  - "csrf\\.disable"
-  - "csurf"
-  - "csrf-csrf"
-  - "csrf-sync"
-  - "protect_from_forgery"
-  - "SameSite"
-  - "X-CSRF-Token"
-  - "X-Requested-With"
-  - "verify_authenticity_token"
-  - "@csrf_exempt"
-  - "csrf\\s*\\(\\s*\\)\\.disable"
-  - "@PostMapping"
-  - "@PutMapping"
-  - "@DeleteMapping"
-  - "WebSecurityConfigurerAdapter"
-  - "SecurityFilterChain"
-  - "HttpSecurity"
-  - "ignoringRequestMatchers"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "위조된 cross-origin 요청이 처리되지 않으면 취약점이 아니다"

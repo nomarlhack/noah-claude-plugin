@@ -1,0 +1,50 @@
+rules:
+  - id: noah-javascript-pathtrv-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js fs.readFile/readFileSync/createReadStream에 req.* 사용자 입력이
+      직접 들어가면 Path Traversal. path.basename 또는 path.resolve로 정규화 후
+      허용 디렉토리 prefix 검사.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.params
+      - pattern: req.params.$X
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: ctx.query
+      - pattern: ctx.params
+    pattern-sinks:
+      - pattern: fs.readFile($X, ...)
+      - pattern: fs.readFileSync($X, ...)
+      - pattern: fs.createReadStream($X, ...)
+      - pattern: fs.writeFile($X, ...)
+      - pattern: fs.writeFileSync($X, ...)
+      - pattern: fs.createWriteStream($X, ...)
+      - pattern: fs.unlink($X, ...)
+      - pattern: fs.unlinkSync($X)
+      - pattern: fsPromises.readFile($X, ...)
+      - pattern: res.sendFile($X, ...)
+      - pattern: res.download($X, ...)
+      - pattern: path.join($A, $X)
+      - pattern: path.resolve($X, ...)
+    pattern-sanitizers:
+      - pattern: path.basename($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if (!$X.includes("..")) { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-22: Path Traversal"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Path Traversal]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [nodejs, express]

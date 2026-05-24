@@ -1,0 +1,37 @@
+rules:
+  - id: noah-scala-crlf-phase1-pattern
+    severity: WARNING
+    languages:
+      - scala
+    message: |
+      crlf-injection-scanner Phase 1 sink/source 패턴 매치 (Scala 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'res\.setHeader\s*\('
+      - pattern-regex: 'res\.writeHead\s*\('
+      - pattern-regex: 'res\.header\s*\('
+      - pattern-regex: 'res\.set\s*\('
+      - pattern-regex: 'res\.cookie\s*\('
+      - pattern-regex: 'res\.attachment\s*\('
+      - pattern-regex: 'response\.headers\['
+      - pattern-regex: 'response\.set_cookie\s*\('
+      - pattern-regex: 'HttpResponseRedirect\s*\('
+      - pattern-regex: 'response\.setHeader\s*\('
+      - pattern-regex: 'response\.addHeader\s*\('
+      - pattern-regex: 'redirect_to'
+      - pattern-regex: 'cookies\['
+      - pattern-regex: 'header\s*\('
+      - pattern-regex: 'setcookie\s*\('
+      - pattern-regex: '@RequestParam'
+      - pattern-regex: '@RequestBody'
+      - pattern-regex: 'req\.query'
+      - pattern-regex: 'req\.body'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-93: CRLF Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

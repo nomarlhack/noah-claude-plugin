@@ -1,0 +1,47 @@
+rules:
+  - id: noah-php-ssrf-taint
+    severity: ERROR
+    languages:
+      - php
+    mode: taint
+    message: |
+      PHP $_GET/$_POST/$_REQUEST 값이 file_get_contents/curl_exec/fopen에 URL로
+      들어가면 SSRF. allow_url_fopen=Off + 화이트리스트 점검.
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_GET[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_POST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_REQUEST[...];
+    pattern-sinks:
+      - pattern: file_get_contents($X, ...)
+      - pattern: file_get_contents($X)
+      - pattern: fopen($X, ...)
+      - pattern: curl_init($X)
+      - pattern: curl_setopt($CH, CURLOPT_URL, $X)
+      - pattern: $CLIENT->request($M, $X, ...)
+      - pattern: $CLIENT->get($X, ...)
+      - pattern: $CLIENT->post($X, ...)
+    pattern-sanitizers:
+      - pattern: filter_var($X, FILTER_VALIDATE_URL)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if (in_array($X, $WHITELIST)) { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-918: Server-Side Request Forgery"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [SSRF]
+      owasp: ["A10:2021 Server-Side Request Forgery"]
+      technology: [php, curl, guzzle]

@@ -1,0 +1,40 @@
+rules:
+  - id: noah-python-deser-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력이 pickle.loads/yaml.load(unsafe)/jsonpickle.decode에
+      들어가면 Insecure Deserialization → RCE. yaml.safe_load, json.loads 사용.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form.get($K, ...)
+      - pattern: request.data
+      - pattern: request.body
+      - pattern: request.cookies[$K]
+      - pattern: request.cookies.get($K, ...)
+    pattern-sinks:
+      - pattern: pickle.loads($X)
+      - pattern: pickle.load($X)
+      - pattern: cPickle.loads($X)
+      - pattern: yaml.load($X)
+      - pattern: yaml.load($X, ...)
+      - pattern: jsonpickle.decode($X)
+      - pattern: shelve.open($X)
+      - pattern: dill.loads($X)
+    pattern-sanitizers:
+      - pattern: yaml.safe_load($X)
+      - pattern: json.loads($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-502: Insecure Deserialization"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Deserialization]
+      owasp: ["A08:2021 Software and Data Integrity Failures"]
+      technology: [python]

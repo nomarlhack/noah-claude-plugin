@@ -1,0 +1,58 @@
+rules:
+  - id: noah-php-cmdi-phase1-pattern
+    severity: WARNING
+    languages:
+      - php
+    message: |
+      command-injection-scanner Phase 1 sink/source 패턴 매치 (Php 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'child_process'
+      - pattern-regex: 'exec\s*\('
+      - pattern-regex: 'execSync\s*\('
+      - pattern-regex: 'execFile\s*\('
+      - pattern-regex: 'spawn\s*\('
+      - pattern-regex: 'spawnSync\s*\('
+      - pattern-regex: 'os\.system\s*\('
+      - pattern-regex: 'os\.popen\s*\('
+      - pattern-regex: 'subprocess\.call\s*\('
+      - pattern-regex: 'subprocess\.run\s*\('
+      - pattern-regex: 'subprocess\.Popen\s*\('
+      - pattern-regex: 'subprocess\.check_output\s*\('
+      - pattern-regex: 'commands\.getoutput\s*\('
+      - pattern-regex: 'Runtime\.getRuntime'
+      - pattern-regex: 'ProcessBuilder'
+      - pattern-regex: '%x{'
+      - pattern-regex: 'shell\s*:\s*true'
+      - pattern-regex: 'shell\s*=\s*True'
+      - pattern-regex: 'shell_exec\s*\('
+      - pattern-regex: 'passthru\s*\('
+      - pattern-regex: '\bsystem\s*\('
+      - pattern-regex: 'popen\s*\('
+      - pattern-regex: 'proc_open\s*\('
+      - pattern-regex: 'pcntl_exec\s*\('
+      - pattern-regex: 'IO\.popen'
+      - pattern-regex: 'Open3\.capture3'
+      - pattern-regex: 'Kernel\.system'
+      - pattern-regex: 'Runtime\.exec\s*\('
+      - pattern-regex: 'bash\s+-c'
+      - pattern-regex: '/bin/sh\s+-c'
+      - pattern-regex: 'execa\s*\('
+      - pattern-regex: 'execaSync'
+      - pattern-regex: 'execaCommand'
+      - pattern-regex: 'shelljs'
+      - pattern-regex: '\$\s*`'
+      - pattern-regex: 'exec\.Command\s*\('
+      - pattern-regex: '@RequestParam'
+      - pattern-regex: '@RequestBody'
+      - pattern-regex: 'req\.query'
+      - pattern-regex: 'req\.body'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-78: OS Command Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

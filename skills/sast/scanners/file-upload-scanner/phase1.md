@@ -1,31 +1,6 @@
 ---
 id_prefix: UPLOAD
-grep_patterns:
-  - "multer"
-  - "formidable"
-  - "busboy"
-  - "multiparty"
-  - "express-fileupload"
-  - "FileField"
-  - "ImageField"
-  - "request\\.files"
-  - "request\\.FILES"
-  - "FormFile\\s*\\("
-  - "UploadFile"
-  - "MultipartFile"
-  - "move_uploaded_file"
-  - "ActiveStorage"
-  - "CarrierWave"
-  - "Shrine"
-  - "multipart/form-data"
-  - "content_type"
-  - "@RequestPart"
-  - "contentType"
-  - "getOriginalFilename\\s*\\("
-  - "Content-Disposition"
-  - "\\.endsWith\\s*\\(\\s*['\"]\\."
-  - "magic_bytes"
-  - "mime\\.lookup"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "악성 파일이 업로드되고 접근 가능하지 않으면 취약점이 아니다"

@@ -1,0 +1,35 @@
+rules:
+  - id: noah-csharp-hosthdr-phase1-pattern
+    severity: WARNING
+    languages:
+      - csharp
+    message: |
+      host-header-scanner Phase 1 sink/source 패턴 매치 (C# 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'req\.headers\.host'
+      - pattern-regex: 'req\.hostname'
+      - pattern-regex: 'req\.get(''host'')'
+      - pattern-regex: 'request\.get_host\s*\('
+      - pattern-regex: 'HTTP_HOST'
+      - pattern-regex: 'request\.build_absolute_uri\s*\('
+      - pattern-regex: 'request\.host'
+      - pattern-regex: 'request\.getServerName\s*\('
+      - pattern-regex: 'X-Forwarded-For'
+      - pattern-regex: 'X-Real-IP'
+      - pattern-regex: 'X-Forwarded-Host'
+      - pattern-regex: 'remote_ip'
+      - pattern-regex: 'remote_addr'
+      - pattern-regex: 'REMOTE_ADDR'
+      - pattern-regex: 'getHeader\s*\('
+      - pattern-regex: 'request\.remoteAddr'
+      - pattern-regex: 'X-Original-Forwarded-For'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-20: Host Header Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

@@ -1,0 +1,67 @@
+rules:
+  - id: noah-kotlin-pi-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      prompt-injection-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'openai'
+      - pattern-regex: 'anthropic'
+      - pattern-regex: 'google\.generativeai'
+      - pattern-regex: 'google\.genai'
+      - pattern-regex: 'vertexai'
+      - pattern-regex: 'bedrock'
+      - pattern-regex: 'cohere'
+      - pattern-regex: 'mistralai'
+      - pattern-regex: 'replicate'
+      - pattern-regex: 'together'
+      - pattern-regex: 'groq'
+      - pattern-regex: 'litellm'
+      - pattern-regex: 'ollama'
+      - pattern-regex: 'huggingface'
+      - pattern-regex: 'transformers'
+      - pattern-regex: 'langchain'
+      - pattern-regex: 'langgraph'
+      - pattern-regex: 'llama_index'
+      - pattern-regex: 'llamaindex'
+      - pattern-regex: 'haystack'
+      - pattern-regex: 'semantic-kernel'
+      - pattern-regex: 'chat\.completions\.create'
+      - pattern-regex: 'messages\.create'
+      - pattern-regex: 'generate_content'
+      - pattern-regex: 'responses\.create'
+      - pattern-regex: 'chat_completion'
+      - pattern-regex: '\.invoke\s*\('
+      - pattern-regex: '\.predict\s*\('
+      - pattern-regex: '\.generate\s*\('
+      - pattern-regex: '\.complete\s*\('
+      - pattern-regex: '\.run\s*\('
+      - pattern-regex: 'SystemMessage'
+      - pattern-regex: 'HumanMessage'
+      - pattern-regex: 'AIMessage'
+      - pattern-regex: 'PromptTemplate'
+      - pattern-regex: 'ChatPromptTemplate'
+      - pattern-regex: 'system_prompt'
+      - pattern-regex: 'system_message'
+      - pattern-regex: 'system_instruction'
+      - pattern-regex: 'AgentExecutor'
+      - pattern-regex: 'create_react_agent'
+      - pattern-regex: 'create_openai_tools_agent'
+      - pattern-regex: 'function_call'
+      - pattern-regex: 'tool_call'
+      - pattern-regex: 'tools\s*='
+      - pattern-regex: 'mcp\.server'
+      - pattern-regex: 'Retriever'
+      - pattern-regex: 'VectorStore'
+      - pattern-regex: 'RAG'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-1427: Prompt Injection (LLM01:2025)"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

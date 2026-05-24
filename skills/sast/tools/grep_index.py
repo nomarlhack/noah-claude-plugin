@@ -118,8 +118,10 @@ def run_grep(pattern: str, project_root: str) -> tuple[list[str], str | None]:
     """단일 패턴에 대해 grep 실행. (매치 리스트, 오류사유) 반환."""
     include_args = [f"--include={ext}" for ext in INCLUDE_EXTS]
     exclude_args = [f"--exclude-dir={d}" for d in EXCLUDE_DIRS]
+    # --binary-files=text: EUC-KR/CP949/ISO-8859 등 비-UTF8 텍스트도 매치 추출
+    # (binary로 분류되면 매치 자체가 누락되어 한국 레거시 PHP/JSP 코드베이스에서 다수 누락 발생)
     cmd = [
-        "grep", "-rnE", "--binary-files=without-match",
+        "grep", "-rnE", "--binary-files=text",
         *include_args, *exclude_args,
         pattern, project_root,
     ]

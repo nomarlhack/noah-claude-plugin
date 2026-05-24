@@ -73,6 +73,10 @@ def main() -> tuple[int, str]:
             rc = _run(name, ["open", REPORT_HTML])
         else:
             continue
+        # validate_report exit 6 = 경고 수준 (파일 유지) — 통과 처리
+        if name == "validate_report" and rc == 6:
+            print(f"[{name}] OK (warnings only, exit=6)")
+            continue
         if rc != 0:
             print(f"[{name}] FAIL (exit={rc})")
             return 1, name

@@ -1,0 +1,33 @@
+rules:
+  - id: noah-ruby-soapact-phase1-pattern
+    severity: WARNING
+    languages:
+      - ruby
+    message: |
+      soapaction-spoofing-scanner Phase 1 sink/source 패턴 매치 (Ruby 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'SOAPAction'
+      - pattern-regex: '@WebService'
+      - pattern-regex: '@WebMethod'
+      - pattern-regex: 'Apache CXF'
+      - pattern-regex: 'Apache Axis'
+      - pattern-regex: '@Endpoint'
+      - pattern-regex: '@PayloadRoot'
+      - pattern-regex: 'zeep'
+      - pattern-regex: 'spyne'
+      - pattern-regex: 'SoapServer'
+      - pattern-regex: 'wsdl'
+      - pattern-regex: 'WSDL'
+      - pattern-regex: 'savon'
+      - pattern-regex: 'soap'
+      - pattern-regex: 'SOAP'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-345: SOAPAction Spoofing"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

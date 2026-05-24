@@ -1,0 +1,41 @@
+rules:
+  - id: noah-python-prompt-injection-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력이 LLM 호출(openai chat.completions.create / anthropic
+      messages.create / langchain invoke)의 prompt/messages에 직접 결합되면
+      Prompt Injection. 안전: 시스템 프롬프트와 사용자 입력 분리, 입력 검증/델리미터,
+      구조화된 출력 강제. (LLM01:2025)
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json
+      - pattern: request.json[$K]
+      - pattern: request.data
+    pattern-sinks:
+      - pattern: openai.chat.completions.create(...)
+      - pattern: $CLIENT.chat.completions.create(...)
+      - pattern: $CLIENT.completions.create(...)
+      - pattern: $CLIENT.messages.create(...)
+      - pattern: anthropic.messages.create(...)
+      - pattern: $MODEL.generate_content($X)
+      - pattern: $LLM.invoke($X)
+      - pattern: $LLM.predict($X)
+      - pattern: $CHAIN.run($X)
+      - pattern: $CHAIN.invoke($X)
+    pattern-sanitizers: []
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-1427: Prompt Injection"]
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Prompt Injection]
+      owasp: ["LLM01:2025 Prompt Injection"]
+      technology: [python, openai, anthropic, langchain]

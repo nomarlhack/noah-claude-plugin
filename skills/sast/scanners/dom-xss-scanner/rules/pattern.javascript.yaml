@@ -1,0 +1,43 @@
+rules:
+  - id: noah-javascript-domxss-phase1-pattern
+    severity: WARNING
+    languages:
+      - javascript
+    message: |
+      dom-xss-scanner Phase 1 sink/source 패턴 매치 (JavaScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'location\.hash'
+      - pattern-regex: 'location\.search'
+      - pattern-regex: 'document\.referrer'
+      - pattern-regex: 'window\.name'
+      - pattern-regex: 'addEventListener.*message'
+      - pattern-regex: 'onmessage'
+      - pattern-regex: 'localStorage\.getItem'
+      - pattern-regex: 'sessionStorage\.getItem'
+      - pattern-regex: '\.innerHTML'
+      - pattern-regex: '\.outerHTML'
+      - pattern-regex: 'document\.write'
+      - pattern-regex: '\beval\s*\('
+      - pattern-regex: 'setTimeout\s*\('
+      - pattern-regex: 'setInterval\s*\('
+      - pattern-regex: 'new Function\s*\('
+      - pattern-regex: 'insertAdjacentHTML'
+      - pattern-regex: '\.html\s*\('
+      - pattern-regex: '\.append\s*\('
+      - pattern-regex: '\.prepend\s*\('
+      - pattern-regex: 'location\.href\s*='
+      - pattern-regex: 'location\.assign\s*\('
+      - pattern-regex: 'location\.replace\s*\('
+      - pattern-regex: 'searchParams\.get\s*\('
+      - pattern-regex: 'useParams\s*\('
+      - pattern-regex: 'useSearchParams'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-79: DOM-based XSS"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

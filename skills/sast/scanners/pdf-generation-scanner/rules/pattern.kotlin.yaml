@@ -1,0 +1,51 @@
+rules:
+  - id: noah-kotlin-pdfgen-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      pdf-generation-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'wkhtmltopdf'
+      - pattern-regex: 'puppeteer'
+      - pattern-regex: 'WeasyPrint'
+      - pattern-regex: 'PDFKit'
+      - pattern-regex: 'prawn'
+      - pattern-regex: 'html-pdf'
+      - pattern-regex: 'pdf-creator-node'
+      - pattern-regex: 'pdfmake'
+      - pattern-regex: 'html.*pdf'
+      - pattern-regex: 'pdf.*generat'
+      - pattern-regex: 'playwright.*pdf'
+      - pattern-regex: 'dompdf'
+      - pattern-regex: 'mpdf'
+      - pattern-regex: 'Mpdf\\'
+      - pattern-regex: 'xhtml2pdf'
+      - pattern-regex: 'pisa'
+      - pattern-regex: 'ITextRenderer'
+      - pattern-regex: 'FlyingSaucer'
+      - pattern-regex: 'pd4ml'
+      - pattern-regex: 'IronPdf'
+      - pattern-regex: 'PuppeteerSharp'
+      - pattern-regex: 'page\.pdf\s*\('
+      - pattern-regex: 'page\.setContent'
+      - pattern-regex: 'renderToString'
+      - pattern-regex: '--no-sandbox'
+      - pattern-regex: '--disable-local-file-access'
+      - pattern-regex: '--enable-local-file-access'
+      - pattern-regex: 'DOMPDF_ENABLE_REMOTE'
+      - pattern-regex: 'DOMPDF_ENABLE_PHP'
+      - pattern-regex: 'url_fetcher'
+      - pattern-regex: '@font-face'
+      - pattern-regex: 'marked\s*\('
+      - pattern-regex: 'markdown.*\.render'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-918: PDF Generator SSRF"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

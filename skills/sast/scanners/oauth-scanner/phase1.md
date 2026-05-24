@@ -1,19 +1,6 @@
 ---
 id_prefix: OAUTH
-grep_patterns:
-  - "oauth"
-  - "OAuth"
-  - "omniauth"
-  - "authorization_code"
-  - "access_token"
-  - "redirect_uri"
-  - "client_secret"
-  - "code_verifier"
-  - "code_challenge"
-  - "passport-oauth"
-  - "openid-client"
-  - "next-auth"
-  - "authlib"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "OAuth 흐름 조작으로 인증이 우회되어야 취약점이다"

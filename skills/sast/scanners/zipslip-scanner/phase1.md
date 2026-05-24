@@ -1,24 +1,6 @@
 ---
 id_prefix: ZIPSLIP
-grep_patterns:
-  - "adm-zip"
-  - "unzipper"
-  - "unzip-stream"
-  - "yauzl"
-  - "decompress"
-  - "zipfile\\.extractall\\s*\\("
-  - "zipfile\\.extract\\s*\\("
-  - "tarfile\\.extractall\\s*\\("
-  - "ZipInputStream"
-  - "ZipFile"
-  - "ZipArchive::extractTo\\s*\\("
-  - "extractAllTo\\s*\\("
-  - "extractEntryTo\\s*\\("
-  - "Zip::"
-  - "tar\\.extract"
-  - "getNextEntry"
-  - "getEntry\\s*\\("
-  - "entry\\.getName"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "의도하지 않은 경로에 파일이 생성되지 않으면 취약점이 아니다"

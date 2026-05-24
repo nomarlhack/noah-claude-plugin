@@ -1,31 +1,6 @@
 ---
 id_prefix: PROTO
-grep_patterns:
-  - "__proto__"
-  - "constructor\\.prototype"
-  - "merge\\s*\\("
-  - "extend\\s*\\("
-  - "deepMerge\\s*\\("
-  - "deepCopy\\s*\\("
-  - "defaultsDeep\\s*\\("
-  - "lodash\\.merge"
-  - "lodash\\.set"
-  - "jQuery\\.extend"
-  - "Object\\.assign\\s*\\("
-  - "dot-prop"
-  - "set-value"
-  - "object-path"
-  - "Object\\.setPrototypeOf"
-  - "hoek\\.merge"
-  - "hoek\\.applyToDefaults"
-  - "koa-body"
-  - "koa-multer"
-  - "@koa/multer"
-  - "qs\\.parse"
-  - "allowPrototypes"
-  - "bodyParser\\.urlencoded"
-  - "express\\.urlencoded"
-  - "urlencoded\\s*\\(\\{"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "프로토타입이 오염되지 않으면 취약점이 아니다"
@@ -60,6 +35,7 @@ Prototype Pollution sink는 "사용자 제어 키가 객체 속성 키 위치(`o
 
 ## 자주 놓치는 패턴 (Frequently Missed)
 
+- **커스텀 path-walk 함수 (dot-name 복원)**: `recoverDotNameObject`, `expandDotKeys`, `unflatten`, `deflatten`, `setByPath`, `dotted-keys-to-object` 류 — 입력 키를 `split('.')`로 분해한 뒤 `obj[k] = obj[k] || {}; obj = obj[k]` 패턴으로 walk하는 코드. `__proto__`/`constructor`/`prototype` 차단과 `Object.create(null)` 초기값이 없으면 사용자 입력 키로 prototype chain에 도달하여 전역 오염. 표준 라이브러리(`merge`/`set` 등) 이름이 코드에 나타나지 않아 식별자 grep으로는 안 잡힘 — semgrep AST 룰(`noah-javascript-proto-pathwalk-pattern`)이 이 패턴 전용. multipart fields, `qs.parse` 결과, JSON body 등이 source.
 - **multipart/urlencoded 파서의 `__proto__` 키 수용**: `multer`/`formidable`/`busboy`/`koa-body`/`express.urlencoded({extended:true})` 등이 키 필터링 없이 body를 plain object로 구성. `qs` 우회와 동일 경로, sink 함수 호출 불필요. 파서 라이브러리명 grep은 file-upload-scanner가 담당 — prototype-pollution은 `__proto__`/`allowPrototypes`/`urlencoded` 오염 신호에 집중.
 - **`qs` 파서의 `__proto__` 우회**: `qs.parse('__proto__[isAdmin]=true')` → 객체에 `__proto__.isAdmin = true`. Express 4.x 기본 `qs` 사용.
 - **MongoDB `$` 연산자와 동시 차단 미흡**: NoSQLi 방어로 `$` prefix는 막아도 `__proto__`는 안 막는 케이스.
@@ -84,6 +60,8 @@ Prototype Pollution sink는 "사용자 제어 키가 객체 속성 키 위치(`o
 - **AST parser 오염**: `esprima`/`acorn` 옵션 객체 오염 → 파싱 결과 조작.
 
 ## 안전 패턴 (FP Guard)
+
+> **⚠️ "컴퓨티드 프로퍼티는 안전"의 잘못된 일반화 주의** — 객체 리터럴 표현식 `{[key]: value}`에서 `[key]`가 `__proto__`여도 own property로만 추가되므로 안전한 건 맞다. **그러나 이 명제는 객체 리터럴 생성 시점에만 성립한다.** `obj[key] = value` 같은 **bracket assignment**, 특히 `obj[k] = obj[k] || {}; obj = obj[k]` 같은 **path-walk + 단축 평가 패턴**은 별개 위험이다 — `obj['__proto__']` 읽기가 prototype getter를 호출해 `Object.prototype`을 반환하고, truthy 분기로 cursor가 prototype chain으로 점프한다. 즉 "컴퓨티드 프로퍼티 안전" 일반화로 이 패턴을 안전 처리하지 말 것. 자주 놓치는 패턴 §"커스텀 path-walk 함수" 참조.
 
 - **`Object.create(null)` 사용**: 프로토타입 체인 자체가 없어 오염 불가.
 - **`Map`/`Set` 사용**: prototype lookup 없음.

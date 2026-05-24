@@ -1,0 +1,73 @@
+rules:
+  - id: noah-csharp-ioh-phase1-pattern
+    severity: WARNING
+    languages:
+      - csharp
+    message: |
+      insecure-output-handling-scanner Phase 1 sink/source 패턴 매치 (C# 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'openai'
+      - pattern-regex: 'anthropic'
+      - pattern-regex: 'google\.generativeai'
+      - pattern-regex: 'google\.genai'
+      - pattern-regex: 'vertexai'
+      - pattern-regex: 'bedrock'
+      - pattern-regex: 'cohere'
+      - pattern-regex: 'mistralai'
+      - pattern-regex: 'litellm'
+      - pattern-regex: 'ollama'
+      - pattern-regex: 'langchain'
+      - pattern-regex: 'llama_index'
+      - pattern-regex: 'llamaindex'
+      - pattern-regex: 'chat\.completions\.create'
+      - pattern-regex: 'messages\.create'
+      - pattern-regex: 'generate_content'
+      - pattern-regex: 'responses\.create'
+      - pattern-regex: '\.invoke\s*\('
+      - pattern-regex: '\.predict\s*\('
+      - pattern-regex: '\.generate\s*\('
+      - pattern-regex: '\.complete\s*\('
+      - pattern-regex: '\.run\s*\('
+      - pattern-regex: 'eval\s*\('
+      - pattern-regex: 'exec\s*\('
+      - pattern-regex: 'Function\s*\('
+      - pattern-regex: 'new Function'
+      - pattern-regex: 'vm\.runInNewContext'
+      - pattern-regex: 'vm\.runInThisContext'
+      - pattern-regex: 'compile\s*\('
+      - pattern-regex: 'subprocess'
+      - pattern-regex: 'child_process'
+      - pattern-regex: 'execSync'
+      - pattern-regex: 'spawnSync'
+      - pattern-regex: 'Runtime\.getRuntime'
+      - pattern-regex: 'ProcessBuilder'
+      - pattern-regex: 'os\.system'
+      - pattern-regex: 'os\.popen'
+      - pattern-regex: 'shell_exec'
+      - pattern-regex: 'Marshal\.load'
+      - pattern-regex: 'pickle\.loads'
+      - pattern-regex: 'innerHTML'
+      - pattern-regex: 'outerHTML'
+      - pattern-regex: 'dangerouslySetInnerHTML'
+      - pattern-regex: 'v-html'
+      - pattern-regex: 'document\.write'
+      - pattern-regex: 'Markdown'
+      - pattern-regex: 'marked\s*\('
+      - pattern-regex: 'DOMPurify'
+      - pattern-regex: 'render_template_string'
+      - pattern-regex: 'executeQuery'
+      - pattern-regex: 'execute\s*\('
+      - pattern-regex: 'raw\s*\('
+      - pattern-regex: 'AgentExecutor'
+      - pattern-regex: 'function_call'
+      - pattern-regex: 'tool_call'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Insecure Output Handling (LLM05:2025)"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

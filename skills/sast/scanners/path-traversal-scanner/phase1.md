@@ -1,35 +1,6 @@
 ---
 id_prefix: PATHTRV
-grep_patterns:
-  - "fs\\.readFile"
-  - "fs\\.readFileSync"
-  - "fs\\.createReadStream"
-  - "path\\.join\\s*\\("
-  - "path\\.resolve\\s*\\("
-  - "fs\\.writeFile"
-  - "send_file"
-  - "render.*file:"
-  - "File\\.open"
-  - "File\\.read"
-  - "file_get_contents\\s*\\("
-  - "include\\s*\\("
-  - "require\\s*\\("
-  - "open\\s*\\("
-  - "readFile"
-  - "new File\\s*\\("
-  - "Paths\\.get\\s*\\("
-  - "Files\\.newInputStream"
-  - "fs\\.createWriteStream"
-  - "fs\\.writeFileSync"
-  - "sendFile\\s*\\("
-  - "os\\.Open\\s*\\("
-  - "os\\.ReadFile\\s*\\("
-  - "os\\.Create\\s*\\("
-  - "searchParams\\.get\\s*\\("
-  - "@RequestParam"
-  - "@PathVariable"
-  - "req\\.query"
-  - "req\\.params"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "의도하지 않은 리소스에 접근하지 못하면 취약점이 아니다"

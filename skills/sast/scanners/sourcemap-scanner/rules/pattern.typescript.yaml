@@ -1,0 +1,27 @@
+rules:
+  - id: noah-typescript-srcmap-phase1-pattern
+    severity: WARNING
+    languages:
+      - typescript
+    message: |
+      sourcemap-scanner Phase 1 sink/source 패턴 매치 (TypeScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'devtool'
+      - pattern-regex: 'sourcemap'
+      - pattern-regex: 'source-map'
+      - pattern-regex: 'productionBrowserSourceMaps'
+      - pattern-regex: 'productionSourceMap'
+      - pattern-regex: 'GENERATE_SOURCEMAP'
+      - pattern-regex: 'sourceMappingURL'
+      - pattern-regex: 'build\.sourcemap'
+      - pattern-regex: 'webpack'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-540: Source Map Exposure"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

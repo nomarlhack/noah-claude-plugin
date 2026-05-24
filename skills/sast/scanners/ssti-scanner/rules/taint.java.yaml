@@ -1,0 +1,41 @@
+rules:
+  - id: noah-java-ssti-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력이 SpelExpressionParser.parseExpression /
+      Velocity.evaluate / Freemarker Template(new StringReader)에 들어가면
+      SSTI / SpEL Injection → RCE.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+    pattern-sinks:
+      - pattern: $PARSER.parseExpression($X)
+      - pattern: new SpelExpressionParser().parseExpression($X)
+      - pattern: Velocity.evaluate($CTX, $W, $TAG, $X)
+      - pattern: $ENGINE.eval($X)
+      - pattern: new Template($N, new StringReader($X), $CFG)
+    pattern-sanitizers:
+      - pattern: new SimpleEvaluationContext(...)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-94: Server-Side Template Injection"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [java, spring, spel, velocity, freemarker]

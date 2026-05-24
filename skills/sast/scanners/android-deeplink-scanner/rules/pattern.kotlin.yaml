@@ -1,0 +1,61 @@
+rules:
+  - id: noah-kotlin-android-deeplink-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      android-deeplink-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'intent-filter'
+      - pattern-regex: 'android:scheme'
+      - pattern-regex: 'android:host'
+      - pattern-regex: 'android:pathPrefix'
+      - pattern-regex: 'android:pathPattern'
+      - pattern-regex: 'android:autoVerify'
+      - pattern-regex: 'android:exported'
+      - pattern-regex: 'android:taskAffinity'
+      - pattern-regex: 'android.intent.action.VIEW'
+      - pattern-regex: 'BROWSABLE'
+      - pattern-regex: 'getIntent\s*\('
+      - pattern-regex: 'getData\s*\('
+      - pattern-regex: 'getDataString\s*\('
+      - pattern-regex: 'getQueryParameter'
+      - pattern-regex: 'getStringExtra'
+      - pattern-regex: 'Intent\.parseUri'
+      - pattern-regex: 'Intent\.getIntent'
+      - pattern-regex: 'WebView'
+      - pattern-regex: 'loadUrl'
+      - pattern-regex: 'loadDataWithBaseURL'
+      - pattern-regex: 'addJavascriptInterface'
+      - pattern-regex: 'setJavaScriptEnabled'
+      - pattern-regex: 'setAllowFileAccess'
+      - pattern-regex: 'setAllowFileAccessFromFileURLs'
+      - pattern-regex: 'setAllowUniversalAccessFromFileURLs'
+      - pattern-regex: 'PendingIntent\.getActivity'
+      - pattern-regex: 'PendingIntent\.getBroadcast'
+      - pattern-regex: 'FLAG_MUTABLE'
+      - pattern-regex: 'FLAG_IMMUTABLE'
+      - pattern-regex: 'startActivity'
+      - pattern-regex: 'startActivityForResult'
+      - pattern-regex: 'assetlinks\.json'
+      - pattern-regex: '@JavascriptInterface'
+      - pattern-regex: 'shouldOverrideUrlLoading'
+      - pattern-regex: 'WebViewClient'
+      - pattern-regex: 'WebChromeClient'
+      - pattern-regex: 'uri\.host'
+      - pattern-regex: 'uri\.scheme'
+      - pattern-regex: 'uri\.path'
+      - pattern-regex: 'uri\.getHost'
+      - pattern-regex: 'uri\.getScheme'
+      - pattern-regex: 'javascript:'
+      - pattern-regex: 'data:text/html'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-927: Android Deeplink"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

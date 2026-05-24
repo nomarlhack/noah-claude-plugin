@@ -1,0 +1,44 @@
+rules:
+  - id: noah-hmt-phase1-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      http-method-tampering-scanner Phase 1 sink/source 패턴 매치.
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'method-override'
+      - pattern-regex: 'X-HTTP-Method-Override'
+      - pattern-regex: 'X-Method-Override'
+      - pattern-regex: '_method'
+      - pattern-regex: 'app\.all\s*\('
+      - pattern-regex: 'Rack::MethodOverride'
+      - pattern-regex: 'limit_except'
+      - pattern-regex: '<Limit'
+      - pattern-regex: '<LimitExcept'
+      - pattern-regex: 'http_method_names'
+      - pattern-regex: '@RequestMapping'
+      - pattern-regex: '@GetMapping'
+      - pattern-regex: '@PostMapping'
+      - pattern-regex: '@PutMapping'
+      - pattern-regex: '@DeleteMapping'
+      - pattern-regex: '@PatchMapping'
+      - pattern-regex: 'require_http_methods'
+      - pattern-regex: 'require_POST'
+      - pattern-regex: 'require_GET'
+      - pattern-regex: 'csrf_exempt'
+      - pattern-regex: 'method=\['
+      - pattern-regex: 'methods=\['
+      - pattern-regex: '@api_route'
+      - pattern-regex: '@route\s*\('
+      - pattern-regex: 'router\.(get|post|put|delete|patch|all)'
+      - pattern-regex: 'AllowAnyMethod'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-650: HTTP Method Tampering"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

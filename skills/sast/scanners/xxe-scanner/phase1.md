@@ -1,29 +1,6 @@
 ---
 id_prefix: XXE
-grep_patterns:
-  - "Nokogiri"
-  - "REXML"
-  - "xml2js"
-  - "libxmljs"
-  - "xmldom"
-  - "fast-xml-parser"
-  - "DocumentBuilderFactory"
-  - "SAXParserFactory"
-  - "XMLInputFactory"
-  - "simplexml_load_string"
-  - "DOMDocument"
-  - "lxml\\.etree"
-  - "xml\\.etree"
-  - "noent"
-  - "resolve_entities"
-  - "parseXML"
-  - "XMLReader"
-  - "load_external_dtd"
-  - "external-general-entities"
-  - "external-parameter-entities"
-  - "DOCTYPE"
-  - "SYSTEM\\s+['\"]"
-  - "setExpandEntityReferences"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "외부 엔티티가 처리되지 않으면 취약점이 아니다"

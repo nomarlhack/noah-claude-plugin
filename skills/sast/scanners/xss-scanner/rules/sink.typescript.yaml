@@ -1,0 +1,21 @@
+rules:
+  # 고정밀 HTML sink 룰 (TypeScript/TSX). sink.javascript.yaml 참조 — 동일 의미론.
+  - id: noah-typescript-xss-innerhtml-sink
+    severity: WARNING
+    languages: [typescript]
+    message: |
+      HTML sink 능력형 매치 (innerHTML/outerHTML/insertAdjacentHTML/document.write/
+      jQuery .html()/dangerouslySetInnerHTML). 매치 = HTML 주입 능력 실재.
+      Safe-by-Proof §2-D — 클래스 일괄 제외 금지, 매치별/동질 하위클래스로 O4 증거 제시.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-79: Improper Neutralization of Input During Web Page Generation"]
+    patterns:
+      - pattern-either:
+          - pattern: $X.innerHTML = $Y
+          - pattern: $X.outerHTML = $Y
+          - pattern: $X.insertAdjacentHTML($POS, $Y)
+          - pattern: document.write($Y)
+          - pattern: document.writeln($Y)
+          - pattern: $EL.html($Y)
+          - pattern: dangerouslySetInnerHTML={$Y}

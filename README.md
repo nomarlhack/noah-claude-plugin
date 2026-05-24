@@ -174,6 +174,98 @@ phase2-review (증거 해석)
 
 상세 규칙은 `skills/sast/sub-skills/scan-report-review/_principles.md`(판정 원칙)와 `_contracts.md`(writer 권한·스키마·매트릭스) 참조.
 
+## Phase 1 정/오탐 판별 방법 (Safe-by-Proof)
+
+위 "판단 기준"이 **출력**(status/tag)을 정의한다면, 이 절은 매치 1건이 후보/안전으로 **분류되는 방법**을 설명합니다. 단일 판정이 아니라 **6층 깔때기**이며, 각 층이 서로 다른 오분류(특히 정탐을 놓치는 FN)를 잡습니다.
+
+> **설계 철학 3가지**
+> 1. **입증책임 역전** — "취약"이 기본값, "안전"은 증거로 입증. 의심·이행불가·미확인은 모두 후보 유지.
+> 2. **삭제 대신 랭킹** — "안전"은 최하위 신뢰 밴드일 뿐 삭제가 아님. 인벤토리·DAST 입력으로 남음.
+> 3. **비대칭(FN > FP)** — 후보 유지는 싸게, 안전 단정은 비싸게. FP는 후속 단계가 거르지만(회복 가능) FN은 회복 불가.
+
+### 6층 깔때기
+
+```
+semgrep 매치(tier+rule_ids) → [1]tier 분기 → [2]의무 판정 → [3]볼륨 전수처리
+   → [4]master-list → [5]블라인드 재판정 → [6]기계 게이트 → Phase 2 동적 확정
+```
+
+### 각 판별 방법 (개별 설명)
+
+**[1] tier 자동 분기** (`decision-framework.md §1`)
+매치를 탐지 방식별 신뢰도로 분기. 같은 토큰도 탐지 방식에 따라 신뢰도가 다름.
+- `taint` — dataflow가 source(사용자입력)→sink 도달 + sanitizer 부재까지 추적 확정. **자동 후보**(재판단 안 함, LLM 변동성 제거).
+- `ast` — 언어 파서가 실제 구문 매치(주석/문자열 오매치 제외). 위치는 정확하나 source/sanitizer 미확인 → 5단계 검토.
+- `generic` — 정규식 텍스트 매치(언어 무관). 주석·문자열·유사 이름도 매치 → 노이즈 多, 최저 신뢰.
+
+**[2] Safe-by-Proof 의무 모델 O1~O4** (`§2-D`)
+"안전(제외)"으로 분류하려면 4개 의무를 **모두 증거로 이행**. 하나라도 미이행이면 후보 유지.
+| 의무 | 안전 인정 조건 | 이행 불가 = 후보 |
+|---|---|---|
+| O1 source 비제어 | 입력이 상수/내부/기검증임을 입증 | 외부 입력 표면에 닿음 |
+| O2 도달성 | sink가 진입점에서 도달 불가 입증 | 람다/reflection/2차 등 **엔진이 눈먼(blind) 경계** = 도달불가 아님 |
+| O3 sanitization | 유효 sanitizer가 모든 경로 지배 입증 | 부분 방어·우회·미적용 경로 |
+| O4 capability | 그 위치가 위험 sink가 아님 입증 | sink 능력 실재 |
+
+**[3] 볼륨 전수처리** (`§6-A-2` 커버리지 + `§2-D` 의무)
+매치 수천~수만 건도 "모든 매치를 설명(account-for-all)". 노이즈는 **동질 클래스로 일괄 제외(증거 첨부)**, 능력형 토큰(eval/system/innerHTML)은 클래스로 못 뭉개고 전수 disposition. 비동질 클래스(같은 토큰이 안전·위험 양쪽) 일괄 제외 금지.
+
+**[4] deviance 신호** (`§2-D 원칙4`, Engler "bugs as deviant behavior")
+코드베이스가 스스로 지키는 다수 관례가 곧 명세. 다수가 방어를 갖췄는데 소수가 누락하면 그 소수는 **고신뢰 후보**(IDOR_ASYMMETRIC이 대표). 다수 안전성이 일탈자 안전성을 증명하지 않음.
+
+**[5] 블라인드 phase1-review**
+독립 에이전트가 Phase 1의 "후보 사유"를 **보지 않고** 코드·evidence만으로 재판정(CONFIRM/OVERRIDE/DISCARD). [2][3]의 분류가 틀린 경우(정확성 오류)를 잡음.
+
+**[6] 기계 게이트** (`tools/phase1_review_assert.py`, 위반 시 exit 7 차단)
+locindex를 ground truth로 써서 우회·과소신고 불가하게 **완전성**을 강제:
+- **커버리지 감사** — 고볼륨 스캐너가 모든 매치를 설명했는가
+- **의무 감사(OBLIGATION)** — capability 스캐너가 능력형 매치를 전수 disposition 했는가 (아래 표)
+- **taint-safe tripwire** — taint(최고신뢰)인데 safe 분류된 후보가 정당 사유+증거를 갖췄는가
+
+> **두 종류의 보장**: [1][3][6]은 **기계적(hard)** — 완전성("빠짐없이 다뤘는가")을 강제. [2][4][5]는 **판단(soft)** — 정확성("분류가 맞는가")을 검증. 완전성만으론 부족(실측: PHP eval 295건을 "전부 클라JS"로 설명해 게이트는 통과했으나 분류가 틀려 RCE 누락 → 블라인드가 잡음). 그래서 두 보장을 직렬로 쌓음.
+
+### 스캐너별 적용 방법
+
+**공통 층(47개 모두)**: [1]tier 분기 · [2]의무 O1~O4 · [3]커버리지 감사(>200건) · [4]deviance · [5]블라인드 · [6]tripwire. 아래는 **스캐너별로 다른** 부분.
+
+**A. capability — 기계 OBLIGATION 게이트 (6개)**
+능력형 토큰(매치=위험동작 실재)을 클래스로 못 뭉갬. 게이트가 전수 disposition 강제.
+
+| 스캐너 | taint | sink룰 | 게이트 모드 |
+|---|---|---|---|
+| command-injection | 4 | 5 (php/ruby/python/java/kotlin) | OBLIGATION (sink룰) |
+| xss | 4 | 2 (js/ts) | OBLIGATION (sink룰) |
+| ssti | 3 | 3 (java/kotlin/ruby) | OBLIGATION (sink룰) |
+| dom-xss | 1 | 2 (js/ts) | OBLIGATION (sink룰) |
+| code-injection | 3 | — | OBLIGATION (ast 전체=eval/assert) |
+| deserialization | 3 | — | OBLIGATION (ast 전체=unserialize/readObject) |
+
+> **sink-mode vs ast-mode**: code-injection/deserialization은 ast-tier가 곧 능력형(eval 등 정밀)이라 ast 전체를 집계. xss/ssti/command-injection/dom-xss는 broad-pattern ast에 노이즈가 수천 건 섞여(`Template(`/출력컨텍스트/`@RequestParam`) **고정밀 `-sink` 룰**로 능력형만 분리 집계(실측: ssti broad ast 1131 → sink 1, command-inj 897 → 0).
+
+**B. absence — 부재 탐지 (검증 누락)**
+sink가 없어 토큰 게이트 불가. "검증이 누락됐는가"를 찾음.
+
+| 스캐너 | 판별 방법 |
+|---|---|
+| idor | taint 룰(java/kotlin, 외부입력 어노테이션 7종 source) + **`idor_inventory.py` 2-모드**(taint ledger + 컨트롤러 source-only 전수 스캔) + 게이트 범위 적정성 + deviance(ASYMMETRIC) |
+| csrf | protect_from_forgery / skip 예외 추적 |
+| business-logic / validation-logic | locindex 없음 — 의미 분석(상태전이·mass-assignment·검증 비대칭) |
+
+**C. injection — taint 위주 (안전 형태 구분)**
+위험 토큰 + 위험 형태(문자열 보간/연결/사용자 host)만 후보. 안전 형태(파라미터 바인딩/상수 host)는 증거 첨부 후 제외.
+
+| 스캐너 | taint 룰 수 |
+|---|---|
+| sqli | 6 (최다) |
+| ssrf · path-traversal | 5 · 5 |
+| open-redirect · xxe | 3 · 3 |
+| crlf-injection · ldap-injection · xpath-injection | 2 |
+| nosqli · file-upload | 1 · 0 |
+
+**D. 공통 층 + pattern 룰만 (나머지 ~30개)**
+taint/sink 룰 없이 pattern(ast)/generic 룰 + 공통 층으로 검토. 다수가 **설정형(config)** — "플랫폼/인프라가 방어할 것" 단정 금지, 미확인 시 후보 유지(PLATFORM_DEFENSE):
+`tls` · `security-headers` · `cookie-security` · `springboot-hardening` · `http-smuggling` · `sourcemap` · `subdomain-takeover` · `host-header` · `http-method-tampering` · `csv-injection` · `jwt` · `oauth` · `saml` · `redos` · `prototype-pollution` · `graphql`(1 taint) · `websocket` · `xslt-injection` · `soapaction-spoofing` · `android-deeplink` · `zipslip` · `pdf-generation` · `prompt-injection`(2) · `system-prompt-leakage` · `insecure-output-handling`(1) · `unbounded-consumption` · `css-injection`
+
 ## 스캐너 목록
 
 | # | 스캐너 | 취약점 유형 | 그룹 |

@@ -1,24 +1,6 @@
 ---
 id_prefix: REDOS
-grep_patterns:
-  - "\\.test\\s*\\("
-  - "\\.match\\s*\\("
-  - "new RegExp\\s*\\("
-  - "re\\.match\\s*\\("
-  - "re\\.search\\s*\\("
-  - "re\\.findall\\s*\\("
-  - "Pattern\\.compile\\s*\\("
-  - "String\\.matches\\s*\\("
-  - "String\\.replaceAll\\s*\\("
-  - "=~"
-  - "\\.scan\\s*\\("
-  - "Regexp\\.new\\s*\\("
-  - "\\.toRegex\\s*\\("
-  - "\\.replace\\s*\\("
-  - "@RequestParam"
-  - "@RequestBody"
-  - "req\\.query"
-  - "req\\.body"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "응답 지연이 발생하지 않으면 취약점이 아니다"

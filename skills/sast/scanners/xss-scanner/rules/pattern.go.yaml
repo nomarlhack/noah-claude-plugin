@@ -1,0 +1,55 @@
+rules:
+  - id: noah-go-xss-phase1-pattern
+    severity: WARNING
+    languages:
+      - go
+    message: |
+      xss-scanner Phase 1 sink/source 패턴 매치 (Go 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'innerHTML'
+      - pattern-regex: 'dangerouslySetInnerHTML'
+      - pattern-regex: 'html_safe'
+      - pattern-regex: 'mark_safe'
+      - pattern-regex: 'Markup\s*\('
+      - pattern-regex: '\|\s*safe'
+      - pattern-regex: 'v-html'
+      - pattern-regex: '\.html\s*\('
+      - pattern-regex: '\.append\s*\('
+      - pattern-regex: '\.prepend\s*\('
+      - pattern-regex: '\.after\s*\('
+      - pattern-regex: '\.before\s*\('
+      - pattern-regex: '\.replaceWith\s*\('
+      - pattern-regex: 'outerHTML'
+      - pattern-regex: 'srcDoc'
+      - pattern-regex: 'document\.write'
+      - pattern-regex: 'insertAdjacentHTML'
+      - pattern-regex: '\beval\s*\('
+      - pattern-regex: 'raw\s*\('
+      - pattern-regex: '<%=='
+      - pattern-regex: 'bypassSecurityTrustHtml'
+      - pattern-regex: '\[innerHTML\]'
+      - pattern-regex: '\{\{\{'
+      - pattern-regex: 'DomSanitizer'
+      - pattern-regex: 'createContextualFragment\s*\('
+      - pattern-regex: '@html'
+      - pattern-regex: 'set:html'
+      - pattern-regex: 'Html\.Raw'
+      - pattern-regex: '@Html\.Raw'
+      - pattern-regex: 'ng-bind-html'
+      - pattern-regex: 'searchParams\.get\s*\('
+      - pattern-regex: 'useParams\s*\('
+      - pattern-regex: '@RequestParam'
+      - pattern-regex: '@PathVariable'
+      - pattern-regex: '@RequestBody'
+      - pattern-regex: 'req\.query'
+      - pattern-regex: 'req\.body'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-79: Cross-site Scripting"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

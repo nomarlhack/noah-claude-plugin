@@ -1,0 +1,31 @@
+rules:
+  - id: noah-java-sqli-sink-pattern
+    severity: WARNING
+    languages:
+      - java
+    message: |
+      Java SQL sink — Statement.executeQuery, Statement.execute, JdbcTemplate.query/update,
+      EntityManager.createQuery/createNativeQuery, @Query annotation 동적 문자열.
+      안전: PreparedStatement.setString, named parameter map.
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\bStatement\b'
+          - pattern-regex: '\.executeQuery\s*\('
+          - pattern-regex: '\.executeUpdate\s*\('
+          - pattern-regex: '\bjdbcTemplate\.(query|update|queryFor|execute)'
+          - pattern-regex: '\bNamedParameterJdbcTemplate\b'
+          - pattern-regex: '\.createNativeQuery\s*\('
+          - pattern-regex: '\.createQuery\s*\('
+          - pattern-regex: '@Query\s*\('
+          - pattern-regex: 'createCriteria\s*\('
+          - pattern-regex: 'Restrictions\.sqlRestriction'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [java, spring, jpa, hibernate, jdbc]

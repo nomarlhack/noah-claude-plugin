@@ -1,33 +1,6 @@
 ---
 id_prefix: SPRING
-grep_patterns:
-  - "spring\\.mvc\\.dispatch-trace-request"
-  - "dispatch-trace-request"
-  - "server\\.error\\.whitelabel"
-  - "whitelabel"
-  - "server\\.error\\.include-stacktrace"
-  - "include-stacktrace"
-  - "springdoc"
-  - "swagger"
-  - "api-docs"
-  - "management\\.endpoints"
-  - "management\\.endpoint"
-  - "actuator"
-  - "spring-boot-starter-actuator"
-  - "spring\\.application\\.admin\\.enabled"
-  - "spring\\.devtools"
-  - "spring-boot-devtools"
-  - "devtools\\.remote\\.secret"
-  - "spring\\.h2\\.console"
-  - "h2database"
-  - "h2\\.console\\.enabled"
-  - "server\\.tomcat\\.accesslog"
-  - "server\\.jetty\\.accesslog"
-  - "server\\.undertow\\.accesslog"
-  - "EndpointRequest"
-  - "management\\.server\\.port"
-  - "enabled-by-default"
-  - "shutdown\\.enabled"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "Prod 환경의 effective config가 안전하지 않으면 후보이다"

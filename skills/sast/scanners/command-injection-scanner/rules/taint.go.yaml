@@ -1,0 +1,39 @@
+rules:
+  - id: noah-go-cmdi-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go exec.Command("sh", "-c", $X) 또는 exec.Command(fmt.Sprintf(...))에
+      HTTP 입력이 들어가면 Command Injection. exec.Command(cmd, args...) 형태로
+      인자 배열 분리가 안전.
+    pattern-sources:
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.FormValue($K)
+      - pattern: r.PostFormValue($K)
+      - pattern: mux.Vars(r)[$K]
+      - pattern: c.Query($K)
+      - pattern: c.Param($K)
+      - pattern: c.PostForm($K)
+    pattern-sinks:
+      - pattern: exec.Command("sh", "-c", $X)
+      - pattern: exec.Command("bash", "-c", $X)
+      - pattern: exec.Command($X, ...)
+      - pattern: exec.CommandContext($CTX, "sh", "-c", $X)
+      - pattern: exec.CommandContext($CTX, "bash", "-c", $X)
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X == "..." { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-78: OS Command Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Command Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [go, gin, chi]

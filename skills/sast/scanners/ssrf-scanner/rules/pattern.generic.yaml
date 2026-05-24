@@ -1,0 +1,62 @@
+rules:
+  - id: noah-ssrf-phase1-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      ssrf-scanner Phase 1 sink/source 패턴 매치.
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'axios'
+      - pattern-regex: 'node-fetch'
+      - pattern-regex: 'http\.get\s*\('
+      - pattern-regex: 'https\.get\s*\('
+      - pattern-regex: 'http\.request\s*\('
+      - pattern-regex: 'urllib'
+      - pattern-regex: 'httpx'
+      - pattern-regex: 'aiohttp'
+      - pattern-regex: 'HttpURLConnection'
+      - pattern-regex: 'RestTemplate'
+      - pattern-regex: 'WebClient'
+      - pattern-regex: 'Net::HTTP'
+      - pattern-regex: 'open-uri'
+      - pattern-regex: 'HTTParty'
+      - pattern-regex: 'Faraday'
+      - pattern-regex: 'RestClient'
+      - pattern-regex: 'http-proxy-middleware'
+      - pattern-regex: 'requests\.get\s*\('
+      - pattern-regex: 'requests\.post\s*\('
+      - pattern-regex: 'OkHttpClient'
+      - pattern-regex: 'Retrofit'
+      - pattern-regex: 'HttpClient'
+      - pattern-regex: 'fetch\s*\('
+      - pattern-regex: 'got\s*\('
+      - pattern-regex: 'urlopen\s*\('
+      - pattern-regex: 'new URL\s*\('
+      - pattern-regex: 'URL\s*\('
+      - pattern-regex: 'curl_exec\s*\('
+      - pattern-regex: 'curl_init\s*\('
+      - pattern-regex: 'Guzzle'
+      - pattern-regex: 'GuzzleHttp'
+      - pattern-regex: 'WebRequest\.Create'
+      - pattern-regex: 'undici'
+      - pattern-regex: 'superagent'
+      - pattern-regex: 'http\.NewRequest'
+      - pattern-regex: 'http\.Get\s*\('
+      - pattern-regex: 'http\.Post\s*\('
+      - pattern-regex: 'http\.PostForm\s*\('
+      - pattern-regex: 'resty\.New'
+      - pattern-regex: 'searchParams\.get\s*\('
+      - pattern-regex: '@RequestParam'
+      - pattern-regex: '@RequestBody'
+      - pattern-regex: 'req\.query'
+      - pattern-regex: 'req\.body'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-918: Server-Side Request Forgery"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

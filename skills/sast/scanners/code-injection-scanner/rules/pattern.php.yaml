@@ -1,0 +1,31 @@
+rules:
+  - id: noah-php-codeinj-pattern
+    severity: ERROR
+    languages:
+      - php
+    message: |
+      PHP 동적 코드 실행 sink — eval/assert(문자열)/create_function/preg_replace e flag.
+      인자가 $_GET/$_POST/$_REQUEST 또는 DB 저장값(2차)이면 RCE (CWE-94).
+      assert는 PHP 7.0+ deprecated·7.2+ 비활성 권장, create_function은 7.2 deprecated·8.0 제거,
+      preg_replace `/e` modifier는 7.0 제거.
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\beval\s*\('
+          - pattern-regex: '\bassert\s*\('
+          - pattern-regex: '\bcreate_function\s*\('
+          - pattern-regex: 'preg_replace\s*\(\s*[''"][^''"]*[''"]e[^''"]*[''"]'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Code Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - php

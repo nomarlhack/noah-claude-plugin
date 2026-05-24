@@ -1,26 +1,6 @@
 ---
 id_prefix: XPATHI
-grep_patterns:
-  - "\\.xpath\\s*\\("
-  - "XPath\\.evaluate\\s*\\("
-  - "XPath\\.compile\\s*\\("
-  - "DOMXPath::query\\s*\\("
-  - "DOMXPath::evaluate\\s*\\("
-  - "SimpleXMLElement::xpath\\s*\\("
-  - "Nokogiri.*xpath"
-  - "REXML::XPath"
-  - "lxml\\.etree\\.xpath"
-  - "XPathFactory"
-  - "SelectNodes"
-  - "SelectSingleNode"
-  - "XPathNavigator"
-  - "XPathExpression"
-  - "\\.findall\\s*\\("
-  - "\\.findtext\\s*\\("
-  - "xmlXPathEval"
-  - "JXPathContext"
-  - "XPathBuilder"
-  - "createExpression"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "쿼리 로직이 변경되지 않으면 취약점이 아니다"

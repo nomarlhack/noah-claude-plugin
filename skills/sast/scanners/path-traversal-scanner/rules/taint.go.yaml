@@ -1,0 +1,37 @@
+rules:
+  - id: noah-go-pathtrv-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go에서 HTTP 입력이 os.Open/os.ReadFile/ioutil.ReadFile에 들어가면 Path Traversal.
+      filepath.Clean 후 prefix 검사.
+    pattern-sources:
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.FormValue($K)
+      - pattern: mux.Vars(r)[$K]
+      - pattern: c.Query($K)
+      - pattern: c.Param($K)
+    pattern-sinks:
+      - pattern: os.Open($X)
+      - pattern: os.ReadFile($X)
+      - pattern: os.Create($X)
+      - pattern: ioutil.ReadFile($X)
+      - pattern: ioutil.WriteFile($X, ...)
+      - pattern: os.Remove($X)
+      - pattern: filepath.Join($A, $X)
+      - pattern: http.ServeFile($W, $R, $X)
+    pattern-sanitizers:
+      - pattern: filepath.Base($X)
+      - pattern: filepath.Clean($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-22: Path Traversal"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Path Traversal]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [go]

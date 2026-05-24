@@ -1,0 +1,54 @@
+rules:
+  - id: noah-java-spring-xss-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java + Spring MVC 컨트롤러 입력이 ResponseBody, Thymeleaf th:utext,
+      PrintWriter.write 등 raw HTML sink로 들어가면 Reflected/Stored XSS.
+      Spring 4.0+의 HtmlUtils.htmlEscape, OWASP Encoder.forHtml로 escape.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+    pattern-sinks:
+      - pattern: $RESP.getWriter().write($X)
+      - pattern: $RESP.getWriter().print($X)
+      - pattern: $RESP.getWriter().println($X)
+      - pattern: response.getWriter().write($X)
+      - pattern: model.addAttribute($K, $X)
+    pattern-sanitizers:
+      - pattern: HtmlUtils.htmlEscape($X)
+      - pattern: HtmlUtils.htmlEscape($X, ...)
+      - pattern: Encoder.forHtml($X)
+      - pattern: Encode.forHtml($X)
+      - pattern: StringEscapeUtils.escapeHtml4($X)
+      - pattern: ESAPI.encoder().encodeForHTML($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [java, spring, thymeleaf, jsp]

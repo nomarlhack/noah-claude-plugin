@@ -1,30 +1,6 @@
 ---
 id_prefix: CSVI
-grep_patterns:
-  - "json2csv"
-  - "csv-stringify"
-  - "csv-writer"
-  - "exceljs"
-  - "xlsx"
-  - "csv\\.writer"
-  - "pandas\\.to_csv\\s*\\("
-  - "openpyxl"
-  - "xlsxwriter"
-  - "fputcsv\\s*\\("
-  - "text/csv"
-  - "format\\.csv"
-  - "CSV\\.generate"
-  - "CSV\\.open"
-  - "setCellValue"
-  - "setCellFormula"
-  - "write_string"
-  - "write_formula"
-  - "cell\\.formula"
-  - "cell\\.value"
-  - "csv\\.QUOTE_"
-  - "Content-Disposition.*csv"
-  - "Content-Disposition.*xlsx"
-  - "createCell"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "수식이 CSV에 포함되지 않으면 취약점이 아니다"

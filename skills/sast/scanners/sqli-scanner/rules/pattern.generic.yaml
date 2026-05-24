@@ -1,0 +1,48 @@
+rules:
+  - id: noah-sqli-phase1-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      sqli-scanner Phase 1 sink/source 패턴 매치 (언어 무관).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'connection\.query\s*\('
+      - pattern-regex: 'sequelize\.query\s*\('
+      - pattern-regex: 'knex\.raw\s*\('
+      - pattern-regex: '\$queryRaw'
+      - pattern-regex: '\$queryRawUnsafe\s*\('
+      - pattern-regex: 'pool\.query\s*\('
+      - pattern-regex: 'cursor\.execute\s*\('
+      - pattern-regex: 'Model\.objects\.raw\s*\('
+      - pattern-regex: 'Model\.objects\.extra\s*\('
+      - pattern-regex: 'session\.execute\s*\('
+      - pattern-regex: 'find_by_sql'
+      - pattern-regex: 'connection\.execute'
+      - pattern-regex: 'db\.run\s*\('
+      - pattern-regex: 'db\.query\s*\('
+      - pattern-regex: 'prepareStatement'
+      - pattern-regex: 'createNativeQuery'
+      - pattern-regex: 'nativeQuery'
+      - pattern-regex: 'jdbcTemplate'
+      - pattern-regex: 'NamedParameterJdbcTemplate'
+      - pattern-regex: 'executeQuery\s*\('
+      - pattern-regex: 'Statement\.execute'
+      - pattern-regex: '\.raw\s*\('
+      - pattern-regex: 'text\s*\('
+      - pattern-regex: 'f"\s*SELECT'
+      - pattern-regex: 'f''\s*SELECT'
+      - pattern-regex: '@Query'
+      - pattern-regex: '\.createQuery\s*\('
+      - pattern-regex: 'createQueryBuilder'
+      - pattern-regex: 'Arel\.sql'
+      - pattern-regex: '\$\{[a-zA-Z_][a-zA-Z0-9_.]*\}'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-89: SQL Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

@@ -1,0 +1,45 @@
+rules:
+  - id: noah-kotlin-oredir-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      open-redirect-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'res\.redirect\s*\('
+      - pattern-regex: 'res\.writeHead\s*\('
+      - pattern-regex: 'HttpResponseRedirect\s*\('
+      - pattern-regex: 'redirect\s*\('
+      - pattern-regex: 'redirect_to'
+      - pattern-regex: 'redirect_back'
+      - pattern-regex: 'header\(''Location'
+      - pattern-regex: 'http\.Redirect\s*\('
+      - pattern-regex: 'window\.location\.href\s*='
+      - pattern-regex: 'window\.location\.replace\s*\('
+      - pattern-regex: 'window\.location\.assign\s*\('
+      - pattern-regex: 'window\.location\s*='
+      - pattern-regex: 'location\.href\s*='
+      - pattern-regex: 'window\.open\s*\('
+      - pattern-regex: 'router\.push\s*\('
+      - pattern-regex: 'router\.replace\s*\('
+      - pattern-regex: 'navigate\s*\('
+      - pattern-regex: 'webview_mount\s*\('
+      - pattern-regex: 'webview_load\s*\('
+      - pattern-regex: 'postMessage\s*\('
+      - pattern-regex: 'searchParams\.get\s*\('
+      - pattern-regex: 'useParams\s*\('
+      - pattern-regex: 'useSearchParams'
+      - pattern-regex: '@RequestParam'
+      - pattern-regex: '@PathVariable'
+      - pattern-regex: 'req\.query'
+      - pattern-regex: 'req\.params'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-601: Open Redirect"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

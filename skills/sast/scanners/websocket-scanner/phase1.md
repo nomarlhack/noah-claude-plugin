@@ -1,18 +1,6 @@
 ---
 id_prefix: WSOCK
-grep_patterns:
-  - "new WebSocket\\s*\\("
-  - "socket\\.io"
-  - "WebSocket"
-  - "ActionCable"
-  - "io\\.on\\('connection'"
-  - "io\\.of\\s*\\("
-  - "verifyClient"
-  - "allowedOrigins"
-  - "wss://"
-  - "ws://"
-  - "express-ws"
-  - "gorilla/websocket"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "악용 가능해야 취약점이다"

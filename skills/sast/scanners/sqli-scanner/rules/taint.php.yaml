@@ -1,0 +1,96 @@
+rules:
+  - id: noah-php-sqli-taint
+    severity: ERROR
+    languages:
+      - php
+    mode: taint
+    message: |
+      PHP $_GET/$_POST/$_REQUEST/$_COOKIE/$_SERVER 값이 SQL sink로 흐름.
+      문자열 결합/보간으로 sink에 들어가면 SQL Injection. 안전 패턴: intval/(int) 캐스트,
+      mysqli_real_escape_string, PDO::quote, PDO prepare+bindValue, CodeIgniter $this->db->escape().
+      커스텀 wrapper(예: 자체 MY_SQL::sql_query) 호출도 sink로 포함 — 자체 DB 클래스를
+      쓰는 레거시 PHP 코드베이스에서 SQLi가 다수 발견된다.
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+      - pattern: $_SERVER
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_GET[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_POST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_REQUEST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = trim($_REQUEST[...]);
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = trim($_GET[...]);
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = trim($_POST[...]);
+
+    pattern-sinks:
+      # 자체 DB wrapper (레거시 PHP의 커스텀 MY_SQL 클래스 등)
+      - pattern: $OBJ->sql_query($Q, ...)
+      - pattern: $OBJ->sql_fetch_object($Q, ...)
+      # 표준 mysqli
+      - pattern: mysqli_query($CONN, $Q, ...)
+      - pattern: mysqli_multi_query($CONN, $Q, ...)
+      - pattern: mysql_query($Q, ...)
+      - pattern: $OBJ->query($Q, ...)
+      - pattern: $OBJ->real_query($Q, ...)
+      # PDO
+      - pattern: $OBJ->exec($Q, ...)
+      - pattern: $OBJ->prepare($Q, ...)
+      # PostgreSQL / Oracle / MSSQL
+      - pattern: pg_query($CONN, $Q, ...)
+      - pattern: pg_query($Q)
+      - pattern: oci_parse($CONN, $Q, ...)
+      - pattern: sqlsrv_query($CONN, $Q, ...)
+      # CodeIgniter
+      - pattern: $this->db->query($Q, ...)
+      - pattern: $CI->db->query($Q, ...)
+
+    pattern-sanitizers:
+      - pattern: intval($X)
+      - pattern: (int)$X
+      - pattern: (int) $X
+      - pattern: floatval($X)
+      - pattern: (float)$X
+      - pattern: mysqli_real_escape_string($CONN, $X)
+      - pattern: $OBJ->real_escape_string($X)
+      - pattern: $OBJ->quote($X)
+      - pattern: addslashes($X)
+      - pattern: $this->db->escape($X)
+      - pattern: $this->db->escape_str($X)
+      - pattern: $CI->db->escape($X)
+      # PDO prepare + bindValue 패턴 (sink가 prepare이지만 bind와 함께면 안전)
+      - patterns:
+          - pattern: $STMT->bindValue($K, $X, ...)
+      - patterns:
+          - pattern: $STMT->bindParam($K, $X, ...)
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-89: SQL Injection"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - php
+        - mysqli
+        - pdo
+        - codeigniter

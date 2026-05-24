@@ -1,31 +1,6 @@
 ---
 id_prefix: SECHDR
-grep_patterns:
-  - "helmet"
-  - "Content-Security-Policy"
-  - "CSP"
-  - "X-Frame-Options"
-  - "X-Content-Type-Options"
-  - "Access-Control-Allow-Origin"
-  - "cors\\s*\\("
-  - "Access-Control-Allow-Credentials"
-  - "Access-Control-Allow-Methods"
-  - "X-XSS-Protection"
-  - "Referrer-Policy"
-  - "Permissions-Policy"
-  - "Feature-Policy"
-  - "Cache-Control"
-  - "Pragma"
-  - "X-Permitted-Cross-Domain-Policies"
-  - "add_header"
-  - "Header\\s+set"
-  - "Header\\s+always"
-  - "proxy_hide_header"
-  - "setHeader"
-  - "res\\.set\\("
-  - "response\\.headers"
-  - "HttpServletResponse"
-  - "@CrossOrigin"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "코드 + 설정 파일 + 인프라 구성을 종합하여 보안 헤더의 실제 적용 상태를 판단한다"

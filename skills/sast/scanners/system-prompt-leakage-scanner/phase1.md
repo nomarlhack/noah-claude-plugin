@@ -1,39 +1,7 @@
 ---
 id_prefix: SPL
+rules_dir: rules/
 prereq_group: llm
-grep_patterns:
-  - "system_prompt"
-  - "system_message"
-  - "system_instruction"
-  - "SystemMessage"
-  - "SystemMessagePromptTemplate"
-  - "ChatPromptTemplate"
-  - "PromptTemplate"
-  - "role.*system"
-  - "\"role\":\\s*\"system\""
-  - "'role':\\s*'system'"
-  - "chat\\.completions\\.create"
-  - "messages\\.create"
-  - "generate_content"
-  - "responses\\.create"
-  - "openai"
-  - "anthropic"
-  - "google\\.generativeai"
-  - "google\\.genai"
-  - "vertexai"
-  - "bedrock"
-  - "cohere"
-  - "mistralai"
-  - "litellm"
-  - "ollama"
-  - "langchain"
-  - "llama_index"
-  - "llamaindex"
-  - "API_KEY"
-  - "api_key"
-  - "secret"
-  - "password"
-  - "token"
 ---
 
 > **Phase 2 진입 조건**: 본 스캐너는 LLM 그룹에 속하며, Phase 2 동적 검증은 Step 8-3 그룹 사전 단계(`llm-endpoint-probe-agent`)가 LLM endpoint를 확보한 경우에만 진입한다. Phase 2 입력 contract는 `<LLM_PROBE_DIR>/llm_endpoint.json` 단일 파일이다.

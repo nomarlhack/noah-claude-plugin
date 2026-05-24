@@ -1,0 +1,42 @@
+rules:
+  - id: noah-typescript-xslti-phase1-pattern
+    severity: WARNING
+    languages:
+      - typescript
+    message: |
+      xslt-injection-scanner Phase 1 sink/source 패턴 매치 (TypeScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'TransformerFactory'
+      - pattern-regex: 'XSLTProcessor'
+      - pattern-regex: 'lxml\.etree\.XSLT'
+      - pattern-regex: 'Nokogiri::XSLT'
+      - pattern-regex: 'xslt-processor'
+      - pattern-regex: 'XslCompiledTransform'
+      - pattern-regex: 'registerPHPFunctions'
+      - pattern-regex: 'XsltSettings'
+      - pattern-regex: 'saxon'
+      - pattern-regex: 'Xalan'
+      - pattern-regex: 'XSLT'
+      - pattern-regex: 'xslt'
+      - pattern-regex: 'EnableScript'
+      - pattern-regex: 'EnableDocumentFunction'
+      - pattern-regex: 'ALLOW_EXTERNAL_FUNCTIONS'
+      - pattern-regex: 'ACCESS_EXTERNAL_DTD'
+      - pattern-regex: 'ACCESS_EXTERNAL_STYLESHEET'
+      - pattern-regex: 'FEATURE_SECURE_PROCESSING'
+      - pattern-regex: 'XMLConstants'
+      - pattern-regex: 'setFeature'
+      - pattern-regex: 'setParameter'
+      - pattern-regex: 'node-libxslt'
+      - pattern-regex: 'saxon-js'
+      - pattern-regex: 'xslt3'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-91: XSLT Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

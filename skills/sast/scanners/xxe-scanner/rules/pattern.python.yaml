@@ -1,0 +1,41 @@
+rules:
+  - id: noah-python-xxe-phase1-pattern
+    severity: WARNING
+    languages:
+      - python
+    message: |
+      xxe-scanner Phase 1 sink/source 패턴 매치 (Python 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'Nokogiri'
+      - pattern-regex: 'REXML'
+      - pattern-regex: 'xml2js'
+      - pattern-regex: 'libxmljs'
+      - pattern-regex: 'xmldom'
+      - pattern-regex: 'fast-xml-parser'
+      - pattern-regex: 'DocumentBuilderFactory'
+      - pattern-regex: 'SAXParserFactory'
+      - pattern-regex: 'XMLInputFactory'
+      - pattern-regex: 'simplexml_load_string'
+      - pattern-regex: 'DOMDocument'
+      - pattern-regex: 'lxml\.etree'
+      - pattern-regex: 'xml\.etree'
+      - pattern-regex: 'noent'
+      - pattern-regex: 'resolve_entities'
+      - pattern-regex: 'parseXML'
+      - pattern-regex: 'XMLReader'
+      - pattern-regex: 'load_external_dtd'
+      - pattern-regex: 'external-general-entities'
+      - pattern-regex: 'external-parameter-entities'
+      - pattern-regex: 'DOCTYPE'
+      - pattern-regex: 'SYSTEM\s+[''"]'
+      - pattern-regex: 'setExpandEntityReferences'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-611: XML External Entity"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

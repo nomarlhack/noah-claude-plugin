@@ -1,0 +1,38 @@
+rules:
+  - id: noah-javascript-crlf-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js에서 req.* 입력이 res.setHeader/res.writeHead/res.cookie 값에 직접
+      들어가면 CRLF Injection (Header Injection). Node http는 일부 개행을 차단하나
+      구버전·우회 점검. 안전: 개행 제거, 화이트리스트.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.params
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: req.headers[$X]
+    pattern-sinks:
+      - pattern: res.setHeader($N, $X)
+      - pattern: res.writeHead($C, $X)
+      - pattern: res.header($N, $X)
+      - pattern: res.set($N, $X)
+      - pattern: res.cookie($N, $X, ...)
+      - pattern: res.append($N, $X)
+    pattern-sanitizers:
+      - pattern: $X.replace(/[\r\n]/g, "")
+      - pattern: encodeURIComponent($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-93: CRLF Injection"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [nodejs, express]

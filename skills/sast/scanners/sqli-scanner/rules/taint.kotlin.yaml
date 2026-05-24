@@ -1,0 +1,163 @@
+rules:
+  - id: noah-kotlin-spring-sqli-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Kotlin + Spring 컨트롤러 입력이 JdbcTemplate/EntityManager/Statement 등
+      SQL sink로 흐름. 문자열 결합·템플릿으로 사용자 입력이 SQL 본문에 삽입되면
+      SQL Injection. 안전 패턴: PreparedStatement.setString, named parameter map,
+      숫자 강제 캐스트(toInt/toLong).
+      참고: https://chequer.atlassian.net/wiki/spaces/Security/pages/797770142
+    pattern-sources:
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam(...) $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable(...) $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @RequestHeader $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @RequestHeader(...) $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @RequestBody $INPUT: $T, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @RequestAttribute(...) $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @CookieValue(...) $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @MatrixVariable(...) $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @ModelAttribute $INPUT: $T, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @SessionAttribute(...) $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @MessageMapping(...) $INPUT: String, ...) { ... }
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              fun $METHOD(..., @DestinationVariable(...) $INPUT: String, ...) { ... }
+
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $JDBC.queryForObject("$STR" + $VAR, ...)
+              - pattern: $JDBC.queryForObject($VAR + "$STR", ...)
+              - pattern: $JDBC.queryForObject("$STR${$VAR}$STR2", ...)
+              - pattern: $JDBC.queryForObject($VAR, ...)
+          - pattern-not: $JDBC.queryForObject("...", ...)
+      - patterns:
+          - pattern-either:
+              - pattern: $JDBC.query("$STR" + $VAR, ...)
+              - pattern: $JDBC.query($VAR + "$STR", ...)
+              - pattern: $JDBC.query("$STR${$VAR}$STR2", ...)
+              - pattern: $JDBC.query($VAR, ...)
+          - pattern-not: $JDBC.query("...", ...)
+      - patterns:
+          - pattern-either:
+              - pattern: $JDBC.update("$STR" + $VAR, ...)
+              - pattern: $JDBC.update($VAR + "$STR", ...)
+              - pattern: $JDBC.update("$STR${$VAR}$STR2", ...)
+              - pattern: $JDBC.update($VAR, ...)
+          - pattern-not: $JDBC.update("...", ...)
+      - patterns:
+          - pattern-either:
+              - pattern: $EM.createQuery("$STR" + $VAR, ...)
+              - pattern: $EM.createQuery($VAR + "$STR", ...)
+              - pattern: $EM.createQuery("$STR${$VAR}$STR2", ...)
+              - pattern: $EM.createQuery($VAR, ...)
+          - pattern-not: $EM.createQuery("...", ...)
+      - patterns:
+          - pattern-either:
+              - pattern: $EM.createNativeQuery("$STR" + $VAR, ...)
+              - pattern: $EM.createNativeQuery($VAR + "$STR", ...)
+              - pattern: $EM.createNativeQuery("$STR${$VAR}$STR2", ...)
+              - pattern: $EM.createNativeQuery($VAR, ...)
+          - pattern-not: $EM.createNativeQuery("...", ...)
+      - patterns:
+          - pattern-either:
+              - pattern: $STMT.executeQuery("$STR" + $VAR)
+              - pattern: $STMT.executeQuery($VAR + "$STR")
+              - pattern: $STMT.executeQuery("$STR${$VAR}$STR2")
+              - pattern: $STMT.executeQuery($VAR)
+          - pattern-not: $STMT.executeQuery("...")
+      - patterns:
+          - pattern-either:
+              - pattern: $STMT.execute("$STR" + $VAR)
+              - pattern: $STMT.execute($VAR + "$STR")
+              - pattern: $STMT.execute("$STR${$VAR}$STR2")
+              - pattern: $STMT.execute($VAR)
+          - pattern-not: $STMT.execute("...")
+
+    pattern-sanitizers:
+      - pattern: $INPUT.toInt()
+      - pattern: $INPUT.toLong()
+      - pattern: $INPUT.toDouble()
+      - pattern: Integer.parseInt($INPUT)
+      - pattern: $INPUT.toIntOrNull()
+      - pattern: $INPUT.toLongOrNull()
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              val $STMT = $CONN.prepareStatement("...")
+              ...
+              $STMT.setString($INDEX, $INPUT)
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              val $STMT = $CONN.prepareStatement("...")
+              ...
+              $STMT.setInt($INDEX, $INPUT)
+      - patterns:
+          - pattern: $INPUT
+          - pattern-inside: |
+              val $PARAMS = mapOf(..., "$KEY" to $INPUT, ...)
+              $TEMPLATE.$QUERY("...", $PARAMS, ...)
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - kotlin
+        - spring
+        - jpa

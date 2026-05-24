@@ -1,0 +1,48 @@
+rules:
+  - id: noah-javascript-codeinj-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js HTTP 입력(req.query/params/body)이 eval/new Function/vm.runInNewContext에
+      직접 흐르면 Code Injection → RCE. 안전: JSON.parse, Number 캐스트.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.query[$X]
+      - pattern: req.params
+      - pattern: req.params.$X
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: ctx.query
+      - pattern: ctx.request.body
+    pattern-sinks:
+      - pattern: eval($X)
+      - pattern: new Function($X)
+      - pattern: new Function(..., $X)
+      - pattern: Function($X)
+      - pattern: vm.runInNewContext($X, ...)
+      - pattern: vm.runInThisContext($X, ...)
+      - pattern: vm.runInContext($X, ...)
+    pattern-sanitizers:
+      - pattern: JSON.parse($X)
+      - pattern: Number($X)
+      - pattern: parseInt($X, ...)
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Code Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - nodejs
+        - express

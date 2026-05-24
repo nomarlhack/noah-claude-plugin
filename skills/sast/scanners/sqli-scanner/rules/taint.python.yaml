@@ -1,0 +1,92 @@
+rules:
+  - id: noah-python-sqli-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 사용자 입력이 SQL sink로 흐름. Django request.GET/POST/body,
+      Flask request.args/form/json, FastAPI Query/Path/Body가 cursor.execute /
+      Model.objects.raw / session.execute(text(...))에 문자열 결합/f-string으로 들어가면 SQLi.
+      안전: 파라미터화(%s 튜플, named %(key)s), ORM 메서드 (.filter, .get).
+    pattern-sources:
+      # Django
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.GET.get($K, ...)
+      - pattern: request.POST.get($K, ...)
+      - pattern: request.data
+      - pattern: request.body
+      # Flask
+      - pattern: request.args[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form[$K]
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json
+      - pattern: request.values[$K]
+      # FastAPI / Starlette
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              def $F(..., $X: $T = Query(...), ...):
+                  ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              def $F(..., $X: $T = Path(...), ...):
+                  ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              def $F(..., $X: $T = Body(...), ...):
+                  ...
+      # aiohttp
+      - pattern: request.match_info[$K]
+      - pattern: request.query[$K]
+      - pattern: await request.json()
+      - pattern: await request.post()
+
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $CUR.execute(f"$STR")
+              - pattern: $CUR.execute("..." + $V)
+              - pattern: $CUR.execute("..." % $V)
+              - pattern: $CUR.execute("..." % ($V, ...))
+              - pattern: $CUR.execute("...".format(...))
+          - pattern-not: $CUR.execute("...", $PARAMS)
+      - pattern: $CUR.executemany($Q, ...)
+      - pattern: $M.objects.raw($Q, ...)
+      - pattern: $M.objects.extra(where=[$Q, ...], ...)
+      - pattern: $M.objects.extra(select={...}, ...)
+      - pattern: connection.execute($Q, ...)
+      - pattern: session.execute(sa.text($Q), ...)
+      - pattern: session.execute(text($Q), ...)
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.session.execute(f"$STR")
+              - pattern: $DB.session.execute("..." + $V)
+              - pattern: $DB.session.execute("..." % $V)
+      - pattern: RawSQL($Q, ...)
+
+    pattern-sanitizers:
+      - pattern: int($X)
+      - pattern: float($X)
+      - pattern: bool($X)
+      - pattern: $X.isdigit()
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X in $WHITELIST:
+                  ...
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [python, django, flask, fastapi, sqlalchemy]

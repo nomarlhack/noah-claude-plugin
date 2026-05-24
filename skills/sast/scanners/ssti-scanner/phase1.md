@@ -1,32 +1,8 @@
 ---
 id_prefix: SSTI
-grep_patterns:
-  - "ejs\\.render\\s*\\("
-  - "pug\\.render\\s*\\("
-  - "nunjucks\\.renderString\\s*\\("
-  - "render_template_string\\s*\\("
-  - "ERB\\.new\\s*\\("
-  - "Liquid::Template\\.parse"
-  - "Template\\s*\\("
-  - "renderString\\s*\\("
-  - "render_string\\s*\\("
-  - "template_string"
-  - "parseExpression\\s*\\("
-  - "SpelExpressionParser"
-  - "Freemarker"
-  - "Mustache\\.render"
-  - "Handlebars\\.compile\\s*\\("
-  - "__import__"
-  - "Velocity\\.evaluate"
-  - "FreeMarker"
-  - "Thymeleaf"
-  - "th:utext"
-  - "Twig"
-  - "text/template"
-  - "@RequestParam"
-  - "@RequestBody"
-  - "req\\.query"
-  - "req\\.body"
+rules_dir: rules/
+exclusion_policy: capability
+capability_via_sink_rule: true
 ---
 
 > ## 핵심 원칙: "템플릿 표현식이 실행되지 않으면 취약점이 아니다"
@@ -98,6 +74,18 @@ SSTI sink는 "사용자 입력이 템플릿 컴파일러의 입력 문자열 위
 - **JSP EL + 동적 include**: `<jsp:include page="${userInput}">` — page가 `.jsp`면 서버사이드 평가.
 - **Tornado (Python) `tornado.template.Template(x)`**: Python 코드 블록 포함 가능 — RCE 직결.
 - **Pebble (Java) `engine.getTemplate(x)`**: Spring Boot 환경에서 자주 사용. sandbox 기본 없음.
+
+## [필수] 능력형 토큰 클래스-제외 금지 (Safe-by-Proof §2-D)
+
+템플릿 표현식 평가 능력형 토큰(`SpelExpressionParser`/`parseExpression`/`TemplateEngine.process`+동적 템플릿 문자열/`Velocity.evaluate`/`new Template(userString)`/`render inline:`/`Jinja2 from_string`/`Smarty eval`)은 **매치 = 템플릿 표현식 평가 능력 실재**다. 일괄 제외 금지 — 개별 또는 동질 하위클래스(판별 축 명시) + spot-check. **주의**: `*RedisTemplate`/`R2dbcEntityTemplate`/`*IndexTemplate`/`buildConstraintViolationWithTemplate` 등 프레임워크 인프라의 `Template` 토큰은 SSTI sink가 아니므로(동질 비-sink 클래스) 그 판별 축을 명시해 분리하되, **진짜 표현식 평가 토큰을 그 노이즈 클래스에 섞어 함께 버리지 말 것**.
+
+**기계 게이트(Java/Kotlin/Ruby)**: `exclusion_policy: capability` + `capability_via_sink_rule: true`. 고정밀 sink 룰(`noah-<lang>-ssti-eval-sink`: `parseExpression`/`Velocity.evaluate`/`createTemplate`/`ERB.new`/`render inline`)이 `Template` 생성자 노이즈와 분리해 능력형 매치를 집계(실측: gift broad ast 1131 → sink 1, booking 1241 → 0). 이 `-sink` 매치는 전수 dispositioned. 결과 MD에 마커:
+
+```
+<!-- OBLIGATION capability_matches=<-sink 매치 수> dispositioned=<처리 수> method="..." -->
+```
+
+`capability_matches`=locindex `-sink` 매치 수, `dispositioned`=동일(잔여 `[INCOMPLETE]`). 그 외 언어/`Template` 노이즈는 §6-A-2 COVERAGE로 처리.
 
 ## 안전 패턴 (FP Guard)
 

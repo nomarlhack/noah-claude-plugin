@@ -1,0 +1,36 @@
+rules:
+  - id: noah-csharp-redos-phase1-pattern
+    severity: WARNING
+    languages:
+      - csharp
+    message: |
+      redos-scanner Phase 1 sink/source 패턴 매치 (C# 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: '\.test\s*\('
+      - pattern-regex: '\.match\s*\('
+      - pattern-regex: 'new RegExp\s*\('
+      - pattern-regex: 're\.match\s*\('
+      - pattern-regex: 're\.search\s*\('
+      - pattern-regex: 're\.findall\s*\('
+      - pattern-regex: 'Pattern\.compile\s*\('
+      - pattern-regex: 'String\.matches\s*\('
+      - pattern-regex: 'String\.replaceAll\s*\('
+      - pattern-regex: '=~'
+      - pattern-regex: '\.scan\s*\('
+      - pattern-regex: 'Regexp\.new\s*\('
+      - pattern-regex: '\.toRegex\s*\('
+      - pattern-regex: '\.replace\s*\('
+      - pattern-regex: '@RequestParam'
+      - pattern-regex: '@RequestBody'
+      - pattern-regex: 'req\.query'
+      - pattern-regex: 'req\.body'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-1333: Regular Expression DoS"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

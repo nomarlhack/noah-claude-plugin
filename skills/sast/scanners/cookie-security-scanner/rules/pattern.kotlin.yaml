@@ -1,0 +1,52 @@
+rules:
+  - id: noah-kotlin-cookie-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      cookie-security-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'Set-Cookie'
+      - pattern-regex: 'set-cookie'
+      - pattern-regex: 'setCookie'
+      - pattern-regex: 'set_cookie'
+      - pattern-regex: 'res\.cookie\s*\('
+      - pattern-regex: 'response\.set_cookie\s*\('
+      - pattern-regex: 'setcookie\s*\('
+      - pattern-regex: 'HttpOnly'
+      - pattern-regex: 'httpOnly'
+      - pattern-regex: 'httponly'
+      - pattern-regex: 'Secure'
+      - pattern-regex: 'SameSite'
+      - pattern-regex: 'Max-Age'
+      - pattern-regex: 'max-age'
+      - pattern-regex: 'maxAge'
+      - pattern-regex: 'max_age'
+      - pattern-regex: 'Expires'
+      - pattern-regex: 'expires'
+      - pattern-regex: 'cookie-parser'
+      - pattern-regex: 'cookie_jar'
+      - pattern-regex: 'SESSION_COOKIE_SECURE'
+      - pattern-regex: 'SESSION_COOKIE_HTTPONLY'
+      - pattern-regex: 'SESSION_COOKIE_SAMESITE'
+      - pattern-regex: 'SESSION_COOKIE_AGE'
+      - pattern-regex: 'config\.session'
+      - pattern-regex: 'cookie_options'
+      - pattern-regex: 'cookieOptions'
+      - pattern-regex: 'cookie_secure'
+      - pattern-regex: 'cookie_httponly'
+      - pattern-regex: 'remember_me'
+      - pattern-regex: 'rememberMe'
+      - pattern-regex: 'persistent.*cookie'
+      - pattern-regex: '__Host-'
+      - pattern-regex: '__Secure-'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-614: Cookie Security"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

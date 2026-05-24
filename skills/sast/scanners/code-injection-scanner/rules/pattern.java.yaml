@@ -1,0 +1,31 @@
+rules:
+  - id: noah-java-codeinj-pattern
+    severity: ERROR
+    languages:
+      - java
+    message: |
+      Java 동적 코드 실행 sink — ScriptEngine.eval / Nashorn / GroovyShell.evaluate /
+      Eval.me. 인자가 사용자 입력이면 RCE. SpEL/OGNL은 ssti-scanner와 cross-ref.
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\bScriptEngine\b'
+          - pattern-regex: '\.eval\s*\('
+          - pattern-regex: '\bGroovyShell\b'
+          - pattern-regex: '\bEval\.me\b'
+          - pattern-regex: '\bGroovyClassLoader\b'
+          - pattern-regex: '\bNashorn\b'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Code Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - java

@@ -1,0 +1,28 @@
+rules:
+  - id: noah-python-saml-phase1-pattern
+    severity: WARNING
+    languages:
+      - python
+    message: |
+      saml-scanner Phase 1 sink/source 패턴 매치 (Python 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'saml'
+      - pattern-regex: 'SAML'
+      - pattern-regex: 'omniauth-saml'
+      - pattern-regex: 'ruby-saml'
+      - pattern-regex: 'passport-saml'
+      - pattern-regex: 'python-saml'
+      - pattern-regex: 'onelogin'
+      - pattern-regex: 'SAMLResponse'
+      - pattern-regex: 'ds:Signature'
+      - pattern-regex: 'ACS'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-347: SAML Authentication"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

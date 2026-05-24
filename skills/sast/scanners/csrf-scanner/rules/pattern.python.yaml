@@ -1,0 +1,38 @@
+rules:
+  - id: noah-python-csrf-phase1-pattern
+    severity: WARNING
+    languages:
+      - python
+    message: |
+      csrf-scanner Phase 1 sink/source 패턴 매치 (Python 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'csrf_exempt'
+      - pattern-regex: 'skip_before_action.*verify_authenticity_token'
+      - pattern-regex: 'csrf\.disable'
+      - pattern-regex: 'csurf'
+      - pattern-regex: 'csrf-csrf'
+      - pattern-regex: 'csrf-sync'
+      - pattern-regex: 'protect_from_forgery'
+      - pattern-regex: 'SameSite'
+      - pattern-regex: 'X-CSRF-Token'
+      - pattern-regex: 'X-Requested-With'
+      - pattern-regex: 'verify_authenticity_token'
+      - pattern-regex: '@csrf_exempt'
+      - pattern-regex: 'csrf\s*\(\s*\)\.disable'
+      - pattern-regex: '@PostMapping'
+      - pattern-regex: '@PutMapping'
+      - pattern-regex: '@DeleteMapping'
+      - pattern-regex: 'WebSecurityConfigurerAdapter'
+      - pattern-regex: 'SecurityFilterChain'
+      - pattern-regex: 'HttpSecurity'
+      - pattern-regex: 'ignoringRequestMatchers'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-352: Cross-Site Request Forgery"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

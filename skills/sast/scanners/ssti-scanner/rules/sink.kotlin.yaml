@@ -1,0 +1,14 @@
+rules:
+  - id: noah-kotlin-ssti-eval-sink
+    severity: WARNING
+    languages: [kotlin]
+    message: |
+      SSTI sink 능력형 매치 (SpEL parseExpression/Velocity.evaluate 등). Safe-by-Proof §2-D.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-1336: Improper Neutralization of Special Elements Used in a Template Engine"]
+    patterns:
+      - pattern-either:
+          - pattern: $P.parseExpression($X)
+          - pattern: Velocity.evaluate(...)
+          - pattern: $E.createTemplate($X)

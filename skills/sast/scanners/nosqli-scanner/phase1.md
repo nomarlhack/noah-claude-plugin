@@ -1,24 +1,6 @@
 ---
 id_prefix: NOSQLI
-grep_patterns:
-  - "collection\\.find\\s*\\("
-  - "collection\\.findOne\\s*\\("
-  - "Model\\.find\\s*\\("
-  - "Model\\.findOne\\s*\\("
-  - "\\$where"
-  - "\\$regex"
-  - "\\$ne"
-  - "\\$gt"
-  - "\\$or"
-  - "\\$and"
-  - "\\$not"
-  - "collection\\.aggregate\\s*\\("
-  - "client\\.eval\\s*\\("
-  - "mongoose"
-  - "mongodb"
-  - "ioredis"
-  - "redis\\.eval"
-  - "@elastic/elasticsearch"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "쿼리 로직이 변경되지 않으면 취약점이 아니다"

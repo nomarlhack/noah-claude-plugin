@@ -1,0 +1,53 @@
+rules:
+  - id: noah-php-xss-taint
+    severity: ERROR
+    languages:
+      - php
+    mode: taint
+    message: |
+      PHP $_GET/$_POST/$_REQUEST/$_COOKIE 값이 echo/print/printf 또는 HTML 본문에
+      직접 출력되면 Reflected XSS. htmlspecialchars(ENT_QUOTES)/strip_tags로 escape.
+      JS 컨텍스트는 json_encode 또는 별도 escape 필요.
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+      - pattern: $_SERVER
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_GET[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_POST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_REQUEST[...];
+    pattern-sinks:
+      - pattern: echo $X;
+      - pattern: print($X);
+      - pattern: printf($X, ...);
+      - pattern: print_r($X);
+      - pattern: print_r($X, ...);
+    pattern-sanitizers:
+      - pattern: htmlspecialchars($X, ...)
+      - pattern: htmlspecialchars($X)
+      - pattern: htmlentities($X, ...)
+      - pattern: htmlentities($X)
+      - pattern: strip_tags($X)
+      - pattern: strip_tags($X, ...)
+      - pattern: filter_var($X, FILTER_SANITIZE_STRING)
+      - pattern: filter_var($X, FILTER_SANITIZE_FULL_SPECIAL_CHARS)
+      - pattern: intval($X)
+      - pattern: (int)$X
+      - pattern: (int) $X
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [php]

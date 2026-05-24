@@ -1,0 +1,45 @@
+rules:
+  - id: noah-java-ldap-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력이 DirContext.search / LdapTemplate.search 필터에
+      문자열 결합으로 들어가면 LDAP Injection. 안전: encodeForLDAP (ESAPI),
+      필터 파라미터 바인딩.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+    pattern-sinks:
+      - pattern: $CTX.search($BASE, $X, ...)
+      - pattern: $TPL.search($BASE, $X, ...)
+      - pattern: new SearchRequest($BASE, $SCOPE, $X, ...)
+    pattern-sanitizers:
+      - pattern: Encoder.encodeForLDAP($X)
+      - pattern: Encode.forLdap($X)
+      - pattern: LdapEncoder.filterEncode($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-90: LDAP Injection"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [java, spring, ldap]

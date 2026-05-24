@@ -1,0 +1,31 @@
+rules:
+  - id: noah-typescript-subto-phase1-pattern
+    severity: WARNING
+    languages:
+      - typescript
+    message: |
+      subdomain-takeover-scanner Phase 1 sink/source 패턴 매치 (TypeScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: '\.github\.io'
+      - pattern-regex: '\.s3\.amazonaws\.com'
+      - pattern-regex: '\.s3-website'
+      - pattern-regex: '\.herokuapp\.com'
+      - pattern-regex: '\.herokudns\.com'
+      - pattern-regex: '\.azurewebsites\.net'
+      - pattern-regex: '\.cloudapp\.azure\.com'
+      - pattern-regex: '\.blob\.core\.windows\.net'
+      - pattern-regex: '\.cloudfront\.net'
+      - pattern-regex: 'aws_route53_record'
+      - pattern-regex: 'cloudflare_record'
+      - pattern-regex: 'CNAME'
+      - pattern-regex: 'github\.io'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-1395: Subdomain Takeover"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

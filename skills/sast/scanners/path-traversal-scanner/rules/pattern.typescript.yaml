@@ -1,0 +1,47 @@
+rules:
+  - id: noah-typescript-pathtrv-phase1-pattern
+    severity: WARNING
+    languages:
+      - typescript
+    message: |
+      path-traversal-scanner Phase 1 sink/source 패턴 매치 (TypeScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'fs\.readFile'
+      - pattern-regex: 'fs\.readFileSync'
+      - pattern-regex: 'fs\.createReadStream'
+      - pattern-regex: 'path\.join\s*\('
+      - pattern-regex: 'path\.resolve\s*\('
+      - pattern-regex: 'fs\.writeFile'
+      - pattern-regex: 'send_file'
+      - pattern-regex: 'render.*file:'
+      - pattern-regex: 'File\.open'
+      - pattern-regex: 'File\.read'
+      - pattern-regex: 'file_get_contents\s*\('
+      - pattern-regex: 'include\s*\('
+      - pattern-regex: 'require\s*\('
+      - pattern-regex: 'open\s*\('
+      - pattern-regex: 'readFile'
+      - pattern-regex: 'new File\s*\('
+      - pattern-regex: 'Paths\.get\s*\('
+      - pattern-regex: 'Files\.newInputStream'
+      - pattern-regex: 'fs\.createWriteStream'
+      - pattern-regex: 'fs\.writeFileSync'
+      - pattern-regex: 'sendFile\s*\('
+      - pattern-regex: 'os\.Open\s*\('
+      - pattern-regex: 'os\.ReadFile\s*\('
+      - pattern-regex: 'os\.Create\s*\('
+      - pattern-regex: 'searchParams\.get\s*\('
+      - pattern-regex: '@RequestParam'
+      - pattern-regex: '@PathVariable'
+      - pattern-regex: 'req\.query'
+      - pattern-regex: 'req\.params'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-22: Path Traversal"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

@@ -1,0 +1,22 @@
+rules:
+  # 고정밀 OS 명령 sink (PHP). `-sink` → ast tier, §2-D 능력형 집계 대상.
+  - id: noah-php-cmdi-shell-sink
+    severity: WARNING
+    languages: [php]
+    message: |
+      OS 명령 실행 sink 능력형 매치 (system/exec/shell_exec/passthru/proc_open/popen).
+      인자가 사용자 입력이고 escapeshellarg 없으면 명령 주입. Safe-by-Proof §2-D.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-78: Improper Neutralization of Special Elements used in an OS Command"]
+    patterns:
+      - pattern-either:
+          - pattern: system($X)
+          - pattern: system($X, ...)
+          - pattern: exec($X)
+          - pattern: exec($X, ...)
+          - pattern: shell_exec($X)
+          - pattern: passthru($X)
+          - pattern: passthru($X, ...)
+          - pattern: proc_open($X, ...)
+          - pattern: popen($X, ...)

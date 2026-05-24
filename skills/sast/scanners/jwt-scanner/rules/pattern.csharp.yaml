@@ -1,0 +1,57 @@
+rules:
+  - id: noah-csharp-jwt-phase1-pattern
+    severity: WARNING
+    languages:
+      - csharp
+    message: |
+      jwt-scanner Phase 1 sink/source 패턴 매치 (C# 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'jwt\.verify\s*\('
+      - pattern-regex: 'jwt\.decode\s*\('
+      - pattern-regex: 'jwt\.sign\s*\('
+      - pattern-regex: 'JWT\.decode\s*\('
+      - pattern-regex: 'JWT\.encode\s*\('
+      - pattern-regex: 'jsonwebtoken'
+      - pattern-regex: 'express-jwt'
+      - pattern-regex: 'passport-jwt'
+      - pattern-regex: 'PyJWT'
+      - pattern-regex: 'python-jose'
+      - pattern-regex: 'ruby-jwt'
+      - pattern-regex: 'firebase/php-jwt'
+      - pattern-regex: 'ignoreExpiration'
+      - pattern-regex: 'algorithms.*none'
+      - pattern-regex: 'bearer'
+      - pattern-regex: 'ExpiredJwtException'
+      - pattern-regex: 'ExpiredSignatureError'
+      - pattern-regex: 'TokenExpiredError'
+      - pattern-regex: 'ExpiredSignature'
+      - pattern-regex: 'parseClaimsJwt'
+      - pattern-regex: 'parseSignedClaims'
+      - pattern-regex: 'Jwts\.parser'
+      - pattern-regex: 'Jwts\.builder'
+      - pattern-regex: 'signWith'
+      - pattern-regex: 'verifyWith'
+      - pattern-regex: 'JWTVerifier'
+      - pattern-regex: 'SignedJWT'
+      - pattern-regex: '\bjose\b'
+      - pattern-regex: 'jose4j'
+      - pattern-regex: 'nimbus-jose-jwt'
+      - pattern-regex: 'secretOrKey'
+      - pattern-regex: 'golang-jwt'
+      - pattern-regex: 'jwt-go'
+      - pattern-regex: 'jwt\.Parse\s*\('
+      - pattern-regex: 'jwt\.ParseWithClaims\s*\('
+      - pattern-regex: 'verify_signature.*false'
+      - pattern-regex: 'verify\s*=\s*[Ff]alse'
+      - pattern-regex: 'algorithms\s*=\s*\[?\s*[''"]none'
+      - pattern-regex: 'alg\s*:\s*[''"]none'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-345: JWT Validation"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

@@ -1,0 +1,36 @@
+rules:
+  - id: noah-zipslip-phase1-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      zipslip-scanner Phase 1 sink/source 패턴 매치.
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'adm-zip'
+      - pattern-regex: 'unzipper'
+      - pattern-regex: 'unzip-stream'
+      - pattern-regex: 'yauzl'
+      - pattern-regex: 'decompress'
+      - pattern-regex: 'zipfile\.extractall\s*\('
+      - pattern-regex: 'zipfile\.extract\s*\('
+      - pattern-regex: 'tarfile\.extractall\s*\('
+      - pattern-regex: 'ZipInputStream'
+      - pattern-regex: 'ZipFile'
+      - pattern-regex: 'ZipArchive::extractTo\s*\('
+      - pattern-regex: 'extractAllTo\s*\('
+      - pattern-regex: 'extractEntryTo\s*\('
+      - pattern-regex: 'Zip::'
+      - pattern-regex: 'tar\.extract'
+      - pattern-regex: 'getNextEntry'
+      - pattern-regex: 'getEntry\s*\('
+      - pattern-regex: 'entry\.getName'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-22: Zip Slip / Path Traversal"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

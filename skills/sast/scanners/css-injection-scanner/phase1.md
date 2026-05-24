@@ -1,20 +1,6 @@
 ---
 id_prefix: CSSI
-grep_patterns:
-  - "style\\s*="
-  - "cssText"
-  - "insertRule\\s*\\("
-  - "setAttribute.*style"
-  - "document\\.styleSheets"
-  - "CSSStyleDeclaration"
-  - "style\\s*\\+\\s*="
-  - "\\[style\\]"
-  - "expression\\s*\\("
-  - "@import"
-  - "url\\s*\\("
-  - "searchParams\\.get\\s*\\("
-  - "@RequestParam"
-  - "req\\.query"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "CSS 의미 단위가 탈출되지 않으면 취약점이 아니다"

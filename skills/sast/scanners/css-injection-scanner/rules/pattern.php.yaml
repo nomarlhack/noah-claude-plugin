@@ -1,0 +1,32 @@
+rules:
+  - id: noah-php-cssi-phase1-pattern
+    severity: WARNING
+    languages:
+      - php
+    message: |
+      css-injection-scanner Phase 1 sink/source 패턴 매치 (Php 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'style\s*='
+      - pattern-regex: 'cssText'
+      - pattern-regex: 'insertRule\s*\('
+      - pattern-regex: 'setAttribute.*style'
+      - pattern-regex: 'document\.styleSheets'
+      - pattern-regex: 'CSSStyleDeclaration'
+      - pattern-regex: 'style\s*\+\s*='
+      - pattern-regex: '\[style\]'
+      - pattern-regex: 'expression\s*\('
+      - pattern-regex: '@import'
+      - pattern-regex: 'url\s*\('
+      - pattern-regex: 'searchParams\.get\s*\('
+      - pattern-regex: '@RequestParam'
+      - pattern-regex: 'req\.query'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-79: CSS Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

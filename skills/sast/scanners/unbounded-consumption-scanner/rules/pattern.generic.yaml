@@ -1,0 +1,61 @@
+rules:
+  - id: noah-uc-phase1-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      unbounded-consumption-scanner Phase 1 sink/source 패턴 매치.
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'openai'
+      - pattern-regex: 'anthropic'
+      - pattern-regex: 'google\.generativeai'
+      - pattern-regex: 'google\.genai'
+      - pattern-regex: 'vertexai'
+      - pattern-regex: 'bedrock'
+      - pattern-regex: 'cohere'
+      - pattern-regex: 'mistralai'
+      - pattern-regex: 'replicate'
+      - pattern-regex: 'litellm'
+      - pattern-regex: 'ollama'
+      - pattern-regex: 'huggingface'
+      - pattern-regex: 'transformers'
+      - pattern-regex: 'langchain'
+      - pattern-regex: 'llama_index'
+      - pattern-regex: 'llamaindex'
+      - pattern-regex: 'chat\.completions\.create'
+      - pattern-regex: 'messages\.create'
+      - pattern-regex: 'generate_content'
+      - pattern-regex: 'responses\.create'
+      - pattern-regex: 'embeddings\.create'
+      - pattern-regex: '\.invoke\s*\('
+      - pattern-regex: '\.predict\s*\('
+      - pattern-regex: '\.generate\s*\('
+      - pattern-regex: '\.complete\s*\('
+      - pattern-regex: 'max_tokens'
+      - pattern-regex: 'max_output_tokens'
+      - pattern-regex: 'max_completion_tokens'
+      - pattern-regex: 'max_new_tokens'
+      - pattern-regex: 'stream\s*='
+      - pattern-regex: 'n\s*='
+      - pattern-regex: 'best_of'
+      - pattern-regex: 'temperature'
+      - pattern-regex: 'Retriever'
+      - pattern-regex: 'VectorStore'
+      - pattern-regex: 'embedding'
+      - pattern-regex: 'rate_limit'
+      - pattern-regex: 'ratelimit'
+      - pattern-regex: 'express-rate-limit'
+      - pattern-regex: 'slowapi'
+      - pattern-regex: 'django-ratelimit'
+      - pattern-regex: 'Bucket4j'
+      - pattern-regex: 'redis'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-770: Unbounded Consumption (LLM10:2025)"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

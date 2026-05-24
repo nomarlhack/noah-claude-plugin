@@ -1,0 +1,36 @@
+rules:
+  - id: noah-csharp-nosqli-phase1-pattern
+    severity: WARNING
+    languages:
+      - csharp
+    message: |
+      nosqli-scanner Phase 1 sink/source 패턴 매치 (C# 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'collection\.find\s*\('
+      - pattern-regex: 'collection\.findOne\s*\('
+      - pattern-regex: 'Model\.find\s*\('
+      - pattern-regex: 'Model\.findOne\s*\('
+      - pattern-regex: '\$where'
+      - pattern-regex: '\$regex'
+      - pattern-regex: '\$ne'
+      - pattern-regex: '\$gt'
+      - pattern-regex: '\$or'
+      - pattern-regex: '\$and'
+      - pattern-regex: '\$not'
+      - pattern-regex: 'collection\.aggregate\s*\('
+      - pattern-regex: 'client\.eval\s*\('
+      - pattern-regex: 'mongoose'
+      - pattern-regex: 'mongodb'
+      - pattern-regex: 'ioredis'
+      - pattern-regex: 'redis\.eval'
+      - pattern-regex: '@elastic/elasticsearch'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-943: NoSQL Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

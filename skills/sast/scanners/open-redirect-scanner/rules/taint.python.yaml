@@ -1,0 +1,41 @@
+rules:
+  - id: noah-python-open-redirect-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력이 redirect()/HttpResponseRedirect에 직접 들어가면
+      Open Redirect. 안전: url_has_allowed_host_and_scheme (Django),
+      상대 경로 강제 또는 호스트 화이트리스트.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form.get($K, ...)
+      - pattern: request.values[$K]
+    pattern-sinks:
+      - pattern: redirect($X)
+      - pattern: redirect($X, ...)
+      - pattern: HttpResponseRedirect($X)
+      - pattern: flask.redirect($X)
+      - pattern: RedirectResponse($X)
+      - pattern: RedirectResponse(url=$X)
+    pattern-sanitizers:
+      - pattern: url_has_allowed_host_and_scheme($X, ...)
+      - pattern: is_safe_url($X, ...)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X.startswith("/"):
+                  ...
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-601: Open Redirect"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [Open Redirect]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [python, django, flask, fastapi]

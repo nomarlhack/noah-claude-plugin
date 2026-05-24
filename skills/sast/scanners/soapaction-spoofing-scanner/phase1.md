@@ -1,21 +1,6 @@
 ---
 id_prefix: SOAPACT
-grep_patterns:
-  - "SOAPAction"
-  - "@WebService"
-  - "@WebMethod"
-  - "Apache CXF"
-  - "Apache Axis"
-  - "@Endpoint"
-  - "@PayloadRoot"
-  - "zeep"
-  - "spyne"
-  - "SoapServer"
-  - "wsdl"
-  - "WSDL"
-  - "savon"
-  - "soap"
-  - "SOAP"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "SOAPAction 변조로 인가가 우회되어야 취약점이다"

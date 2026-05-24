@@ -1,0 +1,48 @@
+rules:
+  - id: noah-python-codeinj-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python HTTP 입력(request.GET/POST/args/form/json)이 eval/exec/compile에 직접
+      흐르면 Code Injection → RCE. 안전: ast.literal_eval, json.loads, int 캐스트.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.GET.get($K, ...)
+      - pattern: request.POST.get($K, ...)
+      - pattern: request.args[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form[$K]
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json
+      - pattern: request.data
+      - pattern: request.values[$K]
+    pattern-sinks:
+      - pattern: eval($X)
+      - pattern: exec($X)
+      - pattern: compile($X, ...)
+    pattern-sanitizers:
+      - pattern: int($X)
+      - pattern: float($X)
+      - pattern: ast.literal_eval($X)
+      - pattern: json.loads($X)
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Code Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - python
+        - django
+        - flask
+        - fastapi

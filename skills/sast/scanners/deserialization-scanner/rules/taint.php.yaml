@@ -1,0 +1,44 @@
+rules:
+  - id: noah-php-deser-taint
+    severity: ERROR
+    languages:
+      - php
+    mode: taint
+    message: |
+      PHP $_GET/$_POST/$_REQUEST/$_COOKIE 값이 unserialize()에 들어가면 PHP Object
+      Injection → POP chain RCE. JSON 직렬화(json_decode) 사용 또는
+      unserialize($x, ['allowed_classes' => false]) 로 클래스 비허용.
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_GET[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_POST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_REQUEST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_COOKIE[...];
+    pattern-sinks:
+      - pattern: unserialize($X)
+      - pattern: unserialize(trim($X))
+      - pattern: maybe_unserialize($X)
+    pattern-sanitizers:
+      - pattern: json_decode($X, ...)
+      - pattern: 'unserialize($X, [''allowed_classes'' => false])'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-502: Insecure Deserialization"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Deserialization]
+      owasp: ["A08:2021 Software and Data Integrity Failures"]
+      technology: [php]

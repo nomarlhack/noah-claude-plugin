@@ -1,0 +1,88 @@
+rules:
+  - id: noah-javascript-sqli-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      JS/TS에서 Express req.query/params/body/headers, Next/Fastify equivalents가
+      connection.query / sequelize.query / knex.raw / $queryRawUnsafe / pool.query에
+      문자열 결합/템플릿 리터럴로 들어가면 SQLi.
+      안전: Prisma `$queryRaw\`...\``, parameterized (?, $1), ORM 메서드 객체 인자.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.query[$X]
+      - pattern: req.params
+      - pattern: req.params.$X
+      - pattern: req.params[$X]
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: req.body[$X]
+      - pattern: req.headers
+      - pattern: req.headers[$X]
+      - pattern: req.cookies
+      - pattern: req.cookies[$X]
+      - pattern: request.query
+      - pattern: request.params
+      - pattern: request.body
+      - pattern: context.params
+      - pattern: ctx.query
+      - pattern: ctx.request.body
+
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $CONN.query(`...${$X}...`, ...)
+              - pattern: $CONN.query("..." + $X, ...)
+              - pattern: $CONN.query($X + "...", ...)
+              - pattern: $CONN.query($X, ...)
+          - pattern-not: $CONN.query("...", $ARR)
+          - pattern-not: $CONN.query("...", [...])
+      - patterns:
+          - pattern-either:
+              - pattern: $POOL.query(`...${$X}...`, ...)
+              - pattern: $POOL.query("..." + $X, ...)
+              - pattern: $POOL.query($X, ...)
+          - pattern-not: $POOL.query("...", $ARR)
+      - pattern: $DB.$queryRawUnsafe($Q, ...)
+      - pattern: $DB.$executeRawUnsafe($Q, ...)
+      - patterns:
+          - pattern-either:
+              - pattern: knex.raw(`...${$X}...`)
+              - pattern: knex.raw("..." + $X)
+              - pattern: $KNEX.raw($X)
+          - pattern-not: knex.raw("...", [...])
+      - patterns:
+          - pattern-either:
+              - pattern: sequelize.query(`...${$X}...`)
+              - pattern: sequelize.query("..." + $X)
+              - pattern: sequelize.query($X)
+          - pattern-not: 'sequelize.query("...", { replacements: ... })'
+      - pattern: $REPO.createQueryBuilder(...).where(`...${$X}...`)
+
+    pattern-sanitizers:
+      - pattern: parseInt($X, ...)
+      - pattern: Number($X)
+      - pattern: Number.parseInt($X, ...)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ([...].includes($X)) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              const $A = [...];
+              if ($A.includes($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [nodejs, express, fastify, sequelize, knex, prisma, typeorm]

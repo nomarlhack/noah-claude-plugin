@@ -1,25 +1,6 @@
 ---
 id_prefix: CRLF
-grep_patterns:
-  - "res\\.setHeader\\s*\\("
-  - "res\\.writeHead\\s*\\("
-  - "res\\.header\\s*\\("
-  - "res\\.set\\s*\\("
-  - "res\\.cookie\\s*\\("
-  - "res\\.attachment\\s*\\("
-  - "response\\.headers\\["
-  - "response\\.set_cookie\\s*\\("
-  - "HttpResponseRedirect\\s*\\("
-  - "response\\.setHeader\\s*\\("
-  - "response\\.addHeader\\s*\\("
-  - "redirect_to"
-  - "cookies\\["
-  - "header\\s*\\("
-  - "setcookie\\s*\\("
-  - "@RequestParam"
-  - "@RequestBody"
-  - "req\\.query"
-  - "req\\.body"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "헤더가 분리되지 않으면 취약점이 아니다"

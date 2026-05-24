@@ -1,0 +1,41 @@
+rules:
+  - id: noah-javascript-open-redirect-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js에서 req.* 입력이 res.redirect()에, 또는 클라이언트에서 location.href에
+      직접 들어가면 Open Redirect. 안전: 상대 경로 강제, 호스트 화이트리스트.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.params
+      - pattern: req.body
+      - pattern: req.body.$X
+    pattern-sinks:
+      - pattern: res.redirect($X)
+      - pattern: res.redirect($CODE, $X)
+      - pattern: res.location($X)
+      - pattern: reply.redirect($X)
+      - pattern: ctx.redirect($X)
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($X.startsWith("/")) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ([...].includes(new URL($X).hostname)) { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-601: Open Redirect"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [Open Redirect]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [nodejs, express, fastify, koa]

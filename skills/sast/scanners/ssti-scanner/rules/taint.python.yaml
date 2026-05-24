@@ -1,0 +1,36 @@
+rules:
+  - id: noah-python-ssti-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력이 render_template_string / Template().render / Jinja2
+      Environment.from_string에 들어가면 Server-Side Template Injection → RCE.
+      안전: 템플릿 파일 기반 렌더링(render_template) + 변수만 컨텍스트로 전달.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json
+      - pattern: request.values[$K]
+    pattern-sinks:
+      - pattern: render_template_string($X, ...)
+      - pattern: render_template_string($X)
+      - pattern: Template($X)
+      - pattern: Template($X).render(...)
+      - pattern: $ENV.from_string($X)
+      - pattern: jinja2.Template($X)
+      - pattern: flask.render_template_string($X, ...)
+    pattern-sanitizers: []
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-94: Server-Side Template Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [python, flask, jinja2]

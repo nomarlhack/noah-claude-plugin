@@ -1,0 +1,69 @@
+rules:
+  - id: noah-kotlin-tls-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      tls-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'tls\.createServer'
+      - pattern-regex: 'https\.createServer'
+      - pattern-regex: 'secureProtocol'
+      - pattern-regex: 'minVersion'
+      - pattern-regex: 'maxVersion'
+      - pattern-regex: 'SSLv2'
+      - pattern-regex: 'SSLv3'
+      - pattern-regex: 'TLSv1_method'
+      - pattern-regex: 'TLSv1_1_method'
+      - pattern-regex: 'TLSv1_2_method'
+      - pattern-regex: 'ciphers\s*[:=]'
+      - pattern-regex: 'rejectUnauthorized'
+      - pattern-regex: 'NODE_TLS_REJECT_UNAUTHORIZED'
+      - pattern-regex: 'ssl_context'
+      - pattern-regex: 'ssl\.create_default_context'
+      - pattern-regex: 'ssl\.wrap_socket'
+      - pattern-regex: 'PROTOCOL_TLS'
+      - pattern-regex: 'PROTOCOL_SSLv23'
+      - pattern-regex: 'CERT_NONE'
+      - pattern-regex: 'CERT_OPTIONAL'
+      - pattern-regex: 'check_hostname'
+      - pattern-regex: 'verify_mode'
+      - pattern-regex: 'ssl_version'
+      - pattern-regex: 'SSLContext'
+      - pattern-regex: 'HTTPS_VERIFY'
+      - pattern-regex: 'verify_ssl'
+      - pattern-regex: 'InsecureRequestWarning'
+      - pattern-regex: 'verify\s*=\s*False'
+      - pattern-regex: 'ServerCertificateValidationCallback'
+      - pattern-regex: 'TrustAllCerts'
+      - pattern-regex: 'AllowAutoRedirect'
+      - pattern-regex: 'setEnabledProtocols'
+      - pattern-regex: 'setEnabledCipherSuites'
+      - pattern-regex: 'SSLConnectionSocketFactory'
+      - pattern-regex: 'TrustSelfSignedStrategy'
+      - pattern-regex: 'X509TrustManager'
+      - pattern-regex: 'checkServerTrusted'
+      - pattern-regex: 'ssl_ciphers'
+      - pattern-regex: 'ssl_protocols'
+      - pattern-regex: 'ssl_prefer_server_ciphers'
+      - pattern-regex: 'SSLCipherSuite'
+      - pattern-regex: 'SSLProtocol'
+      - pattern-regex: 'ssl_certificate'
+      - pattern-regex: 'proxy_ssl_verify'
+      - pattern-regex: 'ssl_verify_client'
+      - pattern-regex: 'HEARTBLEED'
+      - pattern-regex: 'compression\s*=.*ssl'
+      - pattern-regex: 'op_no_compression'
+      - pattern-regex: 'SSL_OP_NO_COMPRESSION'
+      - pattern-regex: 'Strict-Transport-Security'
+      - pattern-regex: 'HSTS'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-326: Weak TLS Configuration"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

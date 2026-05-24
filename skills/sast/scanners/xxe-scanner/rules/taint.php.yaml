@@ -1,0 +1,41 @@
+rules:
+  - id: noah-php-xxe-taint
+    severity: ERROR
+    languages:
+      - php
+    mode: taint
+    message: |
+      PHP $_GET/$_POST/php://input 등 사용자 XML이 simplexml_load_string /
+      DOMDocument::loadXML에 LIBXML_NOENT 플래그와 함께 들어가면 XXE.
+      안전: libxml_disable_entity_loader(true) (PHP < 8.0), LIBXML_NOENT 미사용.
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_GET[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_POST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = file_get_contents("php://input");
+    pattern-sinks:
+      - pattern: simplexml_load_string($X, ...)
+      - pattern: simplexml_load_string($X)
+      - pattern: $DOC->loadXML($X)
+      - pattern: $DOC->loadXML($X, ...)
+      - pattern: $DOC->load($X)
+    pattern-sanitizers:
+      - pattern: libxml_disable_entity_loader(true)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-611: XML External Entity"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [XXE]
+      owasp: ["A05:2021 Security Misconfiguration"]
+      technology: [php]

@@ -1,0 +1,29 @@
+rules:
+  - id: noah-python-codeinj-pattern
+    severity: ERROR
+    languages:
+      - python
+    message: |
+      Python 동적 코드 실행 sink — eval/exec/compile. 인자가 사용자 입력이면 RCE.
+      안전: ast.literal_eval(리터럴만), json.loads.
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: exec(...)
+          - pattern: compile(...)
+      - pattern-not: ast.literal_eval(...)
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Code Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - python

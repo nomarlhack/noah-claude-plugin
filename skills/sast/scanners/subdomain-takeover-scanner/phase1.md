@@ -1,19 +1,6 @@
 ---
 id_prefix: SUBTO
-grep_patterns:
-  - "\\.github\\.io"
-  - "\\.s3\\.amazonaws\\.com"
-  - "\\.s3-website"
-  - "\\.herokuapp\\.com"
-  - "\\.herokudns\\.com"
-  - "\\.azurewebsites\\.net"
-  - "\\.cloudapp\\.azure\\.com"
-  - "\\.blob\\.core\\.windows\\.net"
-  - "\\.cloudfront\\.net"
-  - "aws_route53_record"
-  - "cloudflare_record"
-  - "CNAME"
-  - "github\\.io"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "공격자가 서브도메인을 장악할 수 없으면 취약점이 아니다"

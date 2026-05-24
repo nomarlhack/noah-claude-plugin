@@ -250,6 +250,7 @@ curl -X <METHOD> "<TARGET_HOST>/<API_PATH>" -H "Cookie: <SESSION_COOKIE>" -d "<P
 ## 안전 판정 항목
 ## 이상 없음 스캐너 점검 항목 요약
 ## 미적용 스캐너 목록
+## 부가 발견
 ### AI 자율 탐색
 ### 독립 후보
 ### 외부 접근 경로 없음
@@ -262,12 +263,14 @@ curl -X <METHOD> "<TARGET_HOST>/<API_PATH>" -H "Cookie: <SESSION_COOKIE>" -d "<P
 #### 소스코드 분석
 #### 재현 방법 및 POC
 #### 권장 조치
+#### 공통 권장 조치
 ```
 
 ### 템플릿 헤딩 (동적 부분 포함)
 
 ```
 ### {SCANNER_NAME} Scanner
+#### 공통 권장 조치 ({IDS} 일괄 적용)
 ### 외부 접근 경로 없음 ({N}건)
 ### 방어 계층 작동 확인 ({N}건)
 ### 취약점 성립 조건 미충족 ({N}건)
@@ -283,6 +286,7 @@ curl -X <METHOD> "<TARGET_HOST>/<API_PATH>" -H "Cookie: <SESSION_COOKIE>" -d "<P
 | 변수 | 정규식 |
 |------|--------|
 | `{N}` | `\d+` |
+| `{IDS}` | `[A-Z][A-Z0-9_]*-\d+(\s*~\s*[A-Z][A-Z0-9_]*-\d+)?` (단일 ID 또는 ID 범위, 예: `CSVI-1 ~ CSVI-10`) |
 | `{SCANNER_NAME}` | `[A-Za-z0-9가-힣/][A-Za-z0-9가-힣/\s\-]*` (공백/하이픈 포함 가능, 첫 글자는 알파벳/한글/숫자) |
 | `{VULN_TITLE}` / `{TITLE}` | `.+` (자유 텍스트) |
 

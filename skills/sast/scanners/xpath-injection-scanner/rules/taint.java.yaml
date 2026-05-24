@@ -1,0 +1,38 @@
+rules:
+  - id: noah-java-xpath-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력이 XPath.compile/evaluate 식에 문자열 결합으로 들어가면
+      XPath Injection. 안전: XPathVariableResolver로 변수 바인딩.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+    pattern-sinks:
+      - pattern: $XPATH.compile($X)
+      - pattern: $XPATH.evaluate($X, ...)
+      - pattern: $XPATH.evaluateExpression($X, ...)
+    pattern-sanitizers:
+      - pattern: $XPATH.setXPathVariableResolver($R)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-643: XPath Injection"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [java]

@@ -1,0 +1,38 @@
+rules:
+  - id: noah-javascript-xpathi-phase1-pattern
+    severity: WARNING
+    languages:
+      - javascript
+    message: |
+      xpath-injection-scanner Phase 1 sink/source 패턴 매치 (JavaScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: '\.xpath\s*\('
+      - pattern-regex: 'XPath\.evaluate\s*\('
+      - pattern-regex: 'XPath\.compile\s*\('
+      - pattern-regex: 'DOMXPath::query\s*\('
+      - pattern-regex: 'DOMXPath::evaluate\s*\('
+      - pattern-regex: 'SimpleXMLElement::xpath\s*\('
+      - pattern-regex: 'Nokogiri.*xpath'
+      - pattern-regex: 'REXML::XPath'
+      - pattern-regex: 'lxml\.etree\.xpath'
+      - pattern-regex: 'XPathFactory'
+      - pattern-regex: 'SelectNodes'
+      - pattern-regex: 'SelectSingleNode'
+      - pattern-regex: 'XPathNavigator'
+      - pattern-regex: 'XPathExpression'
+      - pattern-regex: '\.findall\s*\('
+      - pattern-regex: '\.findtext\s*\('
+      - pattern-regex: 'xmlXPathEval'
+      - pattern-regex: 'JXPathContext'
+      - pattern-regex: 'XPathBuilder'
+      - pattern-regex: 'createExpression'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-643: XPath Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

@@ -1,0 +1,42 @@
+rules:
+  - id: noah-typescript-hsmg-phase1-pattern
+    severity: WARNING
+    languages:
+      - typescript
+    message: |
+      http-smuggling-scanner Phase 1 sink/source 패턴 매치 (TypeScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'Transfer-Encoding'
+      - pattern-regex: 'Content-Length'
+      - pattern-regex: 'chunked'
+      - pattern-regex: 'proxy_pass'
+      - pattern-regex: 'ProxyPass'
+      - pattern-regex: 'http-proxy-middleware'
+      - pattern-regex: 'proxy_http_version'
+      - pattern-regex: 'changeOrigin'
+      - pattern-regex: 'http-reuse'
+      - pattern-regex: 'keepalive_timeout'
+      - pattern-regex: 'upstream'
+      - pattern-regex: 'LimitRequestBody'
+      - pattern-regex: 'upstream_keepalive'
+      - pattern-regex: 'Expect'
+      - pattern-regex: 'Upgrade:'
+      - pattern-regex: 'HTTP2-Settings'
+      - pattern-regex: 'h2c'
+      - pattern-regex: '--insecure-http-parser'
+      - pattern-regex: 'gunicorn'
+      - pattern-regex: 'uvicorn'
+      - pattern-regex: 'puma'
+      - pattern-regex: 'tomcat'
+      - pattern-regex: 'envoy'
+      - pattern-regex: 'haproxy'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-444: HTTP Request Smuggling"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

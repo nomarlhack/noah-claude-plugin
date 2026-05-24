@@ -1,0 +1,30 @@
+rules:
+  - id: noah-ruby-codeinj-pattern
+    severity: ERROR
+    languages:
+      - ruby
+    message: |
+      Ruby 동적 코드 실행 sink — eval/instance_eval/class_eval/module_eval/binding.eval.
+      인자가 사용자 입력이면 RCE.
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\beval\s*[\(\s]'
+          - pattern-regex: '\binstance_eval\b'
+          - pattern-regex: '\bclass_eval\b'
+          - pattern-regex: '\bmodule_eval\b'
+          - pattern-regex: '\bbinding\.eval\b'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Code Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - ruby

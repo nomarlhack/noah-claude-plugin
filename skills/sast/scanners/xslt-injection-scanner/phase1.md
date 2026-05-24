@@ -1,30 +1,6 @@
 ---
 id_prefix: XSLTI
-grep_patterns:
-  - "TransformerFactory"
-  - "XSLTProcessor"
-  - "lxml\\.etree\\.XSLT"
-  - "Nokogiri::XSLT"
-  - "xslt-processor"
-  - "XslCompiledTransform"
-  - "registerPHPFunctions"
-  - "XsltSettings"
-  - "saxon"
-  - "Xalan"
-  - "XSLT"
-  - "xslt"
-  - "EnableScript"
-  - "EnableDocumentFunction"
-  - "ALLOW_EXTERNAL_FUNCTIONS"
-  - "ACCESS_EXTERNAL_DTD"
-  - "ACCESS_EXTERNAL_STYLESHEET"
-  - "FEATURE_SECURE_PROCESSING"
-  - "XMLConstants"
-  - "setFeature"
-  - "setParameter"
-  - "node-libxslt"
-  - "saxon-js"
-  - "xslt3"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "XSLT 변환이 조작되지 않으면 취약점이 아니다"

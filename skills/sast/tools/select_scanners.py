@@ -61,7 +61,7 @@ def read_index(scanner_name):
 SCANNERS = [
     "xss-scanner", "dom-xss-scanner", "ssrf-scanner", "open-redirect-scanner",
     "crlf-injection-scanner", "csrf-scanner", "path-traversal-scanner",
-    "file-upload-scanner", "command-injection-scanner", "sqli-scanner",
+    "file-upload-scanner", "command-injection-scanner", "code-injection-scanner", "sqli-scanner",
     "http-method-tampering-scanner", "xxe-scanner", "deserialization-scanner",
     "ssti-scanner", "jwt-scanner", "oauth-scanner", "nosqli-scanner",
     "ldap-injection-scanner", "host-header-scanner", "xslt-injection-scanner",
@@ -307,6 +307,8 @@ def check_exclude(scanner):
             return "파일 업로드 엔드포인트 없음"
     elif scanner == "command-injection-scanner":
         pass  # grep이 0이면 exec/system 호출 없으므로 안전
+    elif scanner == "code-injection-scanner":
+        pass  # grep이 0이면 eval/assert/create_function 등 코드 실행 sink 없으므로 안전
     elif scanner == "sqli-scanner":
         if not has_dep_any(
             # Node.js
@@ -605,7 +607,7 @@ BASE_GROUPS = {
     "url-navigation": ["xss-scanner", "dom-xss-scanner", "open-redirect-scanner"],
     "response-header": ["crlf-injection-scanner", "host-header-scanner", "http-method-tampering-scanner"],
     "db-query": ["sqli-scanner", "nosqli-scanner"],
-    "process-execution": ["command-injection-scanner", "ssti-scanner"],
+    "process-execution": ["command-injection-scanner", "code-injection-scanner", "ssti-scanner"],
     "server-request": ["ssrf-scanner", "pdf-generation-scanner"],
     "file-system": ["path-traversal-scanner", "file-upload-scanner", "zipslip-scanner"],
     "xml-serialization": ["xxe-scanner", "xslt-injection-scanner", "deserialization-scanner"],

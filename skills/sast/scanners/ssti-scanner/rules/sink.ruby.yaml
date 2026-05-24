@@ -1,0 +1,15 @@
+rules:
+  - id: noah-ruby-ssti-eval-sink
+    severity: WARNING
+    languages: [ruby]
+    message: |
+      SSTI sink 능력형 매치 (ERB.new 동적 템플릿/render inline). Safe-by-Proof §2-D.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-1336: Improper Neutralization of Special Elements Used in a Template Engine"]
+    patterns:
+      - pattern-either:
+          - pattern: "ERB.new($X)"
+          - pattern: "Erubi::Engine.new($X)"
+          - pattern: "render(inline: $X)"
+          - pattern: "render(inline: $X, ...)"

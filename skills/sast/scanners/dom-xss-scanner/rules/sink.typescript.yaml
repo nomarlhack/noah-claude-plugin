@@ -1,0 +1,18 @@
+rules:
+  - id: noah-typescript-domxss-sink
+    severity: WARNING
+    languages: [typescript]
+    message: |
+      DOM XSS sink 능력형 매치 (innerHTML/outerHTML/insertAdjacentHTML/document.write/
+      jQuery .html()). Safe-by-Proof §2-D — 클래스 일괄 제외 금지.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-79: Improper Neutralization of Input During Web Page Generation"]
+    patterns:
+      - pattern-either:
+          - pattern: $X.innerHTML = $Y
+          - pattern: $X.outerHTML = $Y
+          - pattern: $X.insertAdjacentHTML($POS, $Y)
+          - pattern: document.write($Y)
+          - pattern: document.writeln($Y)
+          - pattern: $EL.html($Y)

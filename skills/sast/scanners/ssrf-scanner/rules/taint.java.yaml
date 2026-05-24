@@ -1,0 +1,54 @@
+rules:
+  - id: noah-java-ssrf-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring RestTemplate/WebClient/HttpURLConnection에 컨트롤러 입력 URL이
+      들어가면 SSRF. 안전: URL 호스트 화이트리스트 + 내부망 IP 차단.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+    pattern-sinks:
+      - pattern: restTemplate.getForObject($X, ...)
+      - pattern: restTemplate.getForEntity($X, ...)
+      - pattern: restTemplate.postForObject($X, ...)
+      - pattern: restTemplate.postForEntity($X, ...)
+      - pattern: restTemplate.exchange($X, ...)
+      - pattern: webClient.get().uri($X)
+      - pattern: webClient.post().uri($X)
+      - pattern: webClient.uri($X)
+      - pattern: new URL($X)
+      - pattern: new URL($X, ...)
+      - pattern: HttpClient.newHttpClient().send($REQ, ...)
+      - pattern: HttpRequest.newBuilder().uri(URI.create($X))
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($WHITELIST.contains($X)) { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-918: Server-Side Request Forgery"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [SSRF]
+      owasp: ["A10:2021 Server-Side Request Forgery"]
+      technology: [java, spring, resttemplate, webclient]

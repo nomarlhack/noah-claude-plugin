@@ -1,0 +1,39 @@
+rules:
+  - id: noah-go-ssrf-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go net/http Client.Get/Post/Do에 HTTP 입력 URL이 직접 들어가면 SSRF.
+      URL.Parse 후 hostname 화이트리스트 비교.
+    pattern-sources:
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.FormValue($K)
+      - pattern: c.Query($K)
+      - pattern: c.Param($K)
+      - pattern: c.PostForm($K)
+    pattern-sinks:
+      - pattern: http.Get($X)
+      - pattern: http.Post($X, ...)
+      - pattern: http.PostForm($X, ...)
+      - pattern: http.NewRequest($M, $X, ...)
+      - pattern: http.NewRequestWithContext($CTX, $M, $X, ...)
+      - pattern: $CLIENT.Get($X)
+      - pattern: $CLIENT.Post($X, ...)
+      - pattern: $CLIENT.Do($REQ)
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X == "..." { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-918: Server-Side Request Forgery"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [SSRF]
+      owasp: ["A10:2021 Server-Side Request Forgery"]
+      technology: [go]

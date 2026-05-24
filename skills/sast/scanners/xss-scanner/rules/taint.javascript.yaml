@@ -1,0 +1,52 @@
+rules:
+  - id: noah-javascript-xss-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      JS/TS에서 Express req/Next/Fastify의 query/params/body가 React
+      dangerouslySetInnerHTML, document.write, innerHTML, $.html(), Vue v-html에
+      들어가면 XSS. 안전: DOMPurify.sanitize, JSX 자동 escape (raw 우회 안 함).
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.query[$X]
+      - pattern: req.params
+      - pattern: req.params.$X
+      - pattern: req.params[$X]
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: req.body[$X]
+      - pattern: ctx.query
+      - pattern: ctx.request.body
+      - pattern: request.query
+      - pattern: request.body
+    pattern-sinks:
+      - pattern: $E.innerHTML = $X
+      - pattern: $E.outerHTML = $X
+      - pattern: document.write($X)
+      - pattern: document.writeln($X)
+      - pattern: $E.insertAdjacentHTML($POS, $X)
+      - pattern: $.html($X)
+      - pattern: $($E).html($X)
+      - pattern: 'dangerouslySetInnerHTML: { __html: $X }'
+      - pattern: '{ __html: $X }'
+      - pattern: res.send($X)
+    pattern-sanitizers:
+      - pattern: DOMPurify.sanitize($X, ...)
+      - pattern: sanitizeHtml($X, ...)
+      - pattern: escape($X)
+      - pattern: encodeURIComponent($X)
+      - pattern: encodeURI($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [nodejs, express, react, vue, angular]

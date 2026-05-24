@@ -1,0 +1,56 @@
+rules:
+  - id: noah-java-pathtrv-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력이 Paths.get / Files.newInputStream / new File에 직접
+      들어가면 Path Traversal. Path.normalize().startsWith($BASE) 검사 + 정규 경로 비교.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+    pattern-sinks:
+      - pattern: Paths.get($X)
+      - pattern: Paths.get($X, ...)
+      - pattern: Paths.get($A, $X)
+      - pattern: Files.newInputStream($X, ...)
+      - pattern: Files.newOutputStream($X, ...)
+      - pattern: Files.readAllBytes($X)
+      - pattern: Files.readAllLines($X, ...)
+      - pattern: Files.write($X, ...)
+      - pattern: new File($X)
+      - pattern: new File($A, $X)
+      - pattern: new FileInputStream($X)
+      - pattern: new FileOutputStream($X)
+      - pattern: new FileReader($X)
+    pattern-sanitizers:
+      - pattern: FilenameUtils.getName($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($X.matches("...")) { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-22: Path Traversal"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Path Traversal]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [java, spring]

@@ -1,16 +1,6 @@
 ---
 id_prefix: SAML
-grep_patterns:
-  - "saml"
-  - "SAML"
-  - "omniauth-saml"
-  - "ruby-saml"
-  - "passport-saml"
-  - "python-saml"
-  - "onelogin"
-  - "SAMLResponse"
-  - "ds:Signature"
-  - "ACS"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "변조된 SAML Response로 인증이 우회되어야 취약점이다"

@@ -1,0 +1,46 @@
+rules:
+  - id: noah-java-xxe-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력(XML 문자열/스트림)이 DocumentBuilder.parse /
+      SAXParser.parse / XMLInputFactory에 들어가는데 외부 엔티티가 비활성화되지
+      않으면 XXE. 안전: setFeature("disallow-doctype-decl", true),
+      ACCESS_EXTERNAL_DTD="" 설정.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestPart $X, ...) { ... }
+    pattern-sinks:
+      - pattern: $DB.parse($X)
+      - pattern: $DB.parse($X, ...)
+      - pattern: $SP.parse($X, ...)
+      - pattern: $XIF.createXMLStreamReader($X)
+      - pattern: $XIF.createXMLEventReader($X)
+      - pattern: $READER.read($X)
+      - pattern: $UM.unmarshal($X)
+    pattern-sanitizers:
+      - pattern: $DBF.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+      - pattern: $DBF.setExpandEntityReferences(false)
+      - pattern: $XIF.setProperty(XMLInputFactory.SUPPORT_DTD, false)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-611: XML External Entity"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [XXE]
+      owasp: ["A05:2021 Security Misconfiguration"]
+      technology: [java, spring, jaxb]

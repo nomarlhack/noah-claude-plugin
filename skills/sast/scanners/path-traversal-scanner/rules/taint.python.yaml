@@ -1,0 +1,46 @@
+rules:
+  - id: noah-python-pathtrv-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력이 open/Path/os.path.join에 들어가 파일 시스템 sink로 도달.
+      안전: os.path.basename + 허용 디렉토리 prefix 검사.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json
+      - pattern: request.files[$K]
+    pattern-sinks:
+      - pattern: open($X, ...)
+      - pattern: open($X)
+      - pattern: Path($X)
+      - pattern: pathlib.Path($X)
+      - pattern: os.path.join($A, $X)
+      - pattern: os.path.join($X, ...)
+      - pattern: send_file($X, ...)
+      - pattern: send_from_directory($D, $X)
+      - pattern: render_template($X, ...)
+      - pattern: shutil.copy($A, $X)
+      - pattern: shutil.copyfile($A, $X)
+    pattern-sanitizers:
+      - pattern: os.path.basename($X)
+      - pattern: secure_filename($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if not $X.startswith(".."):
+                  ...
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-22: Path Traversal"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Path Traversal]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [python, django, flask, fastapi]

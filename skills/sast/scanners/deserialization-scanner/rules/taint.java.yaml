@@ -1,0 +1,41 @@
+rules:
+  - id: noah-java-deser-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력이 ObjectInputStream.readObject / XMLDecoder /
+      XStream.fromXML에 들어가면 Insecure Deserialization → RCE.
+      안전: 화이트리스트 ObjectInputFilter, JSON(Jackson) 사용.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestHeader $X, ...) { ... }
+    pattern-sinks:
+      - pattern: $OIS.readObject()
+      - pattern: new ObjectInputStream($X).readObject()
+      - pattern: $DEC.readObject()
+      - pattern: $XS.fromXML($X)
+      - pattern: SerializationUtils.deserialize($X)
+    pattern-sanitizers:
+      - pattern: $OIS.setObjectInputFilter($F)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-502: Insecure Deserialization"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Deserialization]
+      owasp: ["A08:2021 Software and Data Integrity Failures"]
+      technology: [java, spring]

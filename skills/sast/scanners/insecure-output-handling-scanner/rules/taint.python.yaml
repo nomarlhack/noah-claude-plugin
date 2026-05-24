@@ -1,0 +1,43 @@
+rules:
+  - id: noah-python-ioh-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      LLM 응답(chat.completions.create / messages.create / generate_content 결과)이
+      검증 없이 eval/exec/subprocess/os.system 또는 SQL/템플릿 sink로 흐르면
+      Insecure Output Handling → RCE/Injection. (LLM05:2025)
+      안전: LLM 출력 스키마 검증, 샌드박스, 출력 인코딩.
+    pattern-sources:
+      - pattern: openai.chat.completions.create(...).choices[0].message.content
+      - pattern: $RESP.choices[0].message.content
+      - pattern: $RESP.choices[$I].message.content
+      - pattern: $RESP.content[0].text
+      - pattern: $RESP.completion
+      - pattern: $MODEL.generate_content(...).text
+      - pattern: $LLM.invoke(...).content
+      - pattern: $CHAIN.run(...)
+      - pattern: $CHAIN.invoke(...)
+    pattern-sinks:
+      - pattern: eval($X)
+      - pattern: exec($X)
+      - pattern: os.system($X)
+      - pattern: subprocess.run($X, ..., shell=True)
+      - pattern: subprocess.Popen($X, ..., shell=True)
+      - pattern: $CUR.execute($X)
+      - pattern: render_template_string($X, ...)
+    pattern-sanitizers:
+      - pattern: int($X)
+      - pattern: json.loads($X)
+      - pattern: ast.literal_eval($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-94: Insecure Output Handling"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Code Injection]
+      owasp: ["LLM05:2025 Improper Output Handling"]
+      technology: [python, openai, anthropic, langchain]

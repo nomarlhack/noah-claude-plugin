@@ -1,0 +1,49 @@
+rules:
+  - id: noah-php-codeinj-taint
+    severity: ERROR
+    languages:
+      - php
+    mode: taint
+    message: |
+      PHP $_GET/$_POST/$_REQUEST/$_COOKIE 값이 eval/assert/create_function에 직접
+      흐르면 Code Injection → RCE (CWE-94). 2차(DB→eval) 케이스는 본 taint로 잡히지
+      않으므로 pattern.php.yaml 후보와 함께 수동 검토. 안전: 정적 리터럴, json_decode,
+      intval 캐스트.
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_GET[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_POST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_REQUEST[...];
+    pattern-sinks:
+      - pattern: eval($X);
+      - pattern: assert($X)
+      - pattern: create_function($A, $X)
+    pattern-sanitizers:
+      - pattern: intval($X)
+      - pattern: (int)$X
+      - pattern: (int) $X
+      - pattern: json_decode($X, ...)
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Code Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - php

@@ -1,0 +1,33 @@
+rules:
+  - id: noah-javascript-sqli-sink-pattern
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+    message: |
+      JS/TS SQL sink — connection.query / sequelize.query / knex.raw /
+      prisma.$queryRawUnsafe / pg pool.query. 인자가 사용자 입력과 결합되면 SQLi.
+      안전: Prisma tagged template (`$queryRaw\`...${x}\``), parameterized query.
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\bconnection\.query\s*\('
+          - pattern-regex: '\bpool\.query\s*\('
+          - pattern-regex: '\bdb\.query\s*\('
+          - pattern-regex: '\bdb\.run\s*\('
+          - pattern-regex: '\bsequelize\.query\s*\('
+          - pattern-regex: '\bknex\.raw\s*\('
+          - pattern-regex: '\.\$queryRawUnsafe\s*\('
+          - pattern-regex: '\.\$executeRawUnsafe\s*\('
+          - pattern-regex: '\.query\s*\(\s*`[^`]*\$\{'
+          - pattern-regex: 'createQueryBuilder\s*\('
+          - pattern-regex: 'getRepository\s*\(.*\)\.query\s*\('
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [nodejs, javascript, typescript, sequelize, knex, prisma, typeorm]

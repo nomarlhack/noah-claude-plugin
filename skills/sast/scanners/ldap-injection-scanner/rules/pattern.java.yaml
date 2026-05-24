@@ -1,0 +1,41 @@
+rules:
+  - id: noah-java-ldapi-phase1-pattern
+    severity: WARNING
+    languages:
+      - java
+    message: |
+      ldap-injection-scanner Phase 1 sink/source 패턴 매치 (Java 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'ldapjs'
+      - pattern-regex: 'activedirectory2'
+      - pattern-regex: 'passport-ldapauth'
+      - pattern-regex: 'python-ldap'
+      - pattern-regex: 'ldap3'
+      - pattern-regex: 'django-auth-ldap'
+      - pattern-regex: 'DirContext\.search\s*\('
+      - pattern-regex: 'LdapTemplate\.search\s*\('
+      - pattern-regex: 'Net::LDAP'
+      - pattern-regex: 'ldap_search\s*\('
+      - pattern-regex: 'ldap_bind\s*\('
+      - pattern-regex: 'ldap'
+      - pattern-regex: 'LDAP'
+      - pattern-regex: 'searcher\.Filter'
+      - pattern-regex: 'DirectorySearcher'
+      - pattern-regex: 'LdapQuery'
+      - pattern-regex: 'escape_filter_chars'
+      - pattern-regex: 'BasicAttribute'
+      - pattern-regex: 'SearchControls'
+      - pattern-regex: 'go-ldap'
+      - pattern-regex: 'gopkg\.in/ldap'
+      - pattern-regex: 'InitialLdapContext'
+      - pattern-regex: 'SearchRequest'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-90: LDAP Injection"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

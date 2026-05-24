@@ -1,0 +1,28 @@
+rules:
+  - id: noah-go-sqli-sink-pattern
+    severity: WARNING
+    languages:
+      - go
+    message: |
+      Go SQL sink — database/sql db.Query/Exec, GORM Raw/Exec, sqlx Get/MustExec.
+      안전: db.Query("... = ?", x) 파라미터 바인딩.
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\bdb\.Query\s*\('
+          - pattern-regex: '\bdb\.QueryRow\s*\('
+          - pattern-regex: '\bdb\.Exec\s*\('
+          - pattern-regex: '\.Raw\s*\('
+          - pattern-regex: '\.Exec\s*\('
+          - pattern-regex: 'sqlx\.MustExec'
+          - pattern-regex: '\bgorm\.'
+          - pattern-regex: 'fmt\.Sprintf\([^)]*SELECT'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [go, gorm, sqlx]

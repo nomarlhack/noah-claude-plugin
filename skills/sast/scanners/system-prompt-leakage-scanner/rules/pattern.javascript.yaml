@@ -1,0 +1,50 @@
+rules:
+  - id: noah-javascript-spl-phase1-pattern
+    severity: WARNING
+    languages:
+      - javascript
+    message: |
+      system-prompt-leakage-scanner Phase 1 sink/source 패턴 매치 (JavaScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'system_prompt'
+      - pattern-regex: 'system_message'
+      - pattern-regex: 'system_instruction'
+      - pattern-regex: 'SystemMessage'
+      - pattern-regex: 'SystemMessagePromptTemplate'
+      - pattern-regex: 'ChatPromptTemplate'
+      - pattern-regex: 'PromptTemplate'
+      - pattern-regex: 'role.*system'
+      - pattern-regex: '"role":\s*"system"'
+      - pattern-regex: '''role'':\s*''system'''
+      - pattern-regex: 'chat\.completions\.create'
+      - pattern-regex: 'messages\.create'
+      - pattern-regex: 'generate_content'
+      - pattern-regex: 'responses\.create'
+      - pattern-regex: 'openai'
+      - pattern-regex: 'anthropic'
+      - pattern-regex: 'google\.generativeai'
+      - pattern-regex: 'google\.genai'
+      - pattern-regex: 'vertexai'
+      - pattern-regex: 'bedrock'
+      - pattern-regex: 'cohere'
+      - pattern-regex: 'mistralai'
+      - pattern-regex: 'litellm'
+      - pattern-regex: 'ollama'
+      - pattern-regex: 'langchain'
+      - pattern-regex: 'llama_index'
+      - pattern-regex: 'llamaindex'
+      - pattern-regex: 'API_KEY'
+      - pattern-regex: 'api_key'
+      - pattern-regex: 'secret'
+      - pattern-regex: 'password'
+      - pattern-regex: 'token'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-200: System Prompt Leakage (LLM07:2025)"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

@@ -1,0 +1,116 @@
+rules:
+  - id: noah-kotlin-idor-missing-owner-gate-taint
+    severity: WARNING
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      외부입력→리소스접근→소유권게이트부재 (IDOR 검토 후보, Kotlin). 컨트롤러가
+      @PathVariable/@RequestParam/@RequestBody로 받은 식별자(이름·타입 무관)를 repository/
+      service 조회·조작 호출에 전달하는데 소유권 게이트가 보이지 않음.
+      [중요] "검증의 부재"라 sanitizer 미매치 시 FP. 검토 후보이며 service 깊이/AOP의
+      소유권 검증을 phase1.md 절차로 직접 확인 후 제외(이름 카탈로그로 거르지 말 것).
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @PathVariable $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @PathVariable(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @RequestParam $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @RequestParam(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @RequestBody $X: $T, ...) { ... }
+      # Spring Web 표준 외부 입력 표면 확장 — path/query/body 외에 header/cookie/multipart/model.
+      # 특정 이름(accountId 등) 카탈로그 금지. 어노테이션이 곧 신뢰 경계.
+      # 게이트웨이가 신뢰 헤더(인증 후 주입)를 덮어쓰는 환경이면 후보 검토 시 안전 분기로 처리한다.
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @RequestHeader $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @RequestHeader(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @CookieValue $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @CookieValue(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @ModelAttribute $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @ModelAttribute(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @RequestPart $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $M(..., @RequestPart(...) $X: $T, ...) { ... }
+    pattern-sinks:
+      - pattern: $REPO.findById($X)
+      - pattern: $REPO.getById($X)
+      - pattern: $REPO.getReferenceById($X)
+      - pattern: $REPO.findOne($X)
+      - pattern: $REPO.delete($X)
+      - pattern: $REPO.deleteById($X)
+      - pattern: $SVC.$GET($X)
+      - pattern: $SVC.$GET($ACCT, $X)
+      - pattern: $SVC.$GET(..., $X, ...)
+    pattern-sanitizers:
+      - pattern: $OWNER.equals($X)
+      - pattern: $X.equals($OWNER)
+      - pattern: $OWNER == $X
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($OWNER != ...) { throw ... }
+              ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              @PreAuthorize("...") fun $M(...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              @PostAuthorize("...") fun $M(...) { ... }
+      # 커스텀 AOP 인가 어노테이션은 코드베이스마다 이름이 달라 룰에 고정하지 않는다.
+      # taint가 못 거르므로 후보로 올라가며, phase1.md 절차대로 에이전트가 service/AOP를
+      # Read해 실제 인가 어노테이션을 확인한 뒤 제외한다(재현율 우선).
+      - pattern: checkOwner($X, ...)
+      - pattern: validateOwnership($X, ...)
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-639: Authorization Bypass Through User-Controlled Key (IDOR)"
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Broken Access Control
+      owasp:
+        - "A01:2021 Broken Access Control"
+      technology:
+        - kotlin
+        - spring

@@ -1,23 +1,6 @@
 ---
 id_prefix: HOSTHDR
-grep_patterns:
-  - "req\\.headers\\.host"
-  - "req\\.hostname"
-  - "req\\.get('host')"
-  - "request\\.get_host\\s*\\("
-  - "HTTP_HOST"
-  - "request\\.build_absolute_uri\\s*\\("
-  - "request\\.host"
-  - "request\\.getServerName\\s*\\("
-  - "X-Forwarded-For"
-  - "X-Real-IP"
-  - "X-Forwarded-Host"
-  - "remote_ip"
-  - "remote_addr"
-  - "REMOTE_ADDR"
-  - "getHeader\\s*\\("
-  - "request\\.remoteAddr"
-  - "X-Original-Forwarded-For"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "헤더 변조로 보안이 우회되지 않으면 취약점이 아니다"

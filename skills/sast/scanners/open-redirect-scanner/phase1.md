@@ -1,33 +1,6 @@
 ---
 id_prefix: OREDIR
-grep_patterns:
-  - "res\\.redirect\\s*\\("
-  - "res\\.writeHead\\s*\\("
-  - "HttpResponseRedirect\\s*\\("
-  - "redirect\\s*\\("
-  - "redirect_to"
-  - "redirect_back"
-  - "header\\('Location"
-  - "http\\.Redirect\\s*\\("
-  - "window\\.location\\.href\\s*="
-  - "window\\.location\\.replace\\s*\\("
-  - "window\\.location\\.assign\\s*\\("
-  - "window\\.location\\s*="
-  - "location\\.href\\s*="
-  - "window\\.open\\s*\\("
-  - "router\\.push\\s*\\("
-  - "router\\.replace\\s*\\("
-  - "navigate\\s*\\("
-  - "webview_mount\\s*\\("
-  - "webview_load\\s*\\("
-  - "postMessage\\s*\\("
-  - "searchParams\\.get\\s*\\("
-  - "useParams\\s*\\("
-  - "useSearchParams"
-  - "@RequestParam"
-  - "@PathVariable"
-  - "req\\.query"
-  - "req\\.params"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "외부로 리다이렉트되지 않으면 취약점이 아니다"

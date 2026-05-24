@@ -1,0 +1,50 @@
+rules:
+  - id: noah-php-sqli-sink-pattern
+    severity: WARNING
+    languages:
+      - php
+    message: |
+      PHP SQL sink 호출 — 인자가 $_GET/$_POST/$_REQUEST/$_COOKIE/DB 저장값과
+      문자열 결합되면 SQL Injection. mysqli_real_escape_string·intval·PDO bind 사용 시 안전.
+      커스텀 DB wrapper(MY_SQL::sql_query 등) 사용 시 prepare/bind 우회 가능성 점검.
+    patterns:
+      - pattern-either:
+          # 자체 DB wrapper (레거시 PHP의 커스텀 MY_SQL 클래스 등) — 컴포넌트 메서드명 명시
+          - pattern-regex: '\$[A-Za-z_][A-Za-z0-9_]*\s*->\s*sql_query\s*\('
+          - pattern-regex: '\$[A-Za-z_][A-Za-z0-9_]*\s*->\s*sql_fetch_object\s*\('
+          - pattern-regex: '\$[A-Za-z_][A-Za-z0-9_]*\s*->\s*sql_fetch_array\s*\('
+          - pattern-regex: '\$[A-Za-z_][A-Za-z0-9_]*\s*->\s*sql_error\s*\('
+          # 표준 mysqli (deprecated mysql_* 포함)
+          - pattern-regex: '\bmysqli_query\s*\('
+          - pattern-regex: '\bmysql_query\s*\('
+          - pattern-regex: '\bmysqli_multi_query\s*\('
+          - pattern-regex: '\$[A-Za-z_][A-Za-z0-9_]*\s*->\s*query\s*\('
+          - pattern-regex: '\$[A-Za-z_][A-Za-z0-9_]*\s*->\s*real_query\s*\('
+          # PDO
+          - pattern-regex: '\$[A-Za-z_][A-Za-z0-9_]*\s*->\s*exec\s*\('
+          - pattern-regex: '\$[A-Za-z_][A-Za-z0-9_]*\s*->\s*prepare\s*\('
+          # PostgreSQL / Oracle
+          - pattern-regex: '\bpg_query\s*\('
+          - pattern-regex: '\boci_parse\s*\('
+          - pattern-regex: '\bsqlsrv_query\s*\('
+          # CodeIgniter
+          - pattern-regex: '\$this\s*->\s*db\s*->\s*query\s*\('
+          - pattern-regex: '\$CI\s*->\s*db\s*->\s*query\s*\('
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-89: SQL Injection"
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - php
+        - mysqli
+        - pdo
+        - codeigniter

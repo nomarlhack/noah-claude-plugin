@@ -1,29 +1,6 @@
 ---
 id_prefix: LDAPI
-grep_patterns:
-  - "ldapjs"
-  - "activedirectory2"
-  - "passport-ldapauth"
-  - "python-ldap"
-  - "ldap3"
-  - "django-auth-ldap"
-  - "DirContext\\.search\\s*\\("
-  - "LdapTemplate\\.search\\s*\\("
-  - "Net::LDAP"
-  - "ldap_search\\s*\\("
-  - "ldap_bind\\s*\\("
-  - "ldap"
-  - "LDAP"
-  - "searcher\\.Filter"
-  - "DirectorySearcher"
-  - "LdapQuery"
-  - "escape_filter_chars"
-  - "BasicAttribute"
-  - "SearchControls"
-  - "go-ldap"
-  - "gopkg\\.in/ldap"
-  - "InitialLdapContext"
-  - "SearchRequest"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "LDAP 필터가 변경되지 않으면 취약점이 아니다"

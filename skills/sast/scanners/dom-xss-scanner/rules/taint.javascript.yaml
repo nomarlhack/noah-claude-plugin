@@ -1,0 +1,54 @@
+rules:
+  - id: noah-javascript-dom-xss-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      클라이언트에서 location.hash/search/href, document.referrer, window.name,
+      postMessage data가 innerHTML/document.write/eval/setTimeout(string)에 들어가면
+      DOM-based XSS. 안전: textContent 사용, DOMPurify.sanitize.
+    pattern-sources:
+      - pattern: location.hash
+      - pattern: location.search
+      - pattern: location.href
+      - pattern: document.location.hash
+      - pattern: document.location.search
+      - pattern: document.URL
+      - pattern: document.referrer
+      - pattern: window.name
+      - pattern: localStorage.getItem($K)
+      - pattern: sessionStorage.getItem($K)
+      - patterns:
+          - pattern: $E.data
+          - pattern-inside: |
+              window.addEventListener("message", function($E) { ... })
+      - pattern: new URLSearchParams(location.search).get($K)
+    pattern-sinks:
+      - pattern: $EL.innerHTML = $X
+      - pattern: $EL.outerHTML = $X
+      - pattern: document.write($X)
+      - pattern: document.writeln($X)
+      - pattern: $EL.insertAdjacentHTML($POS, $X)
+      - pattern: eval($X)
+      - pattern: setTimeout($X, ...)
+      - pattern: setInterval($X, ...)
+      - pattern: new Function($X)
+      - pattern: $($SEL).html($X)
+      - pattern: $EL.setAttribute("src", $X)
+    pattern-sanitizers:
+      - pattern: DOMPurify.sanitize($X, ...)
+      - pattern: DOMPurify.sanitize($X)
+      - pattern: encodeURIComponent($X)
+      - pattern: $EL.textContent = $X
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: DOM-based XSS"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [javascript, typescript, browser]

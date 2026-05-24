@@ -1,0 +1,50 @@
+rules:
+  - id: noah-python-ssrf-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python requests.get/urllib.urlopen/httpx에 사용자 제어 URL이 직접 들어가면 SSRF.
+      안전: URL 화이트리스트 또는 ipaddress 모듈로 내부망 차단.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json
+      - pattern: request.body
+    pattern-sinks:
+      - pattern: requests.get($X, ...)
+      - pattern: requests.post($X, ...)
+      - pattern: requests.put($X, ...)
+      - pattern: requests.delete($X, ...)
+      - pattern: requests.request($M, $X, ...)
+      - pattern: urllib.request.urlopen($X, ...)
+      - pattern: urllib2.urlopen($X, ...)
+      - pattern: urlopen($X, ...)
+      - pattern: httpx.get($X, ...)
+      - pattern: httpx.post($X, ...)
+      - pattern: aiohttp.ClientSession().get($X, ...)
+      - pattern: aiohttp.request($M, $X, ...)
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X in $WHITELIST:
+                  ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if urlparse($X).netloc in $WHITELIST:
+                  ...
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-918: Server-Side Request Forgery"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [SSRF]
+      owasp: ["A10:2021 Server-Side Request Forgery"]
+      technology: [python, requests, httpx, aiohttp]

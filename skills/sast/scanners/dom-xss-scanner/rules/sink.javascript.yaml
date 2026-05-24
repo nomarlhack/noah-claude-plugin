@@ -1,0 +1,21 @@
+rules:
+  # 고정밀 DOM sink 룰 (capability sub-rule). broad phase1-pattern과 분리되어
+  # §2-D 기계 OBLIGATION 게이트의 능력형 집계 대상(`-sink` → ast tier).
+  - id: noah-javascript-domxss-sink
+    severity: WARNING
+    languages: [javascript]
+    message: |
+      DOM XSS sink 능력형 매치 (innerHTML/outerHTML/insertAdjacentHTML/document.write/
+      jQuery .html()). client source(location/hash/postMessage 등)가 escape 없이 도달하면 DOM XSS.
+      Safe-by-Proof §2-D — 클래스 일괄 제외 금지.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-79: Improper Neutralization of Input During Web Page Generation"]
+    patterns:
+      - pattern-either:
+          - pattern: $X.innerHTML = $Y
+          - pattern: $X.outerHTML = $Y
+          - pattern: $X.insertAdjacentHTML($POS, $Y)
+          - pattern: document.write($Y)
+          - pattern: document.writeln($Y)
+          - pattern: $EL.html($Y)

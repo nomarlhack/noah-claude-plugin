@@ -116,8 +116,8 @@ MANIFEST_RE = re.compile(
     r"<!-- NOAH-SAST MANIFEST v1 -->\s*```json\s*(\{.*?\})\s*```\s*<!-- /NOAH-SAST MANIFEST -->",
     re.S,
 )
-CANDIDATE_HEADER_RE = re.compile(r"^## ([A-Z][A-Z0-9]*-\d+):\s*", re.M)
-ID_PREFIX_RE = re.compile(r"^id_prefix:\s*([A-Z][A-Z0-9]*)\s*$", re.M)
+CANDIDATE_HEADER_RE = re.compile(r"^## ([A-Z][A-Z0-9_]*-\d+):\s*", re.M)
+ID_PREFIX_RE = re.compile(r"^id_prefix:\s*([A-Z][A-Z0-9_]*)\s*$", re.M)
 PREREQ_GROUP_RE = re.compile(r"^prereq_group:\s*([a-z][a-z0-9_-]*)\s*$", re.M)
 
 

@@ -1,0 +1,34 @@
+rules:
+  - id: noah-ruby-graphql-phase1-pattern
+    severity: WARNING
+    languages:
+      - ruby
+    message: |
+      graphql-scanner Phase 1 sink/source 패턴 매치 (Ruby 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'graphql'
+      - pattern-regex: 'GraphQL'
+      - pattern-regex: 'apollo-server'
+      - pattern-regex: 'express-graphql'
+      - pattern-regex: 'graphql-yoga'
+      - pattern-regex: 'graphene'
+      - pattern-regex: 'strawberry'
+      - pattern-regex: 'ariadne'
+      - pattern-regex: 'graphql-java'
+      - pattern-regex: 'graphql-ruby'
+      - pattern-regex: '__schema'
+      - pattern-regex: 'introspection'
+      - pattern-regex: '/graphql'
+      - pattern-regex: 'IntrospectionQuery'
+      - pattern-regex: '__type'
+      - pattern-regex: 'depthLimit'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-285: GraphQL Authorization"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

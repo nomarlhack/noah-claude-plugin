@@ -1,0 +1,32 @@
+rules:
+  - id: noah-python-ldap-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력이 ldap search filter에 문자열 결합으로 들어가면 LDAP Injection.
+      안전: ldap.filter.escape_filter_chars / ldap3 escape_filter_chars.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form.get($K, ...)
+    pattern-sinks:
+      - pattern: $CONN.search($BASE, $X, ...)
+      - pattern: $CONN.search_s($BASE, $SCOPE, $X, ...)
+      - pattern: $CONN.search_ext($BASE, $SCOPE, $X, ...)
+    pattern-sanitizers:
+      - pattern: escape_filter_chars($X)
+      - pattern: ldap.filter.escape_filter_chars($X)
+      - pattern: ldap3.utils.conv.escape_filter_chars($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-90: LDAP Injection"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [python, ldap, ldap3]

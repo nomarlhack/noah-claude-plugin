@@ -1,0 +1,56 @@
+rules:
+  - id: noah-go-sqli-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go에서 HTTP 핸들러의 r.URL.Query().Get / r.FormValue / mux.Vars / gin Context 값이
+      db.Query/Exec, gorm.Raw 등에 fmt.Sprintf로 들어가면 SQLi.
+      안전: 파라미터 바인딩 (?, $1).
+    pattern-sources:
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.URL.Query()[$K]
+      - pattern: r.FormValue($K)
+      - pattern: r.PostFormValue($K)
+      - pattern: r.Header.Get($K)
+      - pattern: mux.Vars(r)[$K]
+      - pattern: c.Query($K)
+      - pattern: c.Param($K)
+      - pattern: c.PostForm($K)
+      - pattern: c.GetHeader($K)
+      - pattern: ctx.Param($K)
+      - pattern: ctx.Query($K)
+      - pattern: chi.URLParam(r, $K)
+
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.Query(fmt.Sprintf(...), ...)
+              - pattern: $DB.QueryRow(fmt.Sprintf(...), ...)
+              - pattern: $DB.Exec(fmt.Sprintf(...), ...)
+              - pattern: $DB.Query("..." + $V)
+              - pattern: $DB.Exec("..." + $V)
+          - pattern-not: $DB.Query("...", $ARGS, ...)
+      - patterns:
+          - pattern-either:
+              - pattern: $TX.Raw(fmt.Sprintf(...))
+              - pattern: $TX.Raw("..." + $V)
+              - pattern: $TX.Exec(fmt.Sprintf(...))
+          - pattern-not: $TX.Raw("...", $ARGS, ...)
+
+    pattern-sanitizers:
+      - pattern: strconv.Atoi($X)
+      - pattern: strconv.ParseInt($X, ...)
+      - pattern: strconv.ParseFloat($X, ...)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [go, gorm, gin, chi]

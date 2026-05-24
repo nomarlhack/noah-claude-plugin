@@ -1,0 +1,19 @@
+rules:
+  # 고정밀 SSTI sink 룰 (Java). broad `Template(` 노이즈(*RedisTemplate/EntityTemplate 등)와
+  # 분리하여 실제 표현식 평가 함수만 매치. `-sink` → ast tier, §2-D 능력형 집계 대상.
+  - id: noah-java-ssti-eval-sink
+    severity: WARNING
+    languages: [java]
+    message: |
+      SSTI sink 능력형 매치 (SpEL parseExpression/Velocity.evaluate 등 표현식 평가).
+      사용자 입력이 표현식 문자열로 평가되면 RCE. Safe-by-Proof §2-D — 클래스 일괄 제외 금지.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-1336: Improper Neutralization of Special Elements Used in a Template Engine"]
+    patterns:
+      - pattern-either:
+          - pattern: $P.parseExpression($X)
+          - pattern: $V.evaluate($CTX, $W, $LOG, $X)
+          - pattern: Velocity.evaluate(...)
+          - pattern: $E.createTemplate($X)
+          - pattern: new SpelExpressionParser().parseExpression($X)

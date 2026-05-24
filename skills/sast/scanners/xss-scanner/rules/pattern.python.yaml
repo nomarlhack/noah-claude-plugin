@@ -1,0 +1,27 @@
+rules:
+  - id: noah-python-xss-sink-pattern
+    severity: WARNING
+    languages:
+      - python
+    message: |
+      Python XSS sink — Jinja2 |safe, Markup(), render_template_string, mark_safe (Django).
+      사용자 입력이 |safe로 감싸지거나 Markup으로 raw HTML 처리되면 XSS.
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\bmark_safe\s*\('
+          - pattern-regex: '\bMarkup\s*\('
+          - pattern-regex: 'render_template_string\s*\('
+          - pattern-regex: '\|\s*safe'
+          - pattern-regex: '\|\s*Markup'
+          - pattern-regex: 'json\.dumps.*safe'
+          - pattern-regex: 'HttpResponse\s*\('
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [python, django, flask, jinja2]

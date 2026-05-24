@@ -1,36 +1,6 @@
 ---
 id_prefix: SQLI
-grep_patterns:
-  - "connection\\.query\\s*\\("
-  - "sequelize\\.query\\s*\\("
-  - "knex\\.raw\\s*\\("
-  - "\\$queryRaw"
-  - "\\$queryRawUnsafe\\s*\\("
-  - "pool\\.query\\s*\\("
-  - "cursor\\.execute\\s*\\("
-  - "Model\\.objects\\.raw\\s*\\("
-  - "Model\\.objects\\.extra\\s*\\("
-  - "session\\.execute\\s*\\("
-  - "find_by_sql"
-  - "connection\\.execute"
-  - "db\\.run\\s*\\("
-  - "db\\.query\\s*\\("
-  - "prepareStatement"
-  - "createNativeQuery"
-  - "nativeQuery"
-  - "jdbcTemplate"
-  - "NamedParameterJdbcTemplate"
-  - "executeQuery\\s*\\("
-  - "Statement\\.execute"
-  - "\\.raw\\s*\\("
-  - "text\\s*\\("
-  - "f\"\\s*SELECT"
-  - "f'\\s*SELECT"
-  - "@Query"
-  - "\\.createQuery\\s*\\("
-  - "createQueryBuilder"
-  - "Arel\\.sql"
-  - "\\$\\{[a-zA-Z_][a-zA-Z0-9_.]*\\}"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "쿼리가 변경되지 않으면 취약점이 아니다"

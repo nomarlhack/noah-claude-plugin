@@ -1,0 +1,49 @@
+rules:
+  - id: noah-javascript-codeinj-pattern
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    message: |
+      JS/TS 동적 코드 실행 sink — eval / new Function / setTimeout(문자열) /
+      setInterval(문자열) / vm.runInNewContext. 인자가 사용자 입력이면 RCE (Node) 또는
+      XSS-동등(브라우저). Node vm은 샌드박스가 아님.
+    patterns:
+      - pattern-either:
+          - pattern: eval(...)
+          - pattern: new Function(...)
+          - pattern: Function(...)
+          - pattern: vm.runInNewContext(...)
+          - pattern: vm.runInThisContext(...)
+          - pattern: vm.runInContext(...)
+          - patterns:
+              - pattern: setTimeout($X, ...)
+              - metavariable-pattern:
+                  metavariable: $X
+                  patterns:
+                    - pattern-either:
+                        - pattern: "$STR"
+          - patterns:
+              - pattern: setInterval($X, ...)
+              - metavariable-pattern:
+                  metavariable: $X
+                  patterns:
+                    - pattern-either:
+                        - pattern: "$STR"
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code (Code Injection)"
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Code Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - nodejs
+        - javascript
+        - typescript

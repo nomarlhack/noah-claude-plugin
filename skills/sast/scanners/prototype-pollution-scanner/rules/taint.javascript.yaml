@@ -1,0 +1,84 @@
+rules:
+  - id: noah-javascript-proto-pollution-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      multipart/urlencoded/json fields가 path-walk 함수에 sanitize 없이 전달되어
+      Object.prototype 오염 가능. 안전: Object.create(null) 초기값, __proto__/constructor/
+      prototype 키 차단, Map 사용.
+    pattern-sources:
+      # multipart parse 결과
+      - pattern: $X
+        pattern-inside: |
+          const { fields, ... } = await parseMultipart(...)
+      - pattern: $X
+        pattern-inside: |
+          const { fields } = await $PARSER(...)
+      # Koa/Express body
+      - pattern: ctx.request.body
+      - pattern: ctx.request.files
+      - pattern: req.body
+      - pattern: req.files
+      # formidable / busboy / multer
+      - pattern: $FIELDS
+        pattern-inside: |
+          $FORM.parse($REQ, ($ERR, $FIELDS, $FILES) => { ... })
+    pattern-sinks:
+      # 커스텀 path-walk 함수 호출
+      - pattern: recoverDotNameObject($X)
+      - pattern: expandDotKeys($X)
+      - pattern: unflatten($X)
+      - pattern: deflatten($X)
+      - pattern: setByPath($OBJ, $X, $VAL)
+      - pattern: $LIB.set($OBJ, $X, $VAL)
+      # 인라인 path-walk 패턴 (객체 인자 직접 전달)
+      - patterns:
+          - pattern: |
+              $KEYS.forEach(($K, ...) => {
+                ...
+                $CUR[$K] = $CUR[$K] || {};
+                $CUR = $CUR[$K];
+                ...
+              })
+    pattern-sanitizers:
+      # Object.create(null) 초기값
+      - pattern: Object.create(null)
+      # __proto__/constructor/prototype 키 차단
+      - patterns:
+          - pattern: $K
+          - pattern-inside: |
+              if ($K === '__proto__' || ...) { ... }
+      - patterns:
+          - pattern: $K
+          - pattern-inside: |
+              if (['__proto__','constructor','prototype'].includes($K)) { ... }
+      - patterns:
+          - pattern: $K
+          - pattern-inside: |
+              if ($K === '__proto__') continue;
+      - patterns:
+          - pattern: $K
+          - pattern-inside: |
+              if ($K === '__proto__') return;
+      # Map 사용
+      - pattern: new Map()
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-1321: Prototype Pollution"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Prototype Pollution
+      owasp:
+        - A08:2021 Software and Data Integrity Failures
+      technology:
+        - nodejs
+        - javascript
+        - typescript

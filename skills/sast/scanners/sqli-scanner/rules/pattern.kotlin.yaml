@@ -1,0 +1,81 @@
+rules:
+  - id: noah-kotlin-sqli-annotation
+    severity: ERROR
+    languages:
+      - kotlin
+    message: |
+      Kotlin SQL annotation에 문자열 템플릿($, ${}) 삽입 — SQL Injection 후보.
+      JPA @Query, MyBatis @Select/@Insert/@Update/@Delete에서 ${} 치환은
+      파라미터 바인딩이 아니므로 사용자 입력이 SQL 토큰으로 해석될 수 있다.
+      안전 바인딩: #{param} (MyBatis), :param (Spring Data).
+      참고: https://chequer.atlassian.net/wiki/spaces/Security/pages/797770142
+    patterns:
+      - pattern-either:
+          - pattern-regex: '@Query\s*\(\s*"[^"]*\$[^"]*"\s*\)'
+          - pattern-regex: '@Query\s*\(\s*"[^"]*\$\{[^}]*\}[^"]*"\s*\)'
+          - pattern-regex: '@Select\s*\(\s*"[^"]*\$[^"]*"\s*\)'
+          - pattern-regex: '@Select\s*\(\s*"[^"]*\$\{[^}]*\}[^"]*"\s*\)'
+          - pattern-regex: '@Insert\s*\(\s*"[^"]*\$[^"]*"\s*\)'
+          - pattern-regex: '@Insert\s*\(\s*"[^"]*\$\{[^}]*\}[^"]*"\s*\)'
+          - pattern-regex: '@Update\s*\(\s*"[^"]*\$[^"]*"\s*\)'
+          - pattern-regex: '@Update\s*\(\s*"[^"]*\$\{[^}]*\}[^"]*"\s*\)'
+          - pattern-regex: '@Delete\s*\(\s*"[^"]*\$[^"]*"\s*\)'
+          - pattern-regex: '@Delete\s*\(\s*"[^"]*\$\{[^}]*\}[^"]*"\s*\)'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - kotlin
+        - spring
+        - jpa
+        - mybatis
+
+  - id: noah-kotlin-sqli-sink-call
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      Kotlin SQL sink 호출 — Phase 1 후보 수집. 인자가 사용자 입력으로 조립된
+      문자열이면 SQL Injection 가능. jdbcTemplate/NamedParameterJdbcTemplate은
+      바인딩 인자(named parameter) 사용 시 안전.
+    patterns:
+      - pattern-either:
+          - pattern: $JDBC.queryForObject(...)
+          - pattern: $JDBC.query(...)
+          - pattern: $JDBC.update(...)
+          - pattern: $JDBC.execute(...)
+          - pattern: $EM.createNativeQuery(...)
+          - pattern: $EM.createQuery(...)
+          - pattern: $STMT.executeQuery(...)
+          - pattern: $STMT.execute(...)
+          - pattern-regex: '\bjdbcTemplate\b'
+          - pattern-regex: '\bNamedParameterJdbcTemplate\b'
+          - pattern-regex: '\bcreateQueryBuilder\s*\('
+          - pattern-regex: '\bprepareStatement\s*\('
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - A03:2021 Injection
+      technology:
+        - kotlin
+        - spring
+        - jpa

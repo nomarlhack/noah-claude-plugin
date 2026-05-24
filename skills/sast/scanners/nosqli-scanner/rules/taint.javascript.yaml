@@ -1,0 +1,47 @@
+rules:
+  - id: noah-javascript-nosqli-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js에서 req.body/query (객체)가 MongoDB find/findOne 쿼리에 직접 들어가면
+      NoSQL Injection ($ne/$gt/$where 연산자 주입). 안전: 입력 타입 강제(String 캐스트),
+      mongo-sanitize, $where 금지.
+    pattern-sources:
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.params
+    pattern-sinks:
+      - pattern: $COL.find($X, ...)
+      - pattern: $COL.findOne($X, ...)
+      - pattern: $COL.findOneAndUpdate($X, ...)
+      - pattern: $COL.findOneAndDelete($X, ...)
+      - pattern: $COL.deleteOne($X, ...)
+      - pattern: $COL.deleteMany($X, ...)
+      - pattern: $COL.updateOne($X, ...)
+      - pattern: $COL.aggregate($X, ...)
+      - pattern: $MODEL.find($X, ...)
+      - pattern: $MODEL.findOne($X, ...)
+      - pattern: $MODEL.where($X)
+    pattern-sanitizers:
+      - pattern: mongoSanitize($X)
+      - pattern: sanitize($X)
+      - pattern: String($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if (typeof $X === "string") { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-943: NoSQL Injection"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [nodejs, mongodb, mongoose]

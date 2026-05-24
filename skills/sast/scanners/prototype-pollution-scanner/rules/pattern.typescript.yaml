@@ -1,0 +1,43 @@
+rules:
+  - id: noah-typescript-proto-phase1-pattern
+    severity: WARNING
+    languages:
+      - typescript
+    message: |
+      prototype-pollution-scanner Phase 1 sink/source 패턴 매치 (TypeScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: '__proto__'
+      - pattern-regex: 'constructor\.prototype'
+      - pattern-regex: 'merge\s*\('
+      - pattern-regex: 'extend\s*\('
+      - pattern-regex: 'deepMerge\s*\('
+      - pattern-regex: 'deepCopy\s*\('
+      - pattern-regex: 'defaultsDeep\s*\('
+      - pattern-regex: 'lodash\.merge'
+      - pattern-regex: 'lodash\.set'
+      - pattern-regex: 'jQuery\.extend'
+      - pattern-regex: 'Object\.assign\s*\('
+      - pattern-regex: 'dot-prop'
+      - pattern-regex: 'set-value'
+      - pattern-regex: 'object-path'
+      - pattern-regex: 'Object\.setPrototypeOf'
+      - pattern-regex: 'hoek\.merge'
+      - pattern-regex: 'hoek\.applyToDefaults'
+      - pattern-regex: 'koa-body'
+      - pattern-regex: 'koa-multer'
+      - pattern-regex: '@koa/multer'
+      - pattern-regex: 'qs\.parse'
+      - pattern-regex: 'allowPrototypes'
+      - pattern-regex: 'bodyParser\.urlencoded'
+      - pattern-regex: 'express\.urlencoded'
+      - pattern-regex: 'urlencoded\s*\(\{'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-1321: Prototype Pollution"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

@@ -1,15 +1,6 @@
 ---
 id_prefix: SRCMAP
-grep_patterns:
-  - "devtool"
-  - "sourcemap"
-  - "source-map"
-  - "productionBrowserSourceMaps"
-  - "productionSourceMap"
-  - "GENERATE_SOURCEMAP"
-  - "sourceMappingURL"
-  - "build\\.sourcemap"
-  - "webpack"
+rules_dir: rules/
 ---
 
 > ## 핵심 원칙: "민감한 정보가 노출되어야 영향이 있다"

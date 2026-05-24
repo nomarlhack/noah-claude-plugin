@@ -1,0 +1,54 @@
+rules:
+  - id: noah-javascript-ssrf-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js fetch/axios/http.get에 req.* 사용자 입력 URL이 들어가면 SSRF.
+      안전: URL parsing 후 hostname 화이트리스트 비교.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.params
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: ctx.query
+      - pattern: ctx.request.body
+    pattern-sinks:
+      - pattern: fetch($X, ...)
+      - pattern: axios.get($X, ...)
+      - pattern: axios.post($X, ...)
+      - pattern: axios.put($X, ...)
+      - pattern: axios.delete($X, ...)
+      - pattern: axios($X, ...)
+      - pattern: http.get($X, ...)
+      - pattern: http.request($X, ...)
+      - pattern: https.get($X, ...)
+      - pattern: https.request($X, ...)
+      - pattern: got($X, ...)
+      - pattern: got.get($X, ...)
+      - pattern: nodeFetch($X, ...)
+      - pattern: request($X, ...)
+      - pattern: superagent.get($X, ...)
+      - pattern: undici.fetch($X, ...)
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ([...].includes($X)) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if (new URL($X).hostname === "...") { ... }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-918: Server-Side Request Forgery"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [SSRF]
+      owasp: ["A10:2021 Server-Side Request Forgery"]
+      technology: [nodejs, express, axios, got, undici]

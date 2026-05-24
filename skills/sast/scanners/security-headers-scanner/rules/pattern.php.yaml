@@ -1,0 +1,43 @@
+rules:
+  - id: noah-php-sechdr-phase1-pattern
+    severity: WARNING
+    languages:
+      - php
+    message: |
+      security-headers-scanner Phase 1 sink/source 패턴 매치 (Php 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'helmet'
+      - pattern-regex: 'Content-Security-Policy'
+      - pattern-regex: 'CSP'
+      - pattern-regex: 'X-Frame-Options'
+      - pattern-regex: 'X-Content-Type-Options'
+      - pattern-regex: 'Access-Control-Allow-Origin'
+      - pattern-regex: 'cors\s*\('
+      - pattern-regex: 'Access-Control-Allow-Credentials'
+      - pattern-regex: 'Access-Control-Allow-Methods'
+      - pattern-regex: 'X-XSS-Protection'
+      - pattern-regex: 'Referrer-Policy'
+      - pattern-regex: 'Permissions-Policy'
+      - pattern-regex: 'Feature-Policy'
+      - pattern-regex: 'Cache-Control'
+      - pattern-regex: 'Pragma'
+      - pattern-regex: 'X-Permitted-Cross-Domain-Policies'
+      - pattern-regex: 'add_header'
+      - pattern-regex: 'Header\s+set'
+      - pattern-regex: 'Header\s+always'
+      - pattern-regex: 'proxy_hide_header'
+      - pattern-regex: 'setHeader'
+      - pattern-regex: 'res\.set\('
+      - pattern-regex: 'response\.headers'
+      - pattern-regex: 'HttpServletResponse'
+      - pattern-regex: '@CrossOrigin'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-693: Missing Security Headers"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

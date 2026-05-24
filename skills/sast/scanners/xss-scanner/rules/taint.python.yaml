@@ -1,0 +1,43 @@
+rules:
+  - id: noah-python-xss-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 Flask/Django request의 GET/POST/form/args가 mark_safe, Markup,
+      render_template_string에 들어가면 XSS. 안전: 기본 Jinja2/Django 자동 escape,
+      bleach.clean() 호이스팅.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.GET.get($K, ...)
+      - pattern: request.POST.get($K, ...)
+      - pattern: request.args[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form[$K]
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json
+      - pattern: request.data
+      - pattern: request.values[$K]
+    pattern-sinks:
+      - pattern: mark_safe($X)
+      - pattern: Markup($X)
+      - pattern: render_template_string($X, ...)
+      - pattern: HttpResponse($X, ...)
+      - pattern: HttpResponse($X)
+    pattern-sanitizers:
+      - pattern: bleach.clean($X, ...)
+      - pattern: html.escape($X)
+      - pattern: escape($X)
+      - pattern: markupsafe.escape($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [python, django, flask, jinja2]

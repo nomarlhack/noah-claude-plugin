@@ -1,0 +1,40 @@
+rules:
+  - id: noah-php-crlf-taint
+    severity: ERROR
+    languages:
+      - php
+    mode: taint
+    message: |
+      PHP $_GET/$_POST/$_REQUEST 값이 header()/setcookie()에 직접 들어가면 CRLF
+      Injection (HTTP Response Splitting). PHP 5.1.2+ header()는 단일 헤더 내 개행을
+      차단하나, 이전 버전·우회 케이스 점검. 안전: 화이트리스트, urlencode.
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_GET[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_POST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_REQUEST[...];
+    pattern-sinks:
+      - pattern: header($X);
+      - pattern: setcookie($N, $X, ...);
+    pattern-sanitizers:
+      - pattern: urlencode($X)
+      - pattern: str_replace(["\r", "\n"], "", $X)
+      - pattern: preg_replace($P, "", $X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-93: CRLF Injection"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [php]

@@ -1,0 +1,44 @@
+rules:
+  - id: noah-php-deser-phase1-pattern
+    severity: WARNING
+    languages:
+      - php
+    message: |
+      deserialization-scanner Phase 1 sink/source 패턴 매치 (Php 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'pickle\.loads\s*\('
+      - pattern-regex: 'pickle\.load\s*\('
+      - pattern-regex: 'yaml\.load\s*\('
+      - pattern-regex: 'Marshal\.load\s*\('
+      - pattern-regex: 'unserialize\s*\('
+      - pattern-regex: 'ObjectInputStream'
+      - pattern-regex: 'readObject\s*\('
+      - pattern-regex: 'XMLDecoder'
+      - pattern-regex: 'XStream\.fromXML\s*\('
+      - pattern-regex: 'BinaryFormatter'
+      - pattern-regex: 'node-serialize'
+      - pattern-regex: 'cryo\.parse\s*\('
+      - pattern-regex: 'jsonpickle\.decode\s*\('
+      - pattern-regex: 'maybe_unserialize\s*\('
+      - pattern-regex: 'shelve\.open\s*\('
+      - pattern-regex: 'activateDefaultTyping'
+      - pattern-regex: 'enableDefaultTyping'
+      - pattern-regex: '@JsonTypeInfo'
+      - pattern-regex: 'GenericJackson2JsonRedisSerializer'
+      - pattern-regex: 'fastjson'
+      - pattern-regex: 'parseObject\s*\('
+      - pattern-regex: 'SnakeYaml'
+      - pattern-regex: 'new Yaml\s*\('
+      - pattern-regex: 'BinaryFormatter\.Deserialize'
+      - pattern-regex: 'TypeNameHandling'
+      - pattern-regex: 'phpggc'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-502: Insecure Deserialization"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH
