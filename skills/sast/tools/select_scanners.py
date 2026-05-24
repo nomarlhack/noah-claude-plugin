@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""select_scanners.py — grep 인덱스 + 프로젝트 파일 기반 46개 스캐너 자동 선별.
+"""select_scanners.py — 패턴 인덱스 + 프로젝트 파일 기반 47개 스캐너 자동 선별.
 
 Usage:
     python3 select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_ROOT> [--write-expected-file=PATH]
@@ -8,7 +8,7 @@ Options:
     --write-expected-file=PATH  적용 스캐너 목록을 JSON 파일로 저장 (phase1_build_master_list.py가 읽음)
 
 Output:
-    - 적용/제외 판정 테이블 (grep 히트 건수 + 사유 포함)
+    - 적용/제외 판정 테이블 (매치 히트 건수 + 사유 포함)
     - 적용 스캐너 목록
     - 그룹 편성
 """
@@ -43,7 +43,7 @@ def has_dependency(pkg, *names):
     deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
     return any(n in deps for n in names)
 
-# --- grep 인덱스 읽기 ---
+# --- 패턴 인덱스 읽기 ---
 def read_index(scanner_name):
     path = os.path.join(INDEX_DIR, f"{scanner_name}.json")
     if not os.path.exists(path):
@@ -57,7 +57,7 @@ def read_index(scanner_name):
     total = sum(len(v) for v in data.values())
     return data, total
 
-# --- 스캐너 제외 조건 (grep 0건일 때만 적용) ---
+# --- 스캐너 제외 조건 (매치 0건일 때만 적용) ---
 SCANNERS = [
     "xss-scanner", "dom-xss-scanner", "ssrf-scanner", "open-redirect-scanner",
     "crlf-injection-scanner", "csrf-scanner", "path-traversal-scanner",
@@ -273,7 +273,7 @@ _scanner_prereq_group: dict[str, str] = {
 
 
 def check_exclude(scanner):
-    """grep 0건일 때 아키텍처 조건으로 제외 가능한지 확인. 제외 시 사유 반환, 포함 시 None."""
+    """매치 0건일 때 아키텍처 조건으로 제외 가능한지 확인. 제외 시 사유 반환, 포함 시 None."""
     if scanner == "xss-scanner":
         if not has_file("*.html", "*.erb", "*.slim", "*.jsx", "*.tsx", "*.vue"):
             return "HTML 출력이 전혀 없는 프로젝트"
@@ -306,9 +306,9 @@ def check_exclude(scanner):
         ):
             return "파일 업로드 엔드포인트 없음"
     elif scanner == "command-injection-scanner":
-        pass  # grep이 0이면 exec/system 호출 없으므로 안전
+        pass  # 매치가 0이면 exec/system 호출 없으므로 안전
     elif scanner == "code-injection-scanner":
-        pass  # grep이 0이면 eval/assert/create_function 등 코드 실행 sink 없으므로 안전
+        pass  # 매치가 0이면 eval/assert/create_function 등 코드 실행 sink 없으므로 안전
     elif scanner == "sqli-scanner":
         if not has_dep_any(
             # Node.js
@@ -334,7 +334,7 @@ def check_exclude(scanner):
         ):
             return "XML 파싱 라이브러리 없음"
     elif scanner == "deserialization-scanner":
-        pass  # grep이 0이면 역직렬화 함수 호출 없음
+        pass  # 매치가 0이면 역직렬화 함수 호출 없음
     elif scanner == "ssti-scanner":
         if not has_dep_any(
             # Node.js
@@ -555,14 +555,14 @@ print("=" * 60)
 print("스캐너 선별 결과")
 print("=" * 60)
 print()
-print("| 스캐너 | grep 히트 | 판정 | 사유 |")
+print("| 스캐너 | 매치 히트 | 판정 | 사유 |")
 print("|--------|----------|------|------|")
 
 for scanner in SCANNERS:
     _, count = read_index(scanner)
     if count > 0:
         included.append((scanner, count))
-        print(f"| {scanner} | {count} | ✅ 포함 | grep 히트 {count}건 |")
+        print(f"| {scanner} | {count} | ✅ 포함 | 매치 히트 {count}건 |")
     else:
         reason = check_exclude(scanner)
         if reason:
@@ -649,7 +649,7 @@ SPLIT_HINTS = {
     ],
 }
 
-MAX_GROUP_WORKLOAD = 150  # 그룹당 최대 grep 히트 합계
+MAX_GROUP_WORKLOAD = 150  # 그룹당 최대 매치 히트 합계
 MAX_GROUP_SIZE = 4        # 그룹당 최대 스캐너 수
 
 included_set = {s for s, _ in included}

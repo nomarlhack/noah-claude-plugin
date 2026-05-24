@@ -6,7 +6,7 @@ Noah SAST 실행 단계를 한눈에 보여주는 문서. 각 Step의 상세 절
 
 ```mermaid
 flowchart TD
-    S1["Step 1<br/>실행 경로 확정"] --> S2["Step 2<br/>grep 인덱싱"]
+    S1["Step 1<br/>실행 경로 확정"] --> S2["Step 2<br/>패턴 인덱싱"]
     S2 --> S3["Step 3<br/>프로젝트 스택 파악"]
     S3 --> S4["Step 4<br/>스캐너 선별"]
     S4 --> S5["Step 5<br/>정적 분석"]
@@ -32,7 +32,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    I["grep 인덱스<br/>PATTERN_INDEX_DIR/*.json"] --> P1["Phase 1 결과<br/>PHASE1_RESULTS_DIR/<br/>*-scanner.md + ai-discovery.md"]
+    I["패턴 인덱스<br/>PATTERN_INDEX_DIR/*.json"] --> P1["Phase 1 결과<br/>PHASE1_RESULTS_DIR/<br/>*-scanner.md + ai-discovery.md"]
     P1 --> MLJ["master-list.json"]
     MLJ --> EV["evaluation/<br/>*-eval.md"]
     P1 --> P2["Phase 2 결과<br/>*-phase2.md"]
@@ -60,7 +60,7 @@ flowchart LR
 
 | 단계 | 스크립트 | 역할 |
 |------|---------|------|
-| Step 2 | `grep_index.py` | grep 패턴 인덱싱 (exit 0 + stdout 키워드로 결과 전달) |
+| Step 2 | `semgrep_index.py` | 패턴 인덱싱 (semgrep 룰 + grep-less 스캐너 빈 인덱스, exit 0 + stdout 키워드로 결과 전달) |
 | Step 4 | `select_scanners.py` | 스캐너 선별 + 그룹 편성 + Tier 출력 |
 | Phase 1 후처리 | `phase1_build_master_list.py` | master-list.json 생성 |
 | Step 7 게이트 | `phase1_review_assert.py` | phase1-review 완료 확인 |

@@ -24,9 +24,9 @@ Phase 2 동적 분석의 인증 컨텍스트 기반 병렬화(Tier A/B/C)를 스
 
 **제약**: 호출 시 작업 디렉토리가 `noah-sast-report.md` 위치(= `assemble_report.py` 출력 위치)여야 한다 (`md_to_html.py`가 `os.getcwd()` 기준).
 
-## grep 인덱싱 — `grep_index.py`
+## 패턴 인덱싱 — `semgrep_index.py`
 
-grep 패턴 인덱싱 수행 후 스크립트 자체에서 JSON 카운트·예상 카운트를 stdout에 출력하고 exit 0으로 종료 (Claude Code Bash tool UI 경고 방지). 실제 결과는 `run_grep_index_exit=N` 줄로 전달된다.
+semgrep 룰(pattern/taint) 인덱싱 수행 후 스크립트 자체에서 JSON 카운트·예상 카운트를 stdout에 출력하고 exit 0으로 종료 (Claude Code Bash tool UI 경고 방지). 실제 결과는 `run_semgrep_index_exit=N` 줄로 전달된다. `rules/`가 없는 grep-less 스캐너(business-logic 등)는 빈 `{}` 인덱스로 처리된다.
 
 **SKILL.md 영향**: Step 2-2 Bash 블록 8줄이 스크립트 한 줄 호출로 대체된다.
 
@@ -47,4 +47,4 @@ Step 11의 결과 체크리스트 테이블 자동 생성은 보류. "동적 테
 ## 자기 비판
 
 - **스크립트 추가 = 유지보수 대상 증가**: 세 항목의 유지보수 비용이 지침 절감 이득보다 크면 실익 없음. Tier 매핑과 후처리 순서는 자주 바뀌지 않는 구조라 안전하다고 판단.
-- **Python 통합**: `report_finalize.py`, `grep_index.py` 모두 순수 Python. 외부 호출자가 없어 쉘 래퍼 분리 이득이 없다고 판단해 통합.
+- **Python 통합**: `report_finalize.py`, `semgrep_index.py` 모두 순수 Python. 외부 호출자가 없어 쉘 래퍼 분리 이득이 없다고 판단해 통합.

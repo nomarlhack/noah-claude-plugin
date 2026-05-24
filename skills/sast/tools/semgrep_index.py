@@ -5,14 +5,13 @@ Noah SAST semgrep 인덱싱 스크립트.
 각 스캐너의 `rules/` 디렉토리에 있는 *.yaml semgrep 룰을 실행하여
 프로젝트 전체에 매치를 인덱싱하고, 스캐너별 JSON 인덱스를 저장한다.
 
-grep_index.py의 보완 도구이다:
-- grep_index.py: 모든 스캐너의 phase1.md frontmatter `grep_patterns` 처리
-- semgrep_index.py: `rules/` 디렉토리가 있는 스캐너만 처리 (semgrep 룰 사용)
+Phase 1 패턴 인덱싱의 단일 진실 원천이다:
+- `rules/` 디렉토리가 있는 스캐너: semgrep 룰(pattern/taint)을 실행해 매치를 인덱싱
+- `rules/`가 없는 grep-less 스캐너(business-logic 등): 빈 `{}` 인덱스를 작성
 
-같은 PATTERN_INDEX_DIR을 출력 위치로 사용하므로, `rules/`가 있는 스캐너의
-JSON 인덱스는 semgrep_index.py가 작성한 결과로 덮어쓰여진다.
+모든 스캐너의 JSON 인덱스를 PATTERN_INDEX_DIR에 작성한다.
 
-출력 JSON 포맷 (grep_index.py와 호환):
+출력 JSON 포맷:
   {
     "<rule_id>": ["path/to/file.kt:42", "path/to/other.kt:7", ...],
     ...
@@ -46,7 +45,7 @@ SEMGREP_TIMEOUT_SEC = 600
 # euc-kr/cp949는 한국 레거시 PHP/JSP, shift_jis는 일본 코드베이스, iso-8859-1은 fallback.
 DECODE_TRY_ENCODINGS = ("utf-8-sig", "euc-kr", "cp949", "shift_jis", "iso-8859-1")
 
-# UTF-8 mirror 빌드 시 제외할 디렉토리 (grep_index.py와 동일)
+# UTF-8 mirror 빌드 시 제외할 디렉토리
 MIRROR_EXCLUDE_DIRS = {
     "node_modules", ".git", "dist", "build",
     "target", "out", ".next", ".nuxt", ".cache",
@@ -57,7 +56,7 @@ MIRROR_EXCLUDE_DIRS = {
     ".parcel-cache", ".turbo", ".svn", ".hg", "storybook-static",
 }
 
-# grep_index.py와 동일한 코드 확장자 필터링.
+# 코드 확장자 필터링.
 # `languages: [generic]` 룰이 .png/.lock 등 무관 파일까지 스캔하는 것을 차단.
 INCLUDE_EXTS = [
     "*.js", "*.jsx", "*.mjs", "*.cjs",
@@ -258,7 +257,10 @@ def process_scanner(
     """스캐너 1개 처리. rules/ 디렉토리가 있어야 처리. 총 매치 수 반환."""
     rules_dir = scanner_dir / "rules"
     if not rules_dir.is_dir():
-        return -1  # skip 신호
+        # rules/ 없는 grep-less 스캐너(business-logic 등): 빈 인덱스를 작성해
+        # 다운스트림(select_scanners 등)의 인덱스 파일 계약을 유지하고 skip 신호 반환.
+        (out_dir / f"{scanner_name}.json").write_text("{}\n", encoding="utf-8")
+        return -1  # skip 신호 (rules 없음)
 
     rule_files = collect_rule_files(rules_dir)
     if not rule_files:
@@ -335,36 +337,10 @@ def process_scanner(
         seen.add(key)
         results_by_rule.setdefault(rule_id, []).append(loc)
 
-    # rule 파일에 정의되어 있으나 매치가 0건인 rule도 키로 포함시키지는 않는다.
-    # (grep_index.py가 0건 패턴도 빈 배열로 포함하는 것과 차이는 있으나,
-    #  select_scanners.py의 sum(len(v) for v in data.values())는 동일하게 작동)
-
-    # 머지 모드: 기존 인덱스(grep 결과)가 있으면 키 충돌 없이 보존.
-    # semgrep이 비-UTF8 파일(EUC-KR PHP 등)을 스킵해도 grep 결과로 보강.
+    # 매치가 0건인 rule은 키로 포함시키지 않는다 (select_scanners.py의
+    # sum(len(v) for v in data.values()) 집계에는 영향 없음).
+    # 비-UTF8 파일 누락은 UTF-8 mirror가 보강하므로 별도 머지 단계가 필요 없다.
     out_path = out_dir / f"{scanner_name}.json"
-    if out_path.exists():
-        try:
-            existing = json.loads(out_path.read_text(encoding="utf-8"))
-            if isinstance(existing, dict):
-                for k, v in existing.items():
-                    if k not in results_by_rule and isinstance(v, list) and v:
-                        results_by_rule[k] = v
-                        # grep 패턴(정규식 키)의 위치도 locindex에 generic tier로 흡수.
-                        # 이미 더 높은 tier로 등록된 위치는 승격 유지.
-                        for loc in v:
-                            slot = loc_index.get(loc)
-                            if slot is None:
-                                loc_index[loc] = {
-                                    "rule_ids": [k],
-                                    "tier": "generic",
-                                    "severity": "",
-                                }
-                                tiers_present.add("generic")
-                            elif k not in slot["rule_ids"]:
-                                slot["rule_ids"].append(k)
-        except (json.JSONDecodeError, OSError):
-            pass
-
     out_path.write_text(
         json.dumps(results_by_rule, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -482,13 +458,13 @@ def main() -> int:
         print("semgrep 적용 대상 스캐너 없음 (rules/ 디렉토리를 가진 스캐너가 없음)")
     if skipped:
         print()
-        print(f"semgrep skip (rules/ 디렉토리 없음): {len(skipped)}개")
+        print(f"rules/ 없음 — 빈 인덱스 작성 (grep-less 스캐너): {len(skipped)}개")
 
     return 2 if failures else 0
 
 
 def _emit_summary(rc: int) -> None:
-    """grep_index.py와 동일한 컨벤션: Bash exit 0, stdout 키워드로 분기 전달."""
+    """Bash exit 0, stdout 키워드로 분기 전달 (Claude Code Bash tool UI 경고 회피)."""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--scanners-dir")
     parser.add_argument("--project-root")

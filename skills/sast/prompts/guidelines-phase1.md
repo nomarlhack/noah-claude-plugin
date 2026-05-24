@@ -84,11 +84,10 @@ Phase 1 분석은 세 단계로 구성된다. 모두 수행해야 한다.
 
 프롬프트에 제공된 패턴 인덱스 파일 경로를 Read 도구로 읽어 패턴별 파일경로:라인번호 목록을 추출하고, 이를 필수 분석 대상으로 확정한다.
 
-**인덱스 JSON 키의 두 가지 의미** — 키는 두 가지 출처 중 하나다. 키 형태를 보고 매치의 신뢰도와 후속 검증 단계를 다르게 가져간다 (구체적 차이는 §6-D-3 참조):
+**인덱스 JSON 키의 의미** — 키는 semgrep 룰 ID이며, 룰 종류(pattern/taint)에 따라 매치의 신뢰도와 후속 검증 단계가 다르다 (구체적 차이는 §6-D-3 참조):
 
 | 키 형태 | 출처 | 매치의 의미 |
 |---|---|---|
-| 정규식 문자열 (예: `connection\\.query\\s*\\(`) | `grep_index.py` (텍스트 매칭) | 단순 sink 호출 위치만 매치. source 도달성·sanitizer 부재 여부 미확인. |
 | `noah-<lang>-...-pattern` (예: `noah-kotlin-sqli-annotation`) | `semgrep_index.py` pattern 룰 (AST 매칭) | sink 호출 위치만 매치하되 언어 파서가 적용되어 주석/문자열 내부 false match는 제외됨. source/sanitizer는 미확인. |
 | `noah-<lang>-...-taint` (예: `noah-kotlin-spring-sqli-taint`) | `semgrep_index.py` taint 룰 (dataflow 분석) | 사용자 입력 source → sink + sanitizer 부재가 룰엔진의 dataflow 분석으로 확정됨. high-signal 후보. |
 
@@ -120,7 +119,7 @@ Phase 1 분석은 세 단계로 구성된다. 모두 수행해야 한다.
 - **`has_taint == false`** (taint 매치 0건 — pattern-only 스캐너이거나, taint 룰이 있어도 이 프로젝트에서 dataflow 신호가 안 잡힌 경우): ast/generic이 유일 신호이므로 **전수 분석한다. 후순위·상한 적용 금지.**
 - **`has_taint == true`** (taint 매치 발생 — dataflow 신호가 이 프로젝트에서 작동): taint·ast 위치를 먼저 모두 처리한 뒤 generic-only 위치를 검토한다. 컨텍스트 예산이 소진되면 **남은 generic-only 위치를 버리지 말고** 반환 요약에 `[INCOMPLETE: generic-tier N건 미검토 — <scanner>]`로 표기한다 (메인 에이전트가 후속 처리). 이는 하드 컷이 아니라 검토 순서이며, 놓침이 아니라 후속 대상 명시이다.
 
-locindex가 없으면(grep만 실행된 경우 등) 기존 평평한 패턴 인덱스를 전수 분석한다.
+locindex가 없으면 기존 평평한 패턴 인덱스를 전수 분석한다.
 
 #### 6-A-2: 커버리지 감사 (고볼륨 스캐너 필수)
 
@@ -196,7 +195,7 @@ Sink-first 분석 완료 후, Source-first 탐색을 수행한다.
    - §9-B(부분 검증 의미 분석): 룰의 sanitizer 목록에 없지만 코드에 다른 형태의 검증(부분 화이트리스트, 타입 캐스팅, 정규식 매칭 등)이 있는 경우, 그 의미를 기술. 룰이 잡지 못한 안전 메커니즘을 놓치지 않기 위함.
    - §10(트리거 조건의 현실성): 룰엔진은 코드 도달성만 확인. 실제 라우트 노출 여부·인증 게이트·인프라 차단은 에이전트가 평가.
 
-   **`pattern` 룰(`noah-<lang>-...-pattern`) 매치 또는 grep 정규식 매치**: 위 단축 절차 미적용. 변수 체인 역추적과 sanitizer ±30줄 Read를 전부 수행한다.
+   **`pattern` 룰(`noah-<lang>-...-pattern`) 매치**: 위 단축 절차 미적용. 변수 체인 역추적과 sanitizer ±30줄 Read를 전부 수행한다.
 4. **모호 케이스 처리** — phase1.md의 "후보 판정 의사결정" 섹션 (표에 없는 조건 조합은 §6-B 의미-기반 원칙으로 판정)
 5. **후보 정리** — phase1.md의 "후보 판정 제한" 한 줄 기준
 
@@ -204,7 +203,7 @@ Sink-first 분석 완료 후, Source-first 탐색을 수행한다.
 
 ### 6-E: 래퍼 함수 재귀 추적 (Sink 간접 호출 탐지)
 
-grep 패턴은 직접적인 Sink 호출만 잡는다. 래핑 함수, 별칭, 유틸리티 함수를 통한 간접 호출은 패턴 인덱스에 나타나지 않는다.
+패턴 룰은 직접적인 Sink 호출만 잡는다. 래핑 함수, 별칭, 유틸리티 함수를 통한 간접 호출은 패턴 인덱스에 나타나지 않는다.
 
 **절차 (Sink-first 분석 후 수행):**
 

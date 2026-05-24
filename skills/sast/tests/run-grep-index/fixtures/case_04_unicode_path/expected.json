@@ -1,8 +1,0 @@
-{
-  "unicode-scanner": {
-    "matches_by_pattern": {
-      "TOKEN_ALPHA": ["한글폴더/코드.js:2"]
-    }
-  },
-  "expect_failures": false
-}

@@ -116,13 +116,13 @@ if command -v python3 >/dev/null 2>&1; then
   fi
 fi
 
-# semgrep 확인 — `rules/` 디렉토리를 가진 스캐너의 Phase 1 인덱싱에 사용
-# (현재 sqli-scanner가 semgrep 룰 기반. 나머지 스캐너는 grep 패턴 사용 — semgrep 없어도 동작)
+# semgrep 확인 — Phase 1 패턴 인덱싱의 핵심 의존성
+# (47개 중 46개 스캐너가 semgrep 룰 기반. 없으면 룰 기반 탐지가 사실상 비활성화됨)
 if command -v semgrep >/dev/null 2>&1; then
   SEMGREP_VER=$(semgrep --version 2>/dev/null | head -1 | tr -d '[:space:]')
   ok "semgrep 확인 (v$SEMGREP_VER)"
 else
-  warn "semgrep이 없습니다. semgrep 룰 기반 스캐너(sqli 등)의 Phase 1 인덱싱이 비활성화됩니다."
+  warn "semgrep이 없습니다. 룰 기반 스캐너 46종의 Phase 1 인덱싱이 비활성화되어 탐지가 크게 제한됩니다."
   warn "설치: brew install semgrep   또는   python3 -m pip install --user semgrep"
 fi
 

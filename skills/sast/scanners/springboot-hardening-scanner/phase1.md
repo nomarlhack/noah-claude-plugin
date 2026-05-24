@@ -37,7 +37,7 @@ rules_dir: rules/
 
 ### Step D: 항목별 점검
 
-아래 12개 항목 각각에 대해, grep 패턴 인덱스에서 관련 파일 위치를 확인하고 Read로 읽어 effective config 값을 판정한다.
+아래 12개 항목 각각에 대해, 패턴 인덱스에서 관련 파일 위치를 확인하고 Read로 읽어 effective config 값을 판정한다.
 
 ---
 

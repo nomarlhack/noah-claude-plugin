@@ -51,7 +51,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/sast
     sqli-scanner/
     ...
   tools/                           ← Python 유틸리티 스크립트
-    grep_index.py              ← grep 인덱싱 (Step 2)
+    semgrep_index.py           ← 패턴 인덱싱 (Step 2)
     select_scanners.py
     phase1_build_master_list.py
     phase2_review_assert.py
@@ -61,10 +61,10 @@ ${CLAUDE_PLUGIN_ROOT}/skills/sast
     scan-report/
     scan-report-review/
     chain-analysis/
-  tests/                           ← grep 커버리지 테스트
+  tests/                           ← 회귀 테스트 (source-reachability 등)
 ```
 
-### Step 2: grep 인덱싱
+### Step 2: 패턴 인덱싱
 
 Step 3 진입 전에 완료한다. 개별 취약점 스캐너 에이전트가 코드베이스를 중복 탐색하는 것을 방지하기 위해, 모든 스캐너 패턴을 일괄 인덱싱한다.
 
@@ -81,40 +81,25 @@ echo "/tmp/phase1_results_$(basename <PROJECT_ROOT>)_$(date +%s)"
 
 #### Step 2-2: 인덱싱 실행
 
-아래 두 스크립트를 **순서대로** 실행한다. `grep_index.py`는 `phase1.md` frontmatter의 `grep_patterns`를 가진 스캐너 전체를, `semgrep_index.py`는 `rules/` 디렉토리를 가진 스캐너만을 처리한다. 같은 출력 디렉토리(`PATTERN_INDEX_DIR`)를 공유하며, `rules/`를 가진 스캐너의 인덱스 JSON은 grep 단계에서 빈 `{}`로 작성된 뒤 semgrep 단계에서 매치 결과로 덮어쓰여진다. 스크립트 exit code는 stdout의 `run_*_exit=N` 줄에서 읽는다 (Bash tool 최종 exit는 항상 0).
+`semgrep_index.py`를 실행한다. `rules/` 디렉토리를 가진 스캐너는 semgrep 룰(pattern/taint)로, `rules/`가 없는 grep-less 스캐너(business-logic 등)는 빈 `{}` 인덱스로 처리되어 모든 스캐너의 인덱스 JSON이 `PATTERN_INDEX_DIR`에 작성된다. 스크립트 exit code는 stdout의 `run_semgrep_index_exit=N` 줄에서 읽는다 (Bash tool 최종 exit는 항상 0).
 
-> `semgrep_index.py`는 `<scanner>.json`(rule_id→위치 목록, 하위 호환)과 함께 **위치 중심 사이드카 `<scanner>.locindex.json`**을 생성한다. locindex는 같은 file:line의 다중 룰 매치를 1개 위치로 병합하고 신뢰도 tier(taint>ast>generic)로 승격하되 `rule_ids` 배열로 모든 매치를 보존한다. Phase 1 그룹 에이전트가 tier 우선순위로 검토하는 데 사용한다(§6-A-1). 또한 비-UTF8 파일(EUC-KR 등)은 UTF-8 mirror로 변환되어 스캔되므로 한국어 레거시 코드베이스의 매치 누락이 방지된다.
+> `semgrep_index.py`는 `<scanner>.json`(rule_id→위치 목록)과 함께 **위치 중심 사이드카 `<scanner>.locindex.json`**을 생성한다. locindex는 같은 file:line의 다중 룰 매치를 1개 위치로 병합하고 신뢰도 tier(taint>ast>generic)로 승격하되 `rule_ids` 배열로 모든 매치를 보존한다. Phase 1 그룹 에이전트가 tier 우선순위로 검토하는 데 사용한다(§6-A-1). 또한 비-UTF8 파일(EUC-KR 등)은 UTF-8 mirror로 변환되어 스캔되므로 한국어 레거시 코드베이스의 매치 누락이 방지된다.
 
 ```bash
-python3 <NOAH_SAST_DIR>/tools/grep_index.py --scanners-dir <NOAH_SAST_DIR>/scanners --project-root <PROJECT_ROOT> --out-dir <PATTERN_INDEX_DIR>
 python3 <NOAH_SAST_DIR>/tools/semgrep_index.py --scanners-dir <NOAH_SAST_DIR>/scanners --project-root <PROJECT_ROOT> --out-dir <PATTERN_INDEX_DIR>
 ```
 
 **분기 판정 (메인 에이전트):**
 
-| `run_grep_index_exit` | `json_count` vs `expected` | 의미 | 조치 |
-|------|------|------|------|
-| `0` | 일치 | 모든 스캐너 정상 | semgrep 단계 진행 |
-| `2` | 일치 | 부분 실패 (`_failures.json` 존재) | 아래 "실패 사유별 대응" 참조 후 조치 |
-| `1` 또는 불일치 | — | 환경/CLI 오류 또는 무결성 실패 | 원인 파악 후 재실행 |
-
 | `run_semgrep_index_exit` | 의미 | 조치 |
 |------|------|------|
-| `0` | semgrep 적용 스캐너 정상 처리 | Step 3 진행 |
+| `0` | 모든 스캐너 정상 처리 | Step 3 진행 |
 | `2` | 부분 실패 (`_semgrep_failures.json` 존재) | reason별 조치: `no_rule_files` (스캐너 디렉토리 구조 오류), `semgrep_timeout` (프로젝트 분할 검토), `semgrep_rule_error` (룰 YAML 문법 오류 — 이슈 보고), `json_decode_error` (semgrep 출력 손상 — 재실행) |
-| `1` | semgrep CLI 부재 또는 경로 오류 | install.sh 안내대로 semgrep 설치 후 재실행. semgrep이 끝까지 없으면 해당 스캐너는 빈 인덱스로 진행 (Phase 1이 후보 없음으로 처리) |
+| `1` | semgrep CLI 부재 또는 경로 오류 | install.sh 안내대로 semgrep 설치 후 재실행. semgrep이 끝까지 없으면 룰 기반 스캐너는 빈 인덱스로 진행 (Phase 1이 후보 없음으로 처리) |
 
-**exit 2 시 grep 단계 실패 사유별 대응:**
+**exit 2 시 실패 사유별 대응:**
 
-메인 에이전트가 `<PATTERN_INDEX_DIR>/_failures.json`을 Read하여 `reason` 필드로 분기:
-
-- `yaml_parse_error`: 해당 스캐너 `phase1.md` frontmatter 수정 필요 (버그 — 이슈 보고)
-- `regex_error`: 해당 스캐너 `phase1.md`의 `grep_patterns` 중 정규식 오류 (버그 — 이슈 보고)
-- `grep_timeout`: 프로젝트 크기가 크거나 패턴이 과다 매치. `PROJECT_ROOT` 서브디렉토리 분할 검토
-- `io_error`: 파일 시스템 권한/경로 점검 후 전체 재실행
-- `phase1_md_missing`: 스캐너 디렉토리 구조 오류 (버그 — 이슈 보고)
-
-`yaml_parse_error`, `regex_error`, `phase1_md_missing`은 해당 스캐너의 JSON이 빈 `{}`로 저장되므로 나머지 스캐너는 정상 진행된다.
+메인 에이전트가 `<PATTERN_INDEX_DIR>/_semgrep_failures.json`을 Read하여 `reason` 필드로 분기. 실패한 스캐너의 JSON은 빈 `{}`로 저장되므로 나머지 스캐너는 정상 진행된다.
 
 ### Step 3: 프로젝트 스택 파악
 
@@ -132,9 +117,9 @@ python3 <NOAH_SAST_DIR>/tools/semgrep_index.py --scanners-dir <NOAH_SAST_DIR>/sc
 
 #### Step 4-1: 제외 여부 결정 (자동화 스크립트)
 
-> Step 2에서 `grep_index.py` stdout의 카운트 요약은 보관만 하면 되며, 메인 에이전트가 별도 테이블로 출력할 의무는 없다. `select_scanners.py`가 동일 정보를 더 풍부한 형태로 출력한다.
+> Step 2에서 `semgrep_index.py` stdout의 카운트 요약은 보관만 하면 되며, 메인 에이전트가 별도 테이블로 출력할 의무는 없다. `select_scanners.py`가 동일 정보를 더 풍부한 형태로 출력한다.
 
-`select_scanners.py`를 실행하여 grep 인덱스 + 프로젝트 아키텍처 기반으로 자동 선별한다:
+`select_scanners.py`를 실행하여 패턴 인덱스 + 프로젝트 아키텍처 기반으로 자동 선별한다:
 
 ```bash
 python3 <NOAH_SAST_DIR>/tools/select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_ROOT> \
@@ -142,17 +127,17 @@ python3 <NOAH_SAST_DIR>/tools/select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_RO
 ```
 
 스크립트 출력:
-- 적용/제외 판정 테이블 (grep 히트 건수 + 사유 포함)
+- 적용/제외 판정 테이블 (매치 히트 건수 + 사유 포함)
 - 적용 스캐너 목록
 - `<PHASE1_RESULTS_DIR>/_expected_scanners.json`: 적용 스캐너 이름 목록 (JSON). `phase1_build_master_list.py`가 자동으로 읽어 Phase 1 완료 후 누락 파일을 MISSING_FILE 에러로 보고한다.
 
 **기본 원칙: 포함이 기본이고, 제외에는 근거가 필요하다.**
-- grep 결과 1건 이상 → 반드시 포함
-- grep 결과 0건 → 스크립트가 아키텍처 조건을 검사하여 제외 가능 여부 판단
+- 매치 1건 이상 → 반드시 포함
+- 매치 0건 → 스크립트가 아키텍처 조건을 검사하여 제외 가능 여부 판단
 
 #### Step 4-2: 스캐너 선별 결과 AI 검토
 
-`select_scanners.py`는 라이브러리 의존성 + grep 히트 수만으로 판단하므로 아래 케이스를 놓친다. 메인 에이전트가 제외된 스캐너 목록을 아래 체크리스트로 검토하여 복원 여부를 결정한다.
+`select_scanners.py`는 라이브러리 의존성 + 매치 히트 수만으로 판단하므로 아래 케이스를 놓친다. 메인 에이전트가 제외된 스캐너 목록을 아래 체크리스트로 검토하여 복원 여부를 결정한다.
 
 **검토 체크리스트 (제외된 각 스캐너에 대해):**
 
@@ -176,7 +161,7 @@ python3 <NOAH_SAST_DIR>/tools/select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_RO
 
 선별된 스캐너를 `select_scanners.py`가 출력한 그룹 편성에 따라 묶어, 그룹당 1개 에이전트로 실행한다.
 
-**그룹 편성**: Step 4-1에서 실행한 `select_scanners.py`의 `--- 그룹 편성 ---` 출력을 그대로 사용한다. 이 스크립트는 의미적 연관성 기반 기본 그룹에서 시작하되, grep 히트 수 합계가 150건을 초과하거나 그룹 내 스캐너가 5개 이상이면 자동 분할한다. 적용 스캐너가 없는 그룹은 자동 제거된다.
+**그룹 편성**: Step 4-1에서 실행한 `select_scanners.py`의 `--- 그룹 편성 ---` 출력을 그대로 사용한다. 이 스크립트는 의미적 연관성 기반 기본 그룹에서 시작하되, 매치 히트 수 합계가 150건을 초과하거나 그룹 내 스캐너가 5개 이상이면 자동 분할한다. 적용 스캐너가 없는 그룹은 자동 제거된다.
 
 **기본 그룹 (참고용, 실제 편성은 스크립트 출력을 따름):**
 
@@ -275,7 +260,7 @@ Phase 1 마스터 목록: <PHASE1_RESULTS_DIR>/master-list.json (Read 도구로 
 3단계 탐색을 내부적으로 수행하세요:
 1. 이 프로젝트의 소스코드를 분석하여 보안 취약점을 탐색하세요.
 [전환] 1단계 탐색 후, master-list.json을 다시 Read하여 Phase 1이 어떤 스캐너에서 후보를 찾았고 어떤 스캐너가 이상 없음인지 재확인한 뒤 2단계로 넘어가세요.
-2. Phase 1 커버리지를 바탕으로, Phase 1이 다루지 않은 영역을 집중 탐색하세요. 특히 비즈니스 로직 결함, 인증·인가 흐름 전체 경로, Race Condition, Mass Assignment처럼 grep 패턴으로는 잡기 어려운 취약점에 집중하세요.
+2. Phase 1 커버리지를 바탕으로, Phase 1이 다루지 않은 영역을 집중 탐색하세요. 특히 비즈니스 로직 결함, 인증·인가 흐름 전체 경로, Race Condition, Mass Assignment처럼 정적 패턴으로는 잡기 어려운 취약점에 집중하세요.
 [전환] 2단계 탐색 후, 지금까지 Read 도구로 열어본 파일과 디렉토리를 점검하고, 아직 열어보지 않은 영역을 파악한 뒤 3단계로 넘어가세요.
 3. 미탐색 영역을 중심으로 취약점을 탐색하세요.
 

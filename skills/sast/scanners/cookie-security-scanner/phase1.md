@@ -26,7 +26,7 @@ rules_dir: rules/
 
 ## Source-first 추가 패턴
 
-grep 인덱스 외에 아래 경로를 추가 탐색한다:
+패턴 인덱스 외에 아래 경로를 추가 탐색한다:
 - 로그인/인증 핸들러 (세션 쿠키 발행 지점)
 - remember-me / "로그인 유지" 기능 (Persistent 쿠키 발행 지점)
 - OAuth 콜백 핸들러 (토큰 쿠키 저장 지점)

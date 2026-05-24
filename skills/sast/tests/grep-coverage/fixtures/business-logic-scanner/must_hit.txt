@@ -1,4 +1,0 @@
-# business-logic-scanner grep coverage test fixtures
-# This scanner uses grep_patterns: [] (grep-less).
-# Analysis is driven by project context, not pattern matching.
-# No code lines to test — this file exists for completeness.

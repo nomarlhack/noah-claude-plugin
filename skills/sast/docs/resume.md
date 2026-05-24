@@ -71,6 +71,6 @@ flowchart TD
 ## 공통 원칙
 
 - **변수 유지**: 동일 세션·동일 터미널 기준이므로 `NOAH_SAST_DIR` / `PATTERN_INDEX_DIR` / `PHASE1_RESULTS_DIR`는 컨텍스트에 남아 있다고 전제한다. 손실 시 `ls -dt /tmp/phase1_results_*_<basename>_*` 로 가장 최근 디렉토리를 후보로 제시.
-- **결정론적 재실행**: `grep_index.py`, `select_scanners.py`, `phase1_build_master_list.py`, `assemble_report.py`는 모두 idempotent. 재개 시 반복 실행해도 결과가 덮어쓰기만 된다.
+- **결정론적 재실행**: `semgrep_index.py`, `select_scanners.py`, `phase1_build_master_list.py`, `assemble_report.py`는 모두 idempotent. 재개 시 반복 실행해도 결과가 덮어쓰기만 된다.
 - **Writer 권한 불변**: 재개 중에도 `sub-skills/scan-report-review/_contracts.md` §1 Writer Matrix를 위반하지 않는다. 특히 `phase1-review` 재호출이 `status` 필드를 건드리지 않도록 주의.
 - **무한 루프 방지**: `phase2-review`는 2회 재시도 후 사용자 대기. `phase1_eval_state.retries` 상한 2 규칙(`_contracts.md` §3)이 `phase1-review` 재호출 루프를 차단.

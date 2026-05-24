@@ -8,12 +8,13 @@
 
 ## phase1.md 구조 표준
 
+> **탐지 패턴은 frontmatter가 아니라 `rules/` 디렉토리에 둔다.** sink/source 패턴은 스캐너의 `rules/` 아래 semgrep 룰(`pattern.<lang>.yaml`, `taint.<lang>.yaml`, `sink.<lang>.yaml`)로 작성하고, `semgrep_index.py`가 이를 인덱싱한다. frontmatter에는 `id_prefix`(필수)와 특수 그룹의 `prereq_group`(선택)만 둔다. business-logic처럼 룰이 필요 없는 grep-less 스캐너는 `rules/`를 두지 않으며 빈 인덱스로 처리된다.
+
 ### 기본형 — sink 추적 스캐너
 
 ```
 ---
 id_prefix: <SCANNER_ID>
-grep_patterns: [...]
 ---
 
 > ## 핵심 원칙: "<한 문장 판정 철학>"
@@ -34,7 +35,6 @@ grep_patterns: [...]
 ```
 ---
 id_prefix: ...
-grep_patterns: ...
 ---
 
 > ## 핵심 원칙: "..."

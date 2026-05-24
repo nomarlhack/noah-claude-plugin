@@ -3,7 +3,7 @@
 `guidelines-phase1.md` 지침 8 및 `scan-report-review/_principles.md` §1 Source 도달성 판정
 (phase1-review/report-review가 모두 적용)이 정상 동작하는지 수동으로 검증하기 위한 픽스처.
 
-grep-coverage 테스트는 패턴 존재만 본다. Source 도달성은 semantic 판정이므로
+패턴 인덱싱(semgrep)은 sink/source 패턴의 존재 여부만 본다. Source 도달성은 semantic 판정이므로
 여기서 자동화하지 않고 LLM 에이전트 기반 회귀로 돌린다.
 
 ## 픽스처
