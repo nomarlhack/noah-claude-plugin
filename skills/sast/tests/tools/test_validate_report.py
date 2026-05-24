@@ -23,6 +23,13 @@ def _make_report(directory, name, poc_count, chain=False):
         f.write(content)
     with open(os.path.join(directory, f"{name}.html"), "w", encoding="utf-8") as f:
         f.write(f"<html><body>{content}</body></html>")
+    # 테스트 격리: validator는 --master-list 미지정 시 /tmp/phase1_results_*/master-list.json을
+    # glob하는 fallback이 있어, 머신에 남은 실제 스캔 잔여물(safe 후보 등)을 주워 검증이 오염된다.
+    # 후보 0건 master-list를 명시적으로 제공해 fallback을 차단한다. 경로를 반환한다.
+    ml_path = os.path.join(directory, "master-list.json")
+    with open(ml_path, "w", encoding="utf-8") as f:
+        f.write('{"candidates": []}')
+    return ml_path
 
 
 class TestValidateReport(unittest.TestCase):
@@ -35,20 +42,20 @@ class TestValidateReport(unittest.TestCase):
     def test_pass(self):
         """POC 건수 일치 → PASS + exit 0"""
         with tempfile.TemporaryDirectory() as d:
-            _make_report(d, "noah-sast-report", 3)
-            r = self._run(["3"], d)
+            ml = _make_report(d, "noah-sast-report", 3)
+            r = self._run(["3", "--master-list", ml], d)
             self.assertEqual(r.returncode, 0, f"stdout: {r.stdout}")
             self.assertIn("PASS", r.stdout)
 
     def test_fail_deletes_files(self):
         """POC 건수 불일치 → FAIL + 파일 삭제 + exit 1"""
         with tempfile.TemporaryDirectory() as d:
-            _make_report(d, "noah-sast-report", 2)
+            ml = _make_report(d, "noah-sast-report", 2)
             md_path = os.path.join(d, "noah-sast-report.md")
             html_path = os.path.join(d, "noah-sast-report.html")
             self.assertTrue(os.path.exists(md_path))
 
-            r = self._run(["5"], d)
+            r = self._run(["5", "--master-list", ml], d)
             self.assertEqual(r.returncode, 1)
             self.assertIn("FAIL", r.stdout)
             self.assertFalse(os.path.exists(md_path), "MD 파일이 삭제되어야 함")
@@ -57,8 +64,8 @@ class TestValidateReport(unittest.TestCase):
     def test_chain_analysis_pass(self):
         """--chain-analysis + 연계 시나리오 섹션 존재 → PASS"""
         with tempfile.TemporaryDirectory() as d:
-            _make_report(d, "noah-sast-report", 2, chain=True)
-            r = self._run(["2", "--chain-analysis"], d)
+            ml = _make_report(d, "noah-sast-report", 2, chain=True)
+            r = self._run(["2", "--chain-analysis", "--master-list", ml], d)
             self.assertEqual(r.returncode, 0, f"stdout: {r.stdout}")
             self.assertIn("chain-analysis", r.stdout)
 

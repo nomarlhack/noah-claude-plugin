@@ -126,12 +126,14 @@ class TestBuildMasterList(unittest.TestCase):
             self.assertIn("NO_MANIFEST", r.stdout)
 
     def test_no_args(self):
-        """인자 없이 실행 → Usage + exit 1"""
+        """인자 없이 실행 → argparse 인자 누락 에러 + exit 2"""
         r = subprocess.run(
             ["python3", SCRIPT], capture_output=True, text=True, timeout=10,
         )
-        self.assertEqual(r.returncode, 1)
-        self.assertIn("Usage", r.stderr)
+        # 필수 위치 인자(phase1_dir, output_json) 누락 시 argparse 표준 종료코드 2.
+        # (처리 단계 오류는 exit 1 — test_invalid_json / test_no_manifest 참조)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("usage", r.stderr)
 
     def test_chain_analysis_excluded(self):
         """chain-analysis.md는 수집 대상에서 제외 (Phase 1 manifest 형식이 아님)"""
