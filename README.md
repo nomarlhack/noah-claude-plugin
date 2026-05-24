@@ -176,83 +176,84 @@ phase2-review (증거 해석)
 
 ## Phase 1 정/오탐 판별 방법 (Safe-by-Proof)
 
-위 "판단 기준"이 **출력**(status/tag)을 정의한다면, 이 절은 매치 1건이 후보/안전으로 **분류되는 방법**을 설명합니다. 단일 판정이 아니라 **6층 깔때기**이며, 각 층이 서로 다른 오분류(특히 정탐을 놓치는 FN)를 잡습니다.
+앞의 "판단 기준"이 최종 결과를 무엇으로 출력하는지(status·tag)를 정의했다면, 이 절은 매치 한 건이 후보 또는 안전으로 **어떻게 분류되는지**를 설명합니다. 분류는 한 번의 판정이 아니라 여섯 개의 층을 차례로 통과하는 깔때기 구조이며, 각 층은 서로 다른 종류의 오분류를 잡아냅니다. 특히 정탐을 안전으로 잘못 떨구는 미탐(놓침)을 막는 데 초점이 있습니다.
 
-> **설계 철학 3가지**
-> 1. **입증책임 역전** — "취약"이 기본값, "안전"은 증거로 입증. 의심·이행불가·미확인은 모두 후보 유지.
-> 2. **삭제 대신 랭킹** — "안전"은 최하위 신뢰 밴드일 뿐 삭제가 아님. 인벤토리·DAST 입력으로 남음.
-> 3. **비대칭(FN > FP)** — 후보 유지는 싸게, 안전 단정은 비싸게. FP는 후속 단계가 거르지만(회복 가능) FN은 회복 불가.
+이 구조를 관통하는 원칙은 세 가지입니다.
 
-### 6층 깔때기
+> 1. **입증책임 역전** — 모든 매치를 일단 "취약"으로 간주하고, "안전"으로 분류하려면 증거를 제시하게 합니다. 의심스럽거나, 증명할 수 없거나, 아직 확인하지 못한 경우는 모두 후보로 남깁니다.
+> 2. **삭제 대신 순위 매기기** — "안전"으로 분류해도 목록에서 지우지 않습니다. 가장 낮은 신뢰 등급으로 내려둘 뿐이며, 검토 인벤토리와 동적 진단의 입력으로 계속 남습니다.
+> 3. **비대칭 (놓침을 더 무겁게)** — 후보로 남기는 비용은 낮게, 안전으로 단정하는 비용은 높게 설계했습니다. 오탐은 뒤 단계에서 걸러낼 수 있어 회복 가능하지만, 정탐을 놓치면 되돌릴 수 없기 때문입니다.
+
+### 여섯 층 깔때기
 
 ```
 semgrep 매치(tier+rule_ids) → [1]tier 분기 → [2]의무 판정 → [3]볼륨 전수처리
    → [4]master-list → [5]블라인드 재판정 → [6]기계 게이트 → Phase 2 동적 확정
 ```
 
-### 각 판별 방법 (개별 설명)
+### 각 판별 방법
 
 **[1] tier 자동 분기** (`decision-framework.md §1`)
-매치를 탐지 방식별 신뢰도로 분기. 같은 토큰도 탐지 방식에 따라 신뢰도가 다름.
-- `taint` — dataflow가 source(사용자입력)→sink 도달 + sanitizer 부재까지 추적 확정. **자동 후보**(재판단 안 함, LLM 변동성 제거).
-- `ast` — 언어 파서가 실제 구문 매치(주석/문자열 오매치 제외). 위치는 정확하나 source/sanitizer 미확인 → 5단계 검토.
-- `generic` — 정규식 텍스트 매치(언어 무관). 주석·문자열·유사 이름도 매치 → 노이즈 多, 최저 신뢰.
+semgrep이 매치를 찾아낸 방식에 따라 신뢰도를 세 등급으로 나눕니다. 같은 토큰이라도 어떻게 탐지됐는지에 따라 신뢰도가 달라지기 때문입니다.
+- `taint` — 데이터 흐름 분석이 사용자 입력(source)에서 위험 지점(sink)까지 도달하는 경로와, 그 사이에 정화 처리(sanitizer)가 없다는 사실까지 모두 확인한 경우입니다. 신뢰도가 가장 높아 자동으로 후보가 되며, 에이전트가 다시 판단하지 않습니다(판정이 흔들리는 것을 막습니다).
+- `ast` — 언어 파서가 실제 구문을 매치한 경우로, 주석이나 문자열 안의 오매치는 걸러집니다. 위치는 정확하지만 입력의 출처와 정화 여부는 아직 모르므로 추가 검토가 필요합니다.
+- `generic` — 정규식으로 글자만 맞춰본 경우입니다. 주석·문자열·비슷한 이름까지 매치되어 노이즈가 많고, 신뢰도가 가장 낮습니다.
 
-**[2] Safe-by-Proof 의무 모델 O1~O4** (`§2-D`)
-"안전(제외)"으로 분류하려면 4개 의무를 **모두 증거로 이행**. 하나라도 미이행이면 후보 유지.
-| 의무 | 안전 인정 조건 | 이행 불가 = 후보 |
+**[2] 의무 모델 O1~O4** (`§2-D`)
+어떤 매치를 "안전"으로 분류하려면 아래 네 가지 의무를 **모두 증거로 충족**해야 합니다. 하나라도 충족하지 못하면 후보로 남깁니다.
+| 의무 | 안전으로 인정받는 조건 | 충족 못 하면 후보 |
 |---|---|---|
-| O1 source 비제어 | 입력이 상수/내부/기검증임을 입증 | 외부 입력 표면에 닿음 |
-| O2 도달성 | sink가 진입점에서 도달 불가 입증 | 람다/reflection/2차 등 **엔진이 눈먼(blind) 경계** = 도달불가 아님 |
-| O3 sanitization | 유효 sanitizer가 모든 경로 지배 입증 | 부분 방어·우회·미적용 경로 |
-| O4 capability | 그 위치가 위험 sink가 아님 입증 | sink 능력 실재 |
+| O1 입력 비제어 | 입력이 상수·내부 생성·이미 검증된 값임을 입증 | 외부 입력 경로에 닿아 있음 |
+| O2 도달 가능성 | sink가 진입점에서 도달 불가능함을 입증 | 람다·리플렉션·2차 흐름 등 분석 엔진이 추적하지 못하는 구간은 "도달 불가"가 아니라 "확인 못 함" |
+| O3 정화 처리 | 유효한 정화 처리가 모든 경로를 덮는다는 것을 입증 | 일부만 막거나, 우회 가능하거나, 적용 안 된 경로가 있음 |
+| O4 위험성 | 그 위치가 실제 위험 지점이 아님을 입증 | 위험한 동작이 실제로 존재함 |
 
-**[3] 볼륨 전수처리** (`§6-A-2` 커버리지 + `§2-D` 의무)
-매치 수천~수만 건도 "모든 매치를 설명(account-for-all)". 노이즈는 **동질 클래스로 일괄 제외(증거 첨부)**, 능력형 토큰(eval/system/innerHTML)은 클래스로 못 뭉개고 전수 disposition. 비동질 클래스(같은 토큰이 안전·위험 양쪽) 일괄 제외 금지.
+**[3] 볼륨 전수 처리** (`§6-A-2` 커버리지 + `§2-D` 의무)
+매치가 수천에서 수만 건에 이르더라도 한 건도 빠짐없이 설명해야 합니다. 노이즈는 같은 성격끼리 묶어 근거와 함께 한꺼번에 제외하되, `eval`·`system`·`innerHTML`처럼 그 자체로 위험한 토큰은 묶어서 버릴 수 없고 하나하나 판정합니다. 안전한 것과 위험한 것이 한 묶음에 섞여 있으면, 그 묶음을 통째로 제외해서는 안 됩니다.
 
-**[4] deviance 신호** (`§2-D 원칙4`, Engler "bugs as deviant behavior")
-코드베이스가 스스로 지키는 다수 관례가 곧 명세. 다수가 방어를 갖췄는데 소수가 누락하면 그 소수는 **고신뢰 후보**(IDOR_ASYMMETRIC이 대표). 다수 안전성이 일탈자 안전성을 증명하지 않음.
+**[4] 관례 일탈(deviance) 신호** (`§2-D 원칙4`)
+코드베이스가 스스로 지키는 다수의 관례가 곧 그 코드의 명세입니다. 대부분의 위치는 방어를 갖췄는데 일부만 빠졌다면, 그 일부는 신뢰도 높은 후보입니다(대표 사례가 `IDOR_ASYMMETRIC`). 다수가 안전하다는 사실이 그 예외의 안전을 증명해 주지는 않기 때문입니다.
 
-**[5] 블라인드 phase1-review**
-독립 에이전트가 Phase 1의 "후보 사유"를 **보지 않고** 코드·evidence만으로 재판정(CONFIRM/OVERRIDE/DISCARD). [2][3]의 분류가 틀린 경우(정확성 오류)를 잡음.
+**[5] 블라인드 재검토** (`phase1-review`)
+독립된 에이전트가 Phase 1이 적어 둔 "후보 사유"를 보지 않은 채, 코드와 증거만으로 다시 판정합니다(유지·번복·폐기). 앞의 [2][3]에서 분류 자체가 틀린 경우를 잡아내는 단계입니다.
 
-**[6] 기계 게이트** (`tools/phase1_review_assert.py`, 위반 시 exit 7 차단)
-locindex를 ground truth로 써서 우회·과소신고 불가하게 **완전성**을 강제:
-- **커버리지 감사** — 고볼륨 스캐너가 모든 매치를 설명했는가
-- **의무 감사(OBLIGATION)** — capability 스캐너가 능력형 매치를 전수 disposition 했는가 (아래 표)
-- **taint-safe tripwire** — taint(최고신뢰)인데 safe 분류된 후보가 정당 사유+증거를 갖췄는가
+**[6] 기계 게이트** (`tools/phase1_review_assert.py`, 위반 시 종료 코드 7로 차단)
+`locindex`를 기준값으로 삼아, 우회하거나 축소 신고할 수 없도록 "빠짐없음"을 강제합니다. 세 가지를 검사합니다.
+- **커버리지 감사** — 고볼륨 스캐너가 모든 매치를 설명했는지 확인합니다.
+- **의무 감사** — capability 스캐너가 위험 토큰을 한 건도 빠짐없이 판정했는지 확인합니다(아래 표).
+- **taint-safe 감지** — 가장 신뢰도 높은 taint 매치를 안전으로 분류했다면, 정당한 사유와 증거가 있는지 확인합니다.
 
-> **두 종류의 보장**: [1][3][6]은 **기계적(hard)** — 완전성("빠짐없이 다뤘는가")을 강제. [2][4][5]는 **판단(soft)** — 정확성("분류가 맞는가")을 검증. 완전성만으론 부족(실측: PHP eval 295건을 "전부 클라JS"로 설명해 게이트는 통과했으나 분류가 틀려 RCE 누락 → 블라인드가 잡음). 그래서 두 보장을 직렬로 쌓음.
+> **두 종류의 보장이 함께 작동합니다.** [1][3][6]은 기계가 강제하는 "빠짐없음(완전성)"을 책임지고, [2][4][5]는 사람과 모델이 판단하는 "분류의 정확성"을 책임집니다. 완전성만으로는 부족합니다. 실제로 PHP의 `eval` 295건을 "전부 클라이언트 JS"라고 설명해 게이트는 통과했지만, 분류가 틀려 원격 코드 실행을 놓친 적이 있고, 이를 블라인드 재검토가 잡아냈습니다. 그래서 두 보장을 직렬로 쌓습니다.
 
 ### 스캐너별 적용 방법
 
-**공통 층(47개 모두)**: [1]tier 분기 · [2]의무 O1~O4 · [3]커버리지 감사(>200건) · [4]deviance · [5]블라인드 · [6]tripwire. 아래는 **스캐너별로 다른** 부분.
+47개 스캐너는 모두 위의 여섯 층을 공통으로 거칩니다([3] 커버리지 감사는 매치가 200건을 넘을 때 적용됩니다). 아래는 스캐너마다 달라지는 부분입니다.
 
-**A. capability — 기계 OBLIGATION 게이트 (6개)**
-능력형 토큰(매치=위험동작 실재)을 클래스로 못 뭉갬. 게이트가 전수 disposition 강제.
+**A. 능력형 — 기계 게이트가 전수 판정을 강제 (6개)**
+매치 자체가 위험한 동작의 존재를 뜻하는 스캐너입니다. 위험 토큰을 묶어서 버릴 수 없고, 게이트가 한 건도 빠짐없이 판정하도록 강제합니다.
 
-| 스캐너 | taint | sink룰 | 게이트 모드 |
+| 스캐너 | taint 룰 | sink 룰 | 게이트 방식 |
 |---|---|---|---|
-| command-injection | 4 | 5 (php/ruby/python/java/kotlin) | OBLIGATION (sink룰) |
-| xss | 4 | 2 (js/ts) | OBLIGATION (sink룰) |
-| ssti | 3 | 3 (java/kotlin/ruby) | OBLIGATION (sink룰) |
-| dom-xss | 1 | 2 (js/ts) | OBLIGATION (sink룰) |
-| code-injection | 3 | — | OBLIGATION (ast 전체=eval/assert) |
-| deserialization | 3 | — | OBLIGATION (ast 전체=unserialize/readObject) |
+| command-injection | 4 | 5 (php/ruby/python/java/kotlin) | sink 룰 매치를 집계 |
+| xss | 4 | 2 (js/ts) | sink 룰 매치를 집계 |
+| ssti | 3 | 3 (java/kotlin/ruby) | sink 룰 매치를 집계 |
+| dom-xss | 1 | 2 (js/ts) | sink 룰 매치를 집계 |
+| code-injection | 3 | — | ast 등급 전체를 집계 (eval·assert) |
+| deserialization | 3 | — | ast 등급 전체를 집계 (unserialize·readObject) |
 
-> **sink-mode vs ast-mode**: code-injection/deserialization은 ast-tier가 곧 능력형(eval 등 정밀)이라 ast 전체를 집계. xss/ssti/command-injection/dom-xss는 broad-pattern ast에 노이즈가 수천 건 섞여(`Template(`/출력컨텍스트/`@RequestParam`) **고정밀 `-sink` 룰**로 능력형만 분리 집계(실측: ssti broad ast 1131 → sink 1, command-inj 897 → 0).
+> code-injection과 deserialization은 ast 등급 자체가 곧 위험 토큰(eval 등)이라 ast 전체를 집계합니다. 반면 xss·ssti·command-injection·dom-xss는 넓은 패턴이 만드는 ast에 노이즈가 수천 건 섞이므로(예: `Template(` 생성자, 출력 컨텍스트, `@RequestParam`), 고정밀 `-sink` 룰로 위험 토큰만 따로 집계합니다. 실측으로 ssti는 넓은 ast 1131건 가운데 sink가 1건, command-injection은 897건 가운데 0건이었습니다.
 
-**B. absence — 부재 탐지 (검증 누락)**
-sink가 없어 토큰 게이트 불가. "검증이 누락됐는가"를 찾음.
+**B. 부재형 — 있어야 할 검증이 빠졌는지 탐지**
+위험 지점(sink)이 따로 없어 토큰 기반 게이트를 쓸 수 없고, "있어야 할 검증이 누락됐는가"를 찾습니다.
 
 | 스캐너 | 판별 방법 |
 |---|---|
-| idor | taint 룰(java/kotlin, 외부입력 어노테이션 7종 source) + **`idor_inventory.py` 2-모드**(taint ledger + 컨트롤러 source-only 전수 스캔) + 게이트 범위 적정성 + deviance(ASYMMETRIC) |
-| csrf | protect_from_forgery / skip 예외 추적 |
-| business-logic / validation-logic | locindex 없음 — 의미 분석(상태전이·mass-assignment·검증 비대칭) |
+| idor | taint 룰(java/kotlin, 외부 입력 어노테이션 7종을 source로 인식) + **`idor_inventory.py` 두 모드**(taint 원장 + 컨트롤러 전수 스캔) + 게이트 범위 적정성 확인 + 관례 일탈 신호 |
+| csrf | `protect_from_forgery` 적용과 그 예외(`skip`) 추적 |
+| business-logic / validation-logic | locindex 없이 코드 의미를 분석(상태 전이, 대량 할당, 검증 비대칭) |
 
-**C. injection — taint 위주 (안전 형태 구분)**
-위험 토큰 + 위험 형태(문자열 보간/연결/사용자 host)만 후보. 안전 형태(파라미터 바인딩/상수 host)는 증거 첨부 후 제외.
+**C. 주입형 — taint 위주로, 위험한 형태만 후보**
+위험 토큰이 위험한 형태(문자열 보간·연결, 사용자가 정한 host)로 쓰일 때만 후보로 올립니다. 파라미터 바인딩이나 상수 host처럼 안전한 형태는 증거를 붙여 제외합니다.
 
 | 스캐너 | taint 룰 수 |
 |---|---|
@@ -262,9 +263,9 @@ sink가 없어 토큰 게이트 불가. "검증이 누락됐는가"를 찾음.
 | crlf-injection · ldap-injection · xpath-injection | 2 |
 | nosqli · file-upload | 1 · 0 |
 
-**D. 공통 층 + pattern 룰만 (나머지 ~30개)**
-taint/sink 룰 없이 pattern(ast)/generic 룰 + 공통 층으로 검토. 다수가 **설정형(config)** — "플랫폼/인프라가 방어할 것" 단정 금지, 미확인 시 후보 유지(PLATFORM_DEFENSE):
-`tls` · `security-headers` · `cookie-security` · `springboot-hardening` · `http-smuggling` · `sourcemap` · `subdomain-takeover` · `host-header` · `http-method-tampering` · `csv-injection` · `jwt` · `oauth` · `saml` · `redos` · `prototype-pollution` · `graphql`(1 taint) · `websocket` · `xslt-injection` · `soapaction-spoofing` · `android-deeplink` · `zipslip` · `pdf-generation` · `prompt-injection`(2) · `system-prompt-leakage` · `insecure-output-handling`(1) · `unbounded-consumption` · `css-injection`
+**D. 공통 층과 패턴 룰로만 검토 (나머지 약 30개)**
+taint나 sink 룰 없이 패턴(ast)·generic 룰과 공통 층으로 검토합니다. 상당수가 설정 점검형이며, "플랫폼이나 인프라가 알아서 막아 줄 것"이라고 단정하지 않고, 확인되지 않으면 후보로 남깁니다(`PLATFORM_DEFENSE`).
+`tls` · `security-headers` · `cookie-security` · `springboot-hardening` · `http-smuggling` · `sourcemap` · `subdomain-takeover` · `host-header` · `http-method-tampering` · `csv-injection` · `jwt` · `oauth` · `saml` · `redos` · `prototype-pollution` · `graphql` · `websocket` · `xslt-injection` · `soapaction-spoofing` · `android-deeplink` · `zipslip` · `pdf-generation` · `prompt-injection` · `system-prompt-leakage` · `insecure-output-handling` · `unbounded-consumption` · `css-injection`
 
 ## 스캐너 목록
 
