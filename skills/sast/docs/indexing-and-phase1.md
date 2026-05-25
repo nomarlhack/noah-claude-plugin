@@ -10,7 +10,7 @@ flowchart TD
 
     subgraph IDX ["semgrep_index.py"]
         direction TB
-        A1["① rule_id → tier 결정\n-taint  → taint\n-sink   → ast\n-pattern → ast\n그 외   → generic"]
+        A1["① rule_id → tier 결정\n...-taint           → taint\nnoa-{lang}-...-pattern → ast\nnoa-...-phase1-pattern → generic\n그 외               → ast"]
         A2["② 같은 file:line 병합\ntier 승격 (taint > ast > generic)\nrule_ids 배열로 모두 보존"]
         A1 --> A2
     end
@@ -117,9 +117,9 @@ tier는 semgrep이 어떤 방식으로 매칭했는지를 나타냅니다. 룰 I
 
 | tier | 결정 기준 | 의미 |
 |------|-----------|------|
-| `taint` | 룰 ID에 `-taint` 포함 | dataflow 분석으로 source→sink 흐름까지 확정. 신뢰도 최고 |
-| `ast` | 룰 ID에 `-sink` 또는 `-pattern` 포함 | 언어 파서로 구문 매칭. 위치는 정확하나 source·sanitizer는 미확인 |
-| `generic` | 그 외 | 정규식 매칭. 노이즈가 많고 신뢰도 최저 |
+| `taint` | rule_id가 `-taint`로 끝남 | dataflow 분석으로 source→sink 흐름 확정. 신뢰도 최고 |
+| `ast` | rule_id에 언어 prefix 포함 (`noah-javascript-...`, `noah-java-...` 등) 또는 `-taint`가 아닌 그 외 | 언어 파서로 구문 매칭. 위치는 정확하나 source·sanitizer는 미확인 |
+| `generic` | rule_id가 `noah-<slug>-phase1-pattern` 형식이고 언어 prefix 없음 (예: `noah-xss-phase1-pattern`) | 범용 정규식 매칭. 언어 무관, 노이즈가 많고 신뢰도 최저 |
 
 ---
 

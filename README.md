@@ -124,7 +124,7 @@ flowchart TD
 
     subgraph IDX ["semgrep_index.py"]
         direction TB
-        A1["① rule_id → tier 결정\n-taint  → taint\n-sink   → ast\n-pattern → ast\n그 외   → generic"]
+        A1["① rule_id → tier 결정\n...-taint           → taint\nnoa-{lang}-...-pattern → ast\nnoa-...-phase1-pattern → generic\n그 외               → ast"]
         A2["② 같은 file:line 병합\ntier 승격 (taint > ast > generic)\nrule_ids 배열로 모두 보존"]
         A1 --> A2
     end
