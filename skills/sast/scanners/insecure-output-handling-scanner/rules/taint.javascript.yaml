@@ -1,0 +1,81 @@
+rules:
+  - id: noah-javascript-ioh-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      LLM 응답(openai/anthropic/langchain/Vercel AI SDK 결과)이 검증 없이
+      eval/innerHTML/document.write/exec/res.send에 직접 흐르면 Insecure Output
+      Handling → XSS/RCE/Injection. (LLM05:2025)
+      안전: LLM 출력 스키마 검증(zod), DOMPurify.sanitize, 샌드박스, 출력 인코딩.
+    pattern-sources:
+      # OpenAI / Azure OpenAI
+      - pattern: $RESP.choices[0].message.content
+      - pattern: $RESP.choices[$I].message.content
+      - pattern: $RESP.data.choices[0].message.content
+      # Anthropic
+      - pattern: $RESP.content[0].text
+      - pattern: $RESP.completion
+      # Google Generative AI / Vertex AI
+      - pattern: $RESP.text()
+      - pattern: $RESP.candidates[0].content.parts[0].text
+      # Vercel AI SDK
+      - pattern: $RESULT.text
+      - pattern: $RESULT.textStream
+      # LangChain JS
+      - pattern: await $LLM.invoke($Q)
+      - pattern: await $CHAIN.invoke($Q)
+      - pattern: await $CHAIN.call($Q)
+
+    pattern-sinks:
+      # DOM-based XSS
+      - pattern: $EL.innerHTML
+      - pattern: document.write($X)
+      - pattern: document.writeln($X)
+      - pattern: $EL.outerHTML
+      - pattern: $EL.insertAdjacentHTML($POS, $X)
+      # Code execution
+      - pattern: eval($X)
+      - pattern: new Function($X)
+      - pattern: vm.runInNewContext($X, ...)
+      # Node.js child process
+      - pattern: exec($X, ...)
+      - pattern: execSync($X, ...)
+      - pattern: child_process.exec($X, ...)
+      # SQL
+      - pattern: $CONN.query($X, ...)
+      - pattern: $POOL.query($X, ...)
+      # HTTP 응답에 raw 삽입
+      - pattern: res.send($X)
+      - pattern: "res.json({..., $K: $X, ...})"
+
+    pattern-sanitizers:
+      - pattern: DOMPurify.sanitize($X)
+      - pattern: JSON.parse($X)
+      - pattern: Number($X)
+      - pattern: parseInt($X, ...)
+      - pattern: $SCHEMA.parse($X)
+      - pattern: $SCHEMA.safeParse($X)
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-79: XSS"
+        - "CWE-94: Code Injection"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Insecure Output Handling
+      owasp:
+        - "LLM05:2025 Improper Output Handling"
+      technology:
+        - nodejs
+        - openai
+        - anthropic
+        - langchain
+        - vercel-ai

@@ -1,0 +1,57 @@
+rules:
+  - id: noah-javascript-ldap-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js에서 req.* 입력이 ldapjs client.search / ldap-authentication 필터에
+      문자열 결합으로 들어가면 LDAP Injection. 안전: ldapjs.escape(), 입력 화이트리스트.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.query[$X]
+      - pattern: req.params
+      - pattern: req.params.$X
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: searchParams.get($K)
+      - pattern: request.query[$K]
+
+    pattern-sinks:
+      # ldapjs
+      - pattern: $CLIENT.search($BASE, $OPTS, ...)
+      - pattern: $CLIENT.bind($DN, ...)
+      - pattern: ldap.createClient($OPTS).search($BASE, $X, ...)
+      # activedirectory / ldap-authentication
+      - pattern: $AD.authenticate($USERNAME, $PASS, ...)
+      - pattern: $AD.findUser($X, ...)
+      - pattern: $AD.findGroup($X, ...)
+      - pattern: $AD.isUserMemberOf($X, ...)
+
+    pattern-sanitizers:
+      - pattern: ldap.escape($X)
+      - pattern: $X.replace(/[*\(\)\\&|!<>=~,+\-'";\s]/g, "")
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ([...].includes($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-90: Improper Neutralization of Special Elements used in an LDAP Query"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - nodejs
+        - ldapjs
+        - activedirectory

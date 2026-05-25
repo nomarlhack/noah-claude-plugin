@@ -1,0 +1,62 @@
+rules:
+  - id: noah-java-zipslip-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java에서 ZipEntry.getName() / TarArchiveEntry.getName()이 경로 정규화 없이
+      new File(destDir, entryName) / Paths.get 등 파일 write sink에 들어가면 Zip Slip.
+      공격자가 "../../../etc/cron.d/backdoor" 같은 경로를 압축 엔트리에 삽입해 임의
+      경로에 파일을 쓸 수 있음.
+      안전: entry.getName() → canonicalPath 비교 + destDir prefix 검증.
+    pattern-sources:
+      # ZipEntry
+      - pattern: $ENTRY.getName()
+      - pattern: zipEntry.getName()
+      - pattern: entry.getName()
+      # TarArchiveEntry (Apache Commons Compress)
+      - pattern: $TENTRY.getName()
+      - pattern: tarEntry.getName()
+
+    pattern-sinks:
+      - pattern: new File($DEST, $X)
+      - pattern: new File($X)
+      - pattern: Paths.get($DEST, $X)
+      - pattern: Paths.get($X)
+      - pattern: new FileOutputStream(new File($DEST, $X))
+      - pattern: new FileOutputStream($X)
+      - pattern: Files.newOutputStream(Paths.get($DEST, $X))
+      - pattern: Files.copy($IN, Paths.get($DEST, $X))
+
+    pattern-sanitizers:
+      # canonicalPath prefix 검증 패턴
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              File $F = new File($DEST, $X);
+              if (!$F.getCanonicalPath().startsWith($DEST)) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              String $CANON = new File($DEST, $X).getCanonicalPath();
+              if (!$CANON.startsWith($DEST)) { ... }
+      - pattern: FilenameUtils.getName($X)
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Path Traversal
+      owasp:
+        - "A01:2021 Broken Access Control"
+      technology:
+        - java
+        - commons-compress
+        - zip4j

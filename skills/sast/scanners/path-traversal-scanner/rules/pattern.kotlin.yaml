@@ -7,35 +7,25 @@ rules:
       path-traversal-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'fs\.readFile'
-      - pattern-regex: 'fs\.readFileSync'
-      - pattern-regex: 'fs\.createReadStream'
-      - pattern-regex: 'path\.join\s*\('
-      - pattern-regex: 'path\.resolve\s*\('
-      - pattern-regex: 'fs\.writeFile'
-      - pattern-regex: 'send_file'
-      - pattern-regex: 'render.*file:'
-      - pattern-regex: 'File\.open'
-      - pattern-regex: 'File\.read'
-      - pattern-regex: 'file_get_contents\s*\('
-      - pattern-regex: 'include\s*\('
-      - pattern-regex: 'require\s*\('
-      - pattern-regex: 'open\s*\('
-      - pattern-regex: 'readFile'
-      - pattern-regex: 'new File\s*\('
+      # JVM/Kotlin 파일 I/O sink
       - pattern-regex: 'Paths\.get\s*\('
-      - pattern-regex: 'Files\.newInputStream'
-      - pattern-regex: 'fs\.createWriteStream'
-      - pattern-regex: 'fs\.writeFileSync'
-      - pattern-regex: 'sendFile\s*\('
-      - pattern-regex: 'os\.Open\s*\('
-      - pattern-regex: 'os\.ReadFile\s*\('
-      - pattern-regex: 'os\.Create\s*\('
-      - pattern-regex: 'searchParams\.get\s*\('
+      - pattern-regex: 'Files\.newInputStream\s*\('
+      - pattern-regex: 'Files\.newOutputStream\s*\('
+      - pattern-regex: 'Files\.readAllBytes\s*\('
+      - pattern-regex: 'Files\.readAllLines\s*\('
+      - pattern-regex: 'Files\.write\s*\('
+      - pattern-regex: 'Files\.copy\s*\('
+      - pattern-regex: 'Files\.delete\s*\('
+      - pattern-regex: 'File\s*\('
+      - pattern-regex: 'FileInputStream\s*\('
+      - pattern-regex: 'FileOutputStream\s*\('
+      - pattern-regex: 'FileReader\s*\('
+      # Spring Resource/Download
+      - pattern-regex: 'ClassPathResource\s*\('
+      - pattern-regex: 'InputStreamResource\s*\('
+      # Spring source annotation
       - pattern-regex: '@RequestParam'
       - pattern-regex: '@PathVariable'
-      - pattern-regex: 'req\.query'
-      - pattern-regex: 'req\.params'
     metadata:
       category: security
       subcategory:

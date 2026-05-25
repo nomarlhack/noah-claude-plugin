@@ -1,0 +1,60 @@
+rules:
+  - id: noah-go-ssti-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go에서 HTTP 입력이 text/template.New().Parse(userInput) 또는 ExecuteTemplate에
+      템플릿 문자열로 직접 들어가면 SSTI → RCE. html/template은 XSS만 막고 템플릿
+      인젝션은 막지 못함. 안전: 템플릿 파일로 분리, 사용자 입력은 Execute 데이터로만 전달.
+    pattern-sources:
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.URL.Query()[$K]
+      - pattern: r.FormValue($K)
+      - pattern: mux.Vars(r)[$K]
+      - pattern: c.Query($K)
+      - pattern: c.Param($K)
+      - pattern: c.QueryParam($K)
+      - pattern: c.Params($K)
+      - pattern: chi.URLParam(r, $K)
+
+    pattern-sinks:
+      # text/template — Parse에 사용자 입력 직접 전달
+      - pattern: template.New($N).Parse($X)
+      - pattern: template.Must(template.New($N).Parse($X))
+      - pattern: $TMPL.Parse($X)
+      # html/template — XSS는 막지만 template injection은 가능
+      - pattern: htmltemplate.New($N).Parse($X)
+      - pattern: htmltemplate.Must(htmltemplate.New($N).Parse($X))
+      # fmt.Fprintf + template 혼합 (직접 HTTP 응답에 삽입)
+      - pattern: fmt.Fprintf($W, $X, ...)
+
+    pattern-sanitizers:
+      # 사용자 입력을 template.Execute의 data 인자로만 전달하는 것이 안전
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $TMPL, $ERR = template.ParseFiles(...)
+              ...
+              $TMPL.Execute($W, $X)
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - go
+        - net/http
+        - gin
+        - echo
+        - fiber

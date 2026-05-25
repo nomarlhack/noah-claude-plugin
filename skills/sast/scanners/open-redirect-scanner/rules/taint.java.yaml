@@ -1,0 +1,69 @@
+rules:
+  - id: noah-java-open-redirect-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력(@RequestParam/@PathVariable)이 response.sendRedirect /
+      RedirectView / "redirect:" 문자열에 직접 들어가면 Open Redirect.
+      안전: 상대 경로 강제, 호스트 화이트리스트, HttpUtils.isSafeRedirectUrl.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+
+    pattern-sinks:
+      - pattern: $RESP.sendRedirect($X)
+      - pattern: response.sendRedirect($X)
+      - pattern: new RedirectView($X)
+      - pattern: new RedirectView($X, ...)
+      - pattern: "\"redirect:\" + $X"
+      - pattern: ResponseEntity.status(HttpStatus.FOUND).location(URI.create($X)).build()
+      - pattern: ResponseEntity.status($S).location(URI.create($X)).build()
+      - pattern: HttpHeaders.setLocation(URI.create($X))
+
+    pattern-sanitizers:
+      - pattern: URI.create($X).getHost()
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($WHITELIST.contains($X)) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($X.startsWith("/")) { ... }
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-601: URL Redirection to Untrusted Site"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Open Redirect
+      owasp:
+        - "A01:2021 Broken Access Control"
+      technology:
+        - java
+        - spring

@@ -1,0 +1,64 @@
+rules:
+  - id: noah-javascript-xxe-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js에서 req.body / req.rawBody가 XML 파서(libxmljs2/DOMParser/xml2js)에
+      entity 확장 비활성화 없이 들어가면 XXE. 안전: libxmljs parseXmlString에서
+      noent:false, DOMParser에서 DTD/entity 처리 비활성.
+    pattern-sources:
+      - pattern: req.body
+      - pattern: req.rawBody
+      - pattern: req.body.toString()
+      - pattern: request.body
+      - pattern: request.text()
+
+    pattern-sinks:
+      # libxmljs2
+      - pattern: libxmljs.parseXmlString($X, ...)
+      - pattern: libxmljs.parseXml($X, ...)
+      - pattern: $XML.parseXmlString($X, ...)
+      # fast-xml-parser
+      - pattern: $PARSER.parse($X, ...)
+      - pattern: parse($X, ...)
+      # DOMParser (browser / xmldom)
+      - pattern: new DOMParser().parseFromString($X, ...)
+      - pattern: $DOM.parseFromString($X, ...)
+      # xml2js (기본 entity 확장이 있는 일부 버전)
+      - pattern: xml2js.parseString($X, ...)
+      - pattern: xml2js.parseStringPromise($X, ...)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              libxmljs.parseXmlString($X, { noent: false })
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              const $OPTS = { processEntities: false };
+              ...
+              $PARSER.parse($X)
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-611: Improper Restriction of XML External Entity Reference"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - XXE
+      owasp:
+        - "A05:2021 Security Misconfiguration"
+      technology:
+        - nodejs
+        - libxmljs2
+        - xml2js
+        - fast-xml-parser
+        - xmldom

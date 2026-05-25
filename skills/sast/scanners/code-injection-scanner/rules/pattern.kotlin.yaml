@@ -1,0 +1,32 @@
+rules:
+  - id: noah-kotlin-codeinj-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      code-injection-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+    pattern-either:
+      # JVM 스크립트 엔진 (ScriptEngine API)
+      - pattern-regex: 'ScriptEngineManager\s*\('
+      - pattern-regex: '\.eval\s*\('
+      - pattern-regex: 'ScriptEngine\.'
+      # Groovy 동적 실행
+      - pattern-regex: 'GroovyShell\s*\('
+      - pattern-regex: 'GroovyClassLoader\s*\('
+      # Spring Expression Language (SpEL) — 사용자 입력이 표현식으로 사용되는 경우
+      - pattern-regex: 'SpelExpressionParser\s*\('
+      - pattern-regex: 'parseExpression\s*\('
+      # Spring source annotation
+      - pattern-regex: '@RequestParam'
+      - pattern-regex: '@PathVariable'
+      - pattern-regex: '@RequestBody'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

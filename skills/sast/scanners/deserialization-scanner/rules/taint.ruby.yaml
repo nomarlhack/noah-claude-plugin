@@ -1,0 +1,57 @@
+rules:
+  - id: noah-ruby-deser-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby에서 HTTP 입력이 Marshal.load / YAML.load(unsafe) / JSON.load에 직접
+      들어가면 Insecure Deserialization → RCE. Marshal.load는 임의 객체를 복원해
+      __init__에 해당하는 initialize/marshal_load 훅으로 RCE 가능.
+      안전: Marshal 사용 금지, YAML.safe_load, JSON.parse.
+    pattern-sources:
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: request.params[$K]
+      - pattern: request.body.read
+      - pattern: request.raw_post
+
+    pattern-sinks:
+      # Marshal
+      - pattern: Marshal.load($X)
+      - pattern: Marshal.restore($X)
+      # YAML — safe_load는 안전, load는 위험
+      - pattern: YAML.load($X)
+      - pattern: YAML.load($X, ...)
+      # JSON.load — JSON.parse는 안전, load는 객체 복원
+      - pattern: JSON.load($X)
+      # MessagePack with allow_unknown_ext
+      - pattern: MessagePack.unpack($X)
+
+    pattern-sanitizers:
+      - pattern: YAML.safe_load($X)
+      - pattern: JSON.parse($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X.is_a?(String)
+                ...
+              end
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-502: Deserialization of Untrusted Data"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Deserialization
+      owasp:
+        - "A08:2021 Software and Data Integrity Failures"
+      technology:
+        - ruby
+        - rails
+        - sinatra

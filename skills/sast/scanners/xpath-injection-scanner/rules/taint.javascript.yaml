@@ -1,0 +1,61 @@
+rules:
+  - id: noah-javascript-xpath-taint
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    mode: taint
+    message: |
+      Node.js에서 req.* 입력이 xpath.select / document.evaluate XPath 식에
+      문자열 결합으로 들어가면 XPath Injection. 안전: 파라미터화 불가 시 입력 이스케이프.
+    pattern-sources:
+      - pattern: req.query
+      - pattern: req.query.$X
+      - pattern: req.query[$X]
+      - pattern: req.params
+      - pattern: req.params.$X
+      - pattern: req.body
+      - pattern: req.body.$X
+      - pattern: searchParams.get($K)
+      - pattern: request.query[$K]
+
+    pattern-sinks:
+      # xpath npm
+      - pattern: xpath.select($X, ...)
+      - pattern: xpath.select1($X, ...)
+      - pattern: xpath.evaluate($X, ...)
+      # xmldom / browser DOM
+      - pattern: $DOC.evaluate($X, ...)
+      - pattern: document.evaluate($X, ...)
+      # libxmljs2
+      - pattern: $DOC.find($X, ...)
+      - pattern: $NODE.get($X, ...)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ([...].includes($X)) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if (/^[a-zA-Z0-9_]+$/.test($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-643: Improper Neutralization of Data within XPath Expressions"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - nodejs
+        - xpath
+        - xmldom
+        - libxmljs2

@@ -1,0 +1,69 @@
+rules:
+  - id: noah-java-crlf-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력(@RequestParam/@PathVariable)이 response.setHeader /
+      addHeader / sendRedirect에 직접 들어가면 CRLF Injection (HTTP Response Splitting).
+      안전: 개행 문자 제거, 화이트리스트.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable(...) $X, ...) { ... }
+
+    pattern-sinks:
+      - pattern: response.setHeader($N, $X)
+      - pattern: response.addHeader($N, $X)
+      - pattern: $RESP.setHeader($N, $X)
+      - pattern: $RESP.addHeader($N, $X)
+      - pattern: response.sendRedirect($X)
+      - pattern: $RESP.sendRedirect($X)
+      - pattern: new Cookie($N, $X)
+      - pattern: ResponseEntity.ok().header($N, $X)
+      - pattern: ResponseEntity.status($S).header($N, $X)
+      - pattern: HttpHeaders.set($N, $X)
+      - pattern: HttpHeaders.add($N, $X)
+
+    pattern-sanitizers:
+      - pattern: $X.replaceAll("[\r\n]", "")
+      - pattern: $X.replace("\r\n", "").replace("\r", "").replace("\n", "")
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if (!$X.contains("\r") && !$X.contains("\n")) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($WHITELIST.contains($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-93: Improper Neutralization of CRLF Sequences"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - java
+        - spring

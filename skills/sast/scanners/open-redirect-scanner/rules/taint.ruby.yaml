@@ -1,0 +1,55 @@
+rules:
+  - id: noah-ruby-open-redirect-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby에서 params/request.params가 redirect_to/redirect/send_redirect에 직접
+      들어가면 Open Redirect. 안전: 상대 경로 강제, URI.parse + host 화이트리스트,
+      url_safe? 커스텀 헬퍼.
+    pattern-sources:
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: request.params[$K]
+
+    pattern-sinks:
+      # Rails
+      - pattern: redirect_to($X)
+      - pattern: redirect_to($X, ...)
+      - pattern: "redirect_to url: $X"
+      - pattern: "redirect_back(fallback_location: $X)"
+      # Sinatra / Rack
+      - pattern: redirect($X)
+      - pattern: redirect($X, ...)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X.start_with?("/")
+                ...
+              end
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $URI = URI.parse($X)
+              raise ... unless $WHITELIST.include?($URI.host)
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-601: URL Redirection to Untrusted Site"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Open Redirect
+      owasp:
+        - "A01:2021 Broken Access Control"
+      technology:
+        - ruby
+        - rails
+        - sinatra

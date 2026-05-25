@@ -1,0 +1,72 @@
+rules:
+  - id: noah-python-crlf-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력이 Flask/Django 응답 헤더에 직접 들어가면 CRLF Injection
+      (HTTP Response Splitting). 안전: 개행 문자 제거, 화이트리스트 검증.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.GET.get($K, ...)
+      - pattern: request.POST.get($K, ...)
+      - pattern: request.args[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form[$K]
+      - pattern: request.form.get($K, ...)
+      - pattern: request.values[$K]
+      - pattern: request.json
+      - pattern: request.data
+
+    pattern-sinks:
+      # Flask
+      - pattern: make_response($R, $X)
+      - pattern: $RESP.headers[$K]
+      - pattern: $RESP.headers.set($K, $X)
+      - pattern: redirect($X)
+      - pattern: flask.redirect($X)
+      # Django
+      - pattern: HttpResponseRedirect($X)
+      - pattern: "HttpResponse(headers={$K: $X})"
+      - pattern: $RESP[$K]
+      # FastAPI / Starlette
+      - pattern: RedirectResponse($X)
+      - pattern: "RedirectResponse(url=$X)"
+      - pattern: "Response(headers={$K: $X})"
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $X = $X.replace("\r", "").replace("\n", "")
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              import re
+              $X = re.sub(r'[\r\n]', '', $X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X.startswith("/"):
+                  ...
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-93: Improper Neutralization of CRLF Sequences"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - python
+        - flask
+        - django
+        - fastapi

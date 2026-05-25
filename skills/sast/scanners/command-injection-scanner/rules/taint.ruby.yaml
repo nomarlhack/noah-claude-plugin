@@ -1,0 +1,68 @@
+rules:
+  - id: noah-ruby-cmdi-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby에서 params/request.params가 system()/exec()/IO.popen()/%x{}/backtick에
+      직접 들어가면 OS Command Injection → RCE. 안전: 인자를 배열로 분리
+      (system("cmd", arg1, arg2)), shellescape, 화이트리스트.
+    pattern-sources:
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: request.params[$K]
+      - pattern: env["QUERY_STRING"]
+
+    pattern-sinks:
+      # Kernel 메서드
+      - pattern: system($X)
+      - pattern: system($X, ...)
+      - pattern: exec($X)
+      - pattern: exec($X, ...)
+      - pattern: spawn($X)
+      - pattern: spawn($X, ...)
+      # IO.popen
+      - pattern: IO.popen($X, ...)
+      - pattern: IO.popen($X)
+      # Open3
+      - pattern: Open3.capture2($X, ...)
+      - pattern: Open3.capture3($X, ...)
+      - pattern: Open3.popen2($X, ...)
+      - pattern: Open3.popen3($X, ...)
+      - pattern: Open3.pipeline($X, ...)
+      # Backtick / %x{} — semgrep에서 backtick은 pattern-regex로만 커버 가능하므로
+      # source→sink 연결은 pattern 룰과 병행 사용
+      - pattern: "%x($X)"
+      # PTY
+      - pattern: PTY.spawn($X, ...)
+
+    pattern-sanitizers:
+      - pattern: Shellwords.escape($X)
+      - pattern: $X.shellescape
+      - pattern: $X.to_i
+      - pattern: Integer($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $WHITELIST.include?($X)
+                ...
+              end
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Command Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - ruby
+        - rails
+        - sinatra
