@@ -233,8 +233,6 @@ Sink-first 분석 완료 후, Source-first 탐색을 수행한다.
 
 ## 지침 8: 후보 판정 제외 기준
 
-> **적용 제외**: phase1.md frontmatter에 `archetype: presence`가 선언된 스캐너는 이 지침을 적용하지 않는다(`decision-framework.md §3 presence 아키타입`). 나머지 모든 스캐너에는 적용된다.
-
 다음에 해당하면 후보로 등록하지 않는다.
 
 - 서버 침해, API 응답 변조, MITM 등 외부 전제 조건이 필요한 경우
