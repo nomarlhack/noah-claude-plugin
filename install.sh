@@ -117,7 +117,7 @@ if command -v python3 >/dev/null 2>&1; then
 fi
 
 # semgrep 확인 — Phase 1 패턴 인덱싱의 핵심 의존성
-# (47개 중 46개 스캐너가 semgrep 룰 기반. 없으면 룰 기반 탐지가 사실상 비활성화됨)
+# (49개 중 48개 스캐너가 semgrep 룰 기반. 없으면 룰 기반 탐지가 사실상 비활성화됨)
 if command -v semgrep >/dev/null 2>&1; then
   SEMGREP_VER=$(semgrep --version 2>/dev/null | head -1 | tr -d '[:space:]')
   ok "semgrep 확인 (v$SEMGREP_VER)"
@@ -204,8 +204,8 @@ ERRORS=0
 [ -d "$INSTALL_DIR/skills/sast/tools" ]    || { warn "skills/sast/tools/ 누락"; ERRORS=$((ERRORS+1)); }
 
 SCANNER_COUNT=$(ls -d "$INSTALL_DIR/skills/sast/scanners"/*-scanner 2>/dev/null | wc -l | tr -d ' ')
-if [ "$SCANNER_COUNT" -lt 46 ]; then
-  warn "스캐너가 ${SCANNER_COUNT}개뿐입니다. (기대값: 47개)"
+if [ "$SCANNER_COUNT" -lt 48 ]; then
+  warn "스캐너가 ${SCANNER_COUNT}개뿐입니다. (기대값: 49개)"
   ERRORS=$((ERRORS+1))
 fi
 

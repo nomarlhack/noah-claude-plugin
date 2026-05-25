@@ -43,3 +43,28 @@ curl "https://target/api/users?id='; DROP TABLE users--"
 
 - **실증**: 개행 삽입 후 실제 로그 파일에서 위조된 라인 확인이 어려우면, 응답에 로그 내용이 반영되는지 확인
 - **민감 정보**: 로그 파일 접근 없이도 "비밀번호 파라미터가 로그에 기록된다"는 코드 증거만으로 confirmed 처리 가능
+
+### Phase 2 결과 파일 형식
+
+```markdown
+<!-- NOAH-SAST PHASE2 MANIFEST v2 -->
+```json
+{
+  "scanner": "log-injection-scanner",
+  "schema_version": 2,
+  "results": [
+    {
+      "id": "LOGINJ-1",
+      "evidence": {
+        "commands": ["curl -X POST 'https://target/login' -d 'username=admin%0aINFO+Login+success&password=wrong'"],
+        "responses": {"http_status": 401, "body_excerpt": "{\"error\": \"invalid credentials\"}"},
+        "observations": ["CRLF 삽입 후 로그 위조 여부 확인 필요 — 로그 파일 직접 접근 불가"]
+      }
+    }
+  ]
+}
+```
+<!-- /NOAH-SAST PHASE2 MANIFEST -->
+```
+
+> **민감 정보 로깅의 경우**: 동적 테스트 불필요 — `commands: []`, `observations: ["소스코드 X:Y에서 request.POST.get('password') → logger.warning 직접 기록 확인"]`으로 기록.

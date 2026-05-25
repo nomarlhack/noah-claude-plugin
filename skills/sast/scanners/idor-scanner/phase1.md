@@ -188,4 +188,5 @@ python3 <NOAH_SAST_DIR>/tools/idor_inventory.py \
    - Go (net/http, Gin, Echo): URL path 변수, `r.URL.Query()`, `r.Header.Get`, body bind, `c.Param`/`c.Query`/`c.GetHeader`
 2. **이름 카탈로그(`*Id`/`accountId` 등) 금지.** 어노테이션/입력 표지가 곧 신뢰 경계다. 식별자 역할 판정은 "값이 달라지면 다른 사람 리소스 접근?"으로.
 3. **인벤토리 도구는 두 모드 병행.** semgrep taint는 람다 클로저·DTO 필드·체이닝에서 추적 한계가 있다(엔진 무관 보편 한계). 그래서 dataflow 확정분(taint) + 컨트롤러 source-only 스캔(전수 안전망)을 합쳐야 FN 0에 가까워진다. 새 언어 컨트롤러 스캔 휴리스틱은 그 언어의 매핑·시그니처 문법에 맞게 추가한다(`idor_inventory.py` 확장).
+   > **도구 한계 (현재)**: `idor_inventory.py` 컨트롤러 전수 스캔(모드 2)은 **Java/Kotlin Spring** 전용 어노테이션만 지원한다. Python(Django/Flask/FastAPI)·Node.js(Express/Fastify) 프로젝트는 taint 룰(모드 1)만 사용 가능하며, taint가 추적하지 못하는 흐름(DTO 필드·람다 바인딩 등)은 **에이전트가 source-first 패턴 탐색(Step 6-B-2)으로 직접 보완**해야 한다.
 4. **인증 부재 진입점도 IDOR 의미론에 포함.** 인증 자체가 없는 상태에서 외부 식별자 수용은 결과적으로 cross-user 접근과 동일. 룰 source 패턴이 잡으면 `IDOR_GATE_UNVERIFIED`(또는 `AUTH_BYPASS`) 후보.
