@@ -1,0 +1,47 @@
+rules:
+  - id: noah-hardcoded-secrets-phase1-pattern
+    severity: ERROR
+    languages:
+      - generic
+    message: |
+      하드코딩된 비밀값 감지 — 코드에 직접 삽입된 API key/password/token/private key.
+      버전 관리 시스템에 영구 기록되어 모든 접근자에게 노출됨.
+      환경 변수(os.environ, process.env) 또는 시크릿 매니저로 이전하세요.
+    pattern-either:
+      # API Key 패턴 — 공급자별 prefix 포함 고엔트로피 값
+      - pattern-regex: '(?i)(api[_-]?key|apikey)\s*[=:]\s*[''"][a-zA-Z0-9_\-]{20,}[''"]'
+      - pattern-regex: '(?i)(secret[_-]?key|secret_access_key)\s*[=:]\s*[''"][a-zA-Z0-9_\-/+]{20,}[''"]'
+      - pattern-regex: '(?i)(access[_-]?token|auth[_-]?token|bearer[_-]?token)\s*[=:]\s*[''"][a-zA-Z0-9_\-\.]{20,}[''"]'
+      # 공급자별 알려진 prefix
+      - pattern-regex: '(?:sk|pk)[-_](test|live|prod)_[a-zA-Z0-9]{24,}'
+      - pattern-regex: 'sk-[a-zA-Z0-9]{48}'
+      - pattern-regex: 'ghp_[a-zA-Z0-9]{36}'
+      - pattern-regex: 'gho_[a-zA-Z0-9]{36}'
+      - pattern-regex: 'github_pat_[a-zA-Z0-9_]{82}'
+      - pattern-regex: 'AKIA[0-9A-Z]{16}'
+      - pattern-regex: 'AIzaSy[0-9A-Za-z\-_]{33}'
+      # DB 비밀번호 하드코딩
+      - pattern-regex: '(?i)(db[_-]?pass(word)?|database[_-]?pass(word)?|mysql[_-]?pass|postgres[_-]?pass)\s*[=:]\s*[''"][^${\s]{8,}[''"]'
+      # JWT secret 하드코딩
+      - pattern-regex: '(?i)(jwt[_-]?secret|token[_-]?secret|signing[_-]?key)\s*[=:]\s*[''"][^${\s]{8,}[''"]'
+      # Private Key PEM 블록
+      - pattern-regex: '-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'
+      # 일반 password 할당 (높은 FP 위험 → 신중하게 사용)
+      - pattern-regex: '(?i)password\s*[=:]\s*[''"][^${\s]{8,}[''"]'
+      # OAuth client secret
+      - pattern-regex: '(?i)(client[_-]?secret|oauth[_-]?secret)\s*[=:]\s*[''"][a-zA-Z0-9_\-]{16,}[''"]'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-798: Use of Hard-coded Credentials"
+        - "CWE-259: Use of Hard-coded Password"
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Hardcoded Credentials
+      owasp:
+        - "A02:2021 Cryptographic Failures"
+        - "LLM06:2025 Sensitive Information Disclosure"

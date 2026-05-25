@@ -1,0 +1,60 @@
+rules:
+  - id: noah-ruby-crlf-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby에서 params/request.params가 response.headers 또는 redirect_to에 직접 들어가면
+      CRLF Injection (HTTP Response Splitting). 안전: 개행 문자 제거, 화이트리스트.
+    pattern-sources:
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: request.params[$K]
+      - pattern: request.query_string
+      - pattern: request.headers[$K]
+
+    pattern-sinks:
+      # Rails response headers 직접 설정
+      - pattern: response.headers[$K]
+      - pattern: response.set_header($K, $X)
+      - pattern: headers[$K]
+      # Rails redirect_to — Location 헤더 경유
+      - pattern: redirect_to($X)
+      - pattern: redirect_to($X, ...)
+      - pattern: "redirect_to url: $X"
+      # Rack/Sinatra
+      - pattern: redirect($X)
+      - pattern: redirect($X, ...)
+      # 쿠키 값
+      - pattern: "cookies[$K] = $X"
+      - pattern: "response.set_cookie($K, $X)"
+
+    pattern-sanitizers:
+      - pattern: $X.gsub(/[\r\n]/, "")
+      - pattern: $X.delete("\r\n")
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X.start_with?("/")
+                ...
+              end
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-93: Improper Neutralization of CRLF Sequences"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - ruby
+        - rails
+        - sinatra
+        - rack

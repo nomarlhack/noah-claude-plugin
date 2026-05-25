@@ -118,6 +118,21 @@ rules:
               - pattern: $STMT.execute("$STR${$VAR}$STR2")
               - pattern: $STMT.execute($VAR)
           - pattern-not: $STMT.execute("...")
+      # StringBuilder/StringBuffer를 통한 동적 쿼리 빌드 패턴
+      # sb.append("AND col = '${userInput}' ") → jdbcTemplate.query(sb.toString())
+      - patterns:
+          - pattern: $JDBC.$METHOD($SB.toString(), ...)
+          - pattern-not: $JDBC.$METHOD($SB.toString(), $PARAMS)
+      - patterns:
+          - pattern: $JDBC.$METHOD($SB.toString())
+      # Kotlin string template 직접 보간 → query 인자
+      - patterns:
+          - pattern-either:
+              - pattern: $JDBC.queryForList("$STR${$VAR}$STR2", ...)
+              - pattern: $JDBC.queryForMap("$STR${$VAR}$STR2", ...)
+              - pattern: $JDBC.execute("$STR${$VAR}$STR2")
+          - pattern-not: $JDBC.queryForList("...", ...)
+          - pattern-not: $JDBC.queryForMap("...", ...)
 
     pattern-sanitizers:
       - pattern: $INPUT.toInt()

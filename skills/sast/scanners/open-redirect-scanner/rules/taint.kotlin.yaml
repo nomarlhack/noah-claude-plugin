@@ -1,0 +1,71 @@
+rules:
+  - id: noah-kotlin-open-redirect-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Kotlin + Spring 컨트롤러 입력(@RequestParam/@PathVariable)이 response.sendRedirect /
+      RedirectView / "redirect:" 문자열에 직접 들어가면 Open Redirect.
+      안전: 상대 경로 강제, 호스트 화이트리스트.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestBody $X: $T, ...) { ... }
+
+    pattern-sinks:
+      - pattern: response.sendRedirect($X)
+      - pattern: $RESP.sendRedirect($X)
+      - pattern: "RedirectView($X)"
+      - pattern: "RedirectView($X, ...)"
+      - pattern: "\"redirect:\" + $X"
+      - pattern: ResponseEntity.status(HttpStatus.FOUND).location(URI.create($X)).build()
+      - pattern: ResponseEntity.status($S).location(URI.create($X)).build()
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($X.startsWith("/")) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              require($X.startsWith("/")) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($WHITELIST.contains(URI.create($X).host)) { ... }
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-601: URL Redirection to Untrusted Site"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Open Redirect
+      owasp:
+        - "A01:2021 Broken Access Control"
+      technology:
+        - kotlin
+        - spring

@@ -1,11 +1,11 @@
 ---
 name: sast
-description: "47개 취약점 스캐너 + AI 자율 탐색을 실행하고 결과를 통합 보고서로 작성하는 스킬. XSS, SSRF, SQLi, Code Injection, CSRF, TLS, 비즈니스 로직, LLM 취약점 등 모든 취약점 유형을 소스코드 분석, AI 자율 탐색, 동적 테스트로 점검한다. 사용자가 'noah-8719:sast', 'sast', '소스코드 취약점 스캔' 등을 요청할 때 이 스킬을 사용한다."
+description: "49개 취약점 스캐너 + AI 자율 탐색을 실행하고 결과를 통합 보고서로 작성하는 스킬. XSS, SSRF, SQLi, Code Injection, CSRF, TLS, 비즈니스 로직, LLM 취약점 등 모든 취약점 유형을 소스코드 분석, AI 자율 탐색, 동적 테스트로 점검한다. 사용자가 'noah-8719:sast', 'sast', '소스코드 취약점 스캔' 등을 요청할 때 이 스킬을 사용한다."
 ---
 
 # Noah SAST — 통합 취약점 스캐너
 
-47개 개별 취약점 스캐너와 AI 자율 탐색을 실행하고, 모든 결과를 하나의 통합 보고서로 작성하는 스킬이다.
+49개 개별 취약점 스캐너와 AI 자율 탐색을 실행하고, 모든 결과를 하나의 통합 보고서로 작성하는 스킬이다.
 
 > `[필수]`는 writer 권한 위반·보안 사고 등 위반 시 치명적 결과를 초래하는 항목에만 붙인다. 태그 없는 항목도 모두 준수 의무이며, 태그는 우선순위가 아닌 경고 수위 표시다.
 
@@ -46,7 +46,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/sast
     ai-discovery-agent.md          ← AI 자율 취약점 탐색 에이전트 프롬프트
     phase2-agent.md                ← Phase 2 동적 테스트 에이전트 프롬프트
     llm-endpoint-probe-agent.md    ← Step 8-3 LLM 그룹 사전 단계 에이전트
-  scanners/                        ← 47개 취약점 스캐너
+  scanners/                        ← 49개 취약점 스캐너
     xss-scanner/
     sqli-scanner/
     ...

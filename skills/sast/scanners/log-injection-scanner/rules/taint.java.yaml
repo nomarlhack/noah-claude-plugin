@@ -1,0 +1,81 @@
+rules:
+  - id: noah-java-log-injection-taint
+    severity: WARNING
+    languages:
+      - java
+    mode: taint
+    message: |
+      Spring 컨트롤러 입력이 개행 제거 없이 Logger에 전달되면 Log Injection.
+      CRLF 삽입으로 로그 위조 또는 민감 정보 로그 노출 가능.
+      안전: 개행 제거 후 로깅, SLF4J parameterized logging.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+
+    pattern-sinks:
+      # SLF4J / Logback — 문자열 결합 형태만 위험 (parameterized는 안전)
+      - pattern: $LOG.info("..." + $X)
+      - pattern: $LOG.debug("..." + $X)
+      - pattern: $LOG.warn("..." + $X)
+      - pattern: $LOG.error("..." + $X)
+      - pattern: $LOG.trace("..." + $X)
+      - pattern: $LOG.info($X)
+      - pattern: $LOG.debug($X)
+      - pattern: $LOG.warn($X)
+      - pattern: $LOG.error($X)
+      # log4j
+      - pattern: logger.info("..." + $X)
+      - pattern: logger.error("..." + $X)
+      - pattern: logger.info($X)
+      - pattern: logger.error($X)
+      # System.out (개발 환경 로그)
+      - pattern: System.out.println("..." + $X)
+      - pattern: System.out.println($X)
+
+    pattern-sanitizers:
+      # SLF4J parameterized logging — 값이 분리되어 CRLF 위험 없음
+      - pattern: $LOG.info("...", $X)
+      - pattern: $LOG.debug("...", $X)
+      - pattern: $LOG.warn("...", $X)
+      - pattern: $LOG.error("...", $X)
+      - pattern: $X.replaceAll("[\r\n]", "")
+      - pattern: $X.replace("\r\n", "").replace("\r", "").replace("\n", "")
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-117: Improper Output Neutralization for Logs"
+        - "CWE-532: Insertion of Sensitive Information into Log File"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Log Injection
+      owasp:
+        - "A09:2021 Security Logging and Monitoring Failures"
+      technology:
+        - java
+        - spring
+        - slf4j
+        - log4j
+        - logback

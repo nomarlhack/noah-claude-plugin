@@ -10,10 +10,17 @@ rules:
     pattern-sources:
       - pattern: request.GET[$K]
       - pattern: request.POST[$K]
+      - pattern: request.GET.get($K, ...)
+      - pattern: request.POST.get($K, ...)
+      - pattern: request.args[$K]
       - pattern: request.args.get($K, ...)
+      - pattern: request.form[$K]
       - pattern: request.form.get($K, ...)
       - pattern: request.data
       - pattern: request.body
+      - pattern: request.json
+      - pattern: request.json[$K]
+      - pattern: request.values[$K]
       - pattern: request.cookies[$K]
       - pattern: request.cookies.get($K, ...)
     pattern-sinks:

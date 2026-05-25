@@ -1,0 +1,109 @@
+rules:
+  - id: noah-python-idor-missing-owner-gate-taint
+    severity: WARNING
+    languages:
+      - python
+    mode: taint
+    message: |
+      외부입력→리소스접근→소유권게이트부재 (IDOR 검토 후보, Python).
+      Django/Flask/FastAPI 뷰가 URL 파라미터·request.GET/POST로 받은 식별자를
+      queryset.get/filter/update/delete에 전달하는데 소유권 검증이 없음.
+      [중요] IDOR은 "검증의 부재"라 FP 가능성 높음. service/mixin 계층의 소유권 검증을
+      phase1.md 절차로 확인 후 제외하라.
+    pattern-sources:
+      # Django
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.GET.get($K, ...)
+      - pattern: request.POST.get($K, ...)
+      - pattern: request.data[$K]
+      - pattern: request.data.get($K, ...)
+      - pattern: kwargs[$K]
+      - pattern: self.kwargs[$K]
+      # Flask
+      - pattern: request.args[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form[$K]
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json[$K]
+      # FastAPI path/query
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              def $F(..., $X: $T = Path(...), ...):
+                  ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              def $F(..., $X: $T = Query(...), ...):
+                  ...
+      # Werkzeug/raw
+      - pattern: request.view_args[$K]
+
+    pattern-sinks:
+      # Django ORM
+      - pattern: $MODEL.objects.get($F=$X)
+      - pattern: $MODEL.objects.filter($F=$X)
+      - pattern: $MODEL.objects.get(pk=$X)
+      - pattern: $MODEL.objects.get(id=$X)
+      - pattern: $MODEL.objects.filter(pk=$X)
+      - pattern: $MODEL.objects.filter(id=$X)
+      - pattern: $QS.get($F=$X)
+      - pattern: $QS.filter($F=$X)
+      - pattern: $QS.get(pk=$X)
+      - pattern: $QS.get(id=$X)
+      - pattern: get_object_or_404($M, $F=$X)
+      - pattern: get_object_or_404($M, pk=$X)
+      - pattern: get_object_or_404($M, id=$X)
+      # SQLAlchemy
+      - pattern: $SESSION.get($M, $X)
+      - pattern: $SESSION.query($M).filter_by(id=$X)
+      - pattern: $SESSION.query($M).filter_by(pk=$X)
+      # Flask-SQLAlchemy
+      - pattern: $M.query.get($X)
+      - pattern: $M.query.get_or_404($X)
+
+    pattern-sanitizers:
+      # 소유권 검증: request.user == 리소스 소유자 비교
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $OBJ.user == request.user:
+                  ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $OBJ.owner == request.user:
+                  ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $OBJ.user_id == request.user.id:
+                  ...
+      # Django permission decorator
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              @permission_required(...)
+              def $F(...):
+                  ...
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-639: Authorization Bypass Through User-Controlled Key"
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - IDOR
+      owasp:
+        - "A01:2021 Broken Access Control"
+      technology:
+        - python
+        - django
+        - flask
+        - fastapi
+        - sqlalchemy

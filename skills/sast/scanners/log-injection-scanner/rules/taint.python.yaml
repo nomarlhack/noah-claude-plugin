@@ -1,0 +1,80 @@
+rules:
+  - id: noah-python-log-injection-taint
+    severity: WARNING
+    languages:
+      - python
+    mode: taint
+    message: |
+      사용자 입력이 개행 제거 없이 logger에 전달되면 Log Injection.
+      CRLF 삽입으로 로그 위조 또는 민감 정보 로그 노출 가능.
+      안전: 개행 제거 후 로깅, 구조화 로깅.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.GET.get($K, ...)
+      - pattern: request.POST.get($K, ...)
+      - pattern: request.args[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form[$K]
+      - pattern: request.form.get($K, ...)
+      - pattern: request.json
+      - pattern: request.json[$K]
+      - pattern: request.data
+      - pattern: request.body
+
+    pattern-sinks:
+      # stdlib logging
+      - pattern: logging.info($X)
+      - pattern: logging.debug($X)
+      - pattern: logging.warning($X)
+      - pattern: logging.error($X)
+      - pattern: logging.critical($X)
+      - pattern: $LOGGER.info($X)
+      - pattern: $LOGGER.debug($X)
+      - pattern: $LOGGER.warning($X)
+      - pattern: $LOGGER.error($X)
+      - pattern: $LOGGER.critical($X)
+      - pattern: logger.info($X)
+      - pattern: logger.debug($X)
+      - pattern: logger.warning($X)
+      - pattern: logger.error($X)
+      # loguru
+      - pattern: $LOG.info($X)
+      - pattern: $LOG.debug($X)
+      - pattern: $LOG.error($X)
+      # print (일부 환경에서 로그로 집계)
+      - pattern: print($X)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $X = $X.replace("\r", "").replace("\n", "")
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              import re
+              $X = re.sub(r'[\r\n]', '', $X)
+      - pattern: $X.strip()
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-117: Improper Output Neutralization for Logs"
+        - "CWE-532: Insertion of Sensitive Information into Log File"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Log Injection
+      owasp:
+        - "A09:2021 Security Logging and Monitoring Failures"
+      technology:
+        - python
+        - django
+        - flask
+        - fastapi
+        - logging
+        - loguru

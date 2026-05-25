@@ -76,6 +76,7 @@ SCANNERS = [
     "prompt-injection-scanner", "system-prompt-leakage-scanner",
     "insecure-output-handling-scanner", "unbounded-consumption-scanner",
     "android-deeplink-scanner",
+    "hardcoded-secrets-scanner", "log-injection-scanner",
 ]
 
 pkg = read_pkg_json()
@@ -526,6 +527,10 @@ def check_exclude(scanner):
             "build.gradle", "build.gradle.kts",
         ):
             return "Android 프로젝트 아님 (AndroidManifest.xml/Kotlin/Java/Gradle 없음)"
+    elif scanner == "hardcoded-secrets-scanner":
+        pass  # 하드코딩 비밀값은 모든 프로젝트에 해당
+    elif scanner == "log-injection-scanner":
+        pass  # 로그 인젝션은 모든 웹 프로젝트에 해당
     elif _scanner_prereq_group.get(scanner) == "llm":
         if not has_dep_any(
             # Python
@@ -618,6 +623,7 @@ BASE_GROUPS = {
     "protocol-check": ["graphql-scanner", "websocket-scanner", "soapaction-spoofing-scanner", "ldap-injection-scanner", "xpath-injection-scanner"],
     "business-logic": ["business-logic-scanner", "validation-logic-scanner"],
     "mobile": ["android-deeplink-scanner"],
+    "secrets-logging": ["hardcoded-secrets-scanner", "log-injection-scanner"],
 }
 
 
