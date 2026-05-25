@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""select_scanners.py — 패턴 인덱스 + 프로젝트 파일 기반 47개 스캐너 자동 선별.
+"""select_scanners.py — 패턴 인덱스 + 프로젝트 파일 기반 49개 스캐너 자동 선별.
 
 Usage:
     python3 select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_ROOT> [--write-expected-file=PATH]
