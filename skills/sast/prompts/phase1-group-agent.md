@@ -11,7 +11,18 @@
 그 후 메인 에이전트가 프롬프트에 나열한 스캐너를 **순서대로** 실행하세요. 각 스캐너마다:
 1. **기존 결과 파일 스킵 검사 (재개 대비)**: 지정된 결과 파일 경로가 이미 존재하면 Read로 파일 끝의 manifest를 확인한다. `declared_count`(정수)와 `candidates` 배열 길이가 일치하면 **해당 스캐너 분석을 스킵**하고 반환 요약에 `[SKIP: 기존 결과 유효]`로 표기한다. 불일치·manifest 부재·JSON 파싱 실패면 정상 분석을 수행하여 덮어쓴다.
 2. 해당 스캐너의 phase1.md를 Read. frontmatter의 `id_prefix` 값을 확인하여 후보 ID 형식(`<id_prefix>-1, <id_prefix>-2, ...`)을 결정한다 (guidelines-phase1.md 지침 3-B).
-3. 해당 스캐너의 패턴 인덱스 JSON을 Read. **같은 디렉토리에 `<scanner-name>.locindex.json`이 있으면 그것을 우선 Read하여 tier 우선순위(taint→ast→generic)로 검토한다 (guidelines-phase1.md §6-A-1).** locindex가 없으면 평평한 패턴 인덱스를 전수 분석한다.
+3. 해당 스캐너의 패턴 인덱스를 확보한다. **같은 디렉토리에 `<scanner-name>.locindex.json`이 있으면 Read 도구 대신 아래 Bash 명령으로 파일별 요약을 얻어 분석한다 (guidelines-phase1.md §6-A-1).** locindex가 없으면 평평한 패턴 인덱스 JSON을 Read하여 전수 분석한다.
+
+   ```bash
+   python3 <NOAH_SAST_DIR>/tools/locindex_summary.py <PATTERN_INDEX_DIR>/<scanner-name>.locindex.json
+   ```
+
+   출력은 매칭 파일 목록(파일별 1줄)으로, **파일 수 기준으로 모든 스캐너에서 2,000줄 이내가 보장**된다. 분석 순서:
+   - `[SINK]` 표시 파일 → 우선 Read하여 실제 sink 코드와 source 추적
+   - `best_tier=taint` 파일 → source→sink dataflow 확인
+   - `best_tier=ast` 파일 → 파일당 1회 Read로 패턴 의미 확인
+   - `best_tier=generic` 파일 → 클래스 판정 후 대량 제외 가능
+   - 노이즈 제거 건수는 COVERAGE `accounted` 계산에 포함한다
 4. guidelines-phase1.md와 phase1.md의 지침을 그대로 따라 분석 수행
 5. 분석 결과를 Write 도구로 지정된 결과 파일 경로에 저장 (guidelines-phase1.md 지침 3 형식)
 6. **[필수] 커버리지 감사 (총 매치 200건 초과 스캐너)**: locindex `_scanner.tier_counts` 합이 200을 넘으면, 결과 MD에 `<!-- COVERAGE matches=<총> accounted=<설명> method="<좁히기 요약>" -->` 주석을 1줄 넣고, 본문에 클래스별 제외 근거를 적는다. `accounted`는 개별 검토 + 클래스 일괄 제외로 **설명한 매치 수**이며 총 매치와 같아야 한다(잔여 0). taint 매치는 클래스로 뭉뚱그리지 말고 전수 나열한다(IDOR은 `tools/idor_inventory.py` 출력 사용). 설명 못 한 잔여는 `[INCOMPLETE: scanner N건]`으로 정직히 표기. 상세는 guidelines-phase1.md §6-A-2. 이 감사가 없으면 게이트(`phase1_review_assert.py --index-dir`)가 exit 7로 차단한다.
@@ -33,6 +44,7 @@ open-redirect-scanner: 후보 1건
 ## 에러 처리 및 자원 관리
 
 **파일 누락 시:**
+- `locindex_summary.py` Bash 실행 실패(파일 없음·스크립트 오류): 평평한 패턴 인덱스 JSON을 Read로 fallback한다. JSON도 없으면 해당 스캐너를 건너뛰고 `[SKIP: 패턴 인덱스 없음]`을 표기한다.
 - 패턴 인덱스 JSON이 없으면(Read 실패): 해당 스캐너를 건너뛰고, 반환 요약에 `[SKIP: 패턴 인덱스 없음]`을 표기한다.
 - phase1.md가 없으면: 해당 스캐너를 건너뛰고 `[SKIP: phase1.md 없음]`을 표기한다.
 - Write 실패 시: 결과를 반환 메시지 본문에 포함하고 `[FALLBACK: Write 실패]`를 표기한다.
