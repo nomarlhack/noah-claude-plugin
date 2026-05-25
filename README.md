@@ -111,7 +111,7 @@ flowchart TD
 ### 준비 (Step 1–4)
 
 **Step 1 · 실행 경로 확정**
-스캔 대상 경로와 결과 저장 디렉토리를 정합니다. 중단된 스캔이 있으면 이어서 진행할지 판단합니다.
+플러그인 루트에서 `NOAH_SAST_DIR`(= `${CLAUDE_PLUGIN_ROOT}/skills/sast`) 경로를 결정합니다. 변수가 치환되지 않으면 Bash fallback으로 설치 경로를 탐색합니다. 이 값을 이후 모든 에이전트 프롬프트에 실제 경로 문자열로 치환해 삽입합니다.
 
 **Step 2 · 패턴 인덱싱**
 코드베이스 전체를 한 번만 훑어 각 스캐너의 semgrep 룰이 매치되는 위치를 미리 색인합니다(`semgrep_index.py`). 결과는 `locindex.json`(위치별 tier·rule_ids)으로 저장되고, Phase 1 에이전트는 이를 `locindex_summary.py`를 통해 파일 목록으로 변환해 받습니다. 상세 내용은 [인덱싱 · Phase 1 상세](skills/sast/docs/indexing-and-phase1.md) 참조.
@@ -163,47 +163,103 @@ flowchart TD
 ```
 
 **Step 3 · 프로젝트 스택 파악**
-언어·프레임워크·인증 방식·DB 종류·프록시 구성 등 모든 스캐너가 공통으로 필요한 프로젝트 정보를 수집합니다.
+모든 스캐너에 공통으로 필요한 프로젝트 정보를 수집합니다.
+
+- `package.json`, `pom.xml`, `requirements.txt` 등에서 언어·프레임워크·라이브러리 확인
+- 서버/클라이언트/설정 파일 위치 파악
+- 인증 방식(세션, JWT, OAuth, SAML 등), DB 종류(SQL, NoSQL, LDAP), 프록시·CDN 구조 확인
+- 환경 설정 파일·CORS·OAuth 설정 등에서 sandbox/dev 도메인 추출 → `SANDBOX_DOMAINS`에 보관 (보고서 PoC URL에 사용)
 
 **Step 4 · 스캐너 선별**
-49개 스캐너 중 이 프로젝트에 해당하는 것만 고릅니다(`select_scanners.py`). AI가 한 번 더 검토해 놓친 스캐너를 복원합니다. **"포함이 기본, 제외에는 근거가 필요"** 원칙으로 동작합니다.
+49개 스캐너 중 이 프로젝트에 해당하는 것만 고릅니다. **"포함이 기본, 제외에는 근거가 필요"** 원칙으로 동작합니다.
+
+- **Step 4-1** `select_scanners.py`가 패턴 인덱스 매치 건수 + 프로젝트 아키텍처로 자동 선별합니다. 매치 1건 이상이면 반드시 포함, 0건이면 스크립트가 아키텍처 조건을 검사해 제외 가능 여부를 판단합니다. `_expected_scanners.json`을 작성해 Phase 1 완료 후 누락 파일을 자동 감지합니다.
+- **Step 4-2** 라이브러리 의존성·매치 수만으로는 놓치는 케이스를 AI가 재검토합니다. 내장 API 직접 구현(예: `fetch()`로 서버사이드 요청 → SSRF), 프레임워크 내장 기능(예: `RestTemplate` → SSRF), 멀티 언어 서브프로젝트 등이 해당합니다.
 
 ### Phase 1 · 정적 분석 (Step 5–7)
 
 **Step 5 · 정적 분석**
-선별된 스캐너를 그룹으로 묶어 병렬 실행합니다. 각 스캐너는 Step 2 색인을 기반으로 위험 지점(sink)과 입력 출처(source)를 추적해 취약점 후보를 찾습니다. `phase1_build_master_list.py`가 결과를 검증해 `master-list.json`을 만듭니다.
+선별된 스캐너를 의미적 연관성 기반 그룹으로 묶어 **그룹당 1 에이전트로 병렬 실행**합니다. 매치 히트 합계 150건 초과 또는 스캐너 5개 이상이면 그룹이 자동 분할됩니다. 각 스캐너는 `locindex_summary.py` 출력을 기반으로 tier 순(taint → ast → generic)으로 파일을 Read해 source→sink 흐름을 추적하고 후보를 등록합니다.
+
+모든 에이전트가 완료되면 `phase1_build_master_list.py`가 결과를 검증합니다.
+- manifest `declared_count`와 실제 헤더 수 일치 여부
+- 필수 섹션(Code, Source→Sink Flow 등) 존재 및 최소 길이
+- 동일 file:line 후보 중복 감지(DUPLICATE SINK)
+
+검증을 통과하면 `master-list.json`이 생성됩니다. 중단 시 `phase1_resume.py`로 재개 지점을 판별하고, 유효한 결과 파일이 있는 스캐너는 자동 스킵합니다.
 
 **Step 6 · AI 자율 분석**
-스캐너가 구조적으로 놓치기 쉬운 취약점(비즈니스 로직 결함, 인가 흐름, Race Condition 등)을 AI가 코드를 직접 읽으며 탐색합니다. 발견한 후보는 `master-list.json`에 통합됩니다.
+스캐너가 구조적으로 놓치기 쉬운 취약점을 AI가 코드를 직접 읽으며 탐색합니다. 에이전트가 내부적으로 3단계를 수행합니다.
+
+1. **자유 탐색** — 소스코드 전반을 읽으며 보안 취약점 탐색
+2. **공백 영역 집중** — Phase 1 master-list.json을 재확인 후, 스캐너가 다루지 않은 영역(비즈니스 로직 결함, 인가 흐름, Race Condition, Mass Assignment) 집중 탐색
+3. **미탐색 영역** — 아직 열어보지 않은 파일·디렉토리를 중심으로 추가 탐색
+
+결과는 `ai-discovery.md`에 저장되고, `phase1_build_master_list.py` 재실행으로 `master-list.json`에 통합됩니다. 에이전트가 `[INCOMPLETE]`를 반환하면 미탐색 영역 정보를 이어받아 후속 에이전트를 디스패치합니다.
 
 **Step 7 · phase1-review**
-독립된 리뷰 에이전트가 "후보 사유"를 보지 않은 채 코드와 증거만으로 전 후보를 재판정합니다(blind eval). 판정 결과는 CONFIRM(유지 → Phase 2 진입), OVERRIDE(내용 수정 후 유지), DISCARD(`safe` 처리 → Phase 2 생략) 세 가지입니다.
+독립된 리뷰 에이전트가 Phase 1의 "후보 사유"를 보지 않은 채 코드와 증거만으로 전 후보를 재판정합니다(blind eval). 판정 결과는 세 가지입니다.
+
+| 판정 | 의미 |
+|------|------|
+| CONFIRM | 후보 유지 → Phase 2 진입 |
+| OVERRIDE | 내용 수정 후 유지 → Phase 2 진입 |
+| DISCARD | `safe` 처리 → Phase 2 생략 |
+
+완료 후 `phase1_review_assert.py`가 게이트를 수행합니다. 커버리지 감사 실패(고볼륨 스캐너 미감사)는 exit 7로 차단합니다.
 
 ### Phase 2 · 동적 검증 (Step 8–11)
 
 > 후보가 없으면 Phase 2를 건너뛰고 보고서(Step 12)로 갑니다.
 
 **Step 8 · 동적 분석**
-- **8-1** — 테스트 URL과 공격 동의(ATTACK_CONSENT)를 사용자에게 묻고 대기합니다.
-- **8-2** — curl·Playwright 등 도구 권한을 확인합니다.
-- **8-3** — LLM 스캐너 그룹이 활성이면 endpoint probe를 먼저 실행합니다(full / connectivity-only / static-only 자동 선택).
-- **8-4** — 스캐너를 Tier A/B/C로 나눠 병렬로 동적 테스트를 수행합니다.
+
+- **8-1 정보 요청** — 두 결정을 명시적으로 분리해 사용자에게 묻고 응답을 대기합니다.
+  - **URL_PROVIDED**: sandbox 도메인 URL + 세션 쿠키/인증 토큰 제공 여부
+  - **ATTACK_CONSENT**: 동적 공격 페이로드 테스트 동의 여부
+
+- **8-2 도구 권한 확인** — `~/.claude/settings.json`을 읽어 필요 권한을 확인합니다. 동적 테스트 경로에는 `Bash(curl:*)`, `Bash(node:*)`, `Bash(npx:*)`, `Bash(python3:*)`가 필요하며, 동적 테스트 거부 시에는 `Bash(python3:*)`만 확인합니다.
+
+- **8-3 LLM endpoint probe** (LLM 그룹 활성 시) — `URL_PROVIDED` × `ATTACK_CONSENT` 매트릭스에 따라 probe 모드를 결정합니다.
+
+  | URL | 공격 동의 | probe 모드 | Phase 2 결과 |
+  |-----|---------|-----------|-------------|
+  | Y | Y | `full` (정적 + 동적 + system override) | Phase 2 진행 |
+  | Y | N | `connectivity-only` (공격 페이로드 없음) | `LLM endpoint 확인됨` |
+  | N | N | `static-only` (동적 호출 없음) | `LLM endpoint 정적 식별` |
+
+- **8-4 Phase 2 실행** — 스캐너를 Tier A/B/C로 나눠 **Tier 간 병렬, Tier 내 순차**로 동적 테스트를 수행합니다. 스캐너당 1 에이전트 원칙을 따르며, 동일 세션을 사용하는 스캐너끼리의 병렬 실행은 금지됩니다. AI 자율 탐색 후보(AI-N)는 기존 스캐너 카테고리에 속하면 해당 스캐너의 Phase 2에 함께 전달하고, 비카테고리 후보(Race Condition, Mass Assignment 등)는 별도 에이전트로 실행합니다.
 
 **Step 9 · phase2-review**
-동적 증거를 해석해 각 후보의 최종 상태(`confirmed`/`candidate`/`safe`)를 확정합니다. 정적·동적 불일치는 `conflicts` 감사 로그에만 기록합니다.
+모든 동적 분석이 완료되면 `scan-report-review mode=phase2-review` 에이전트가 증거를 해석해 각 후보의 최종 상태를 `master-list.json`에 기록합니다.
+
+| 상태 | 조건 |
+|------|------|
+| `confirmed` | 실제 트리거 확인 (동적 테스트 실행 결과 파트 필수) |
+| `candidate` | 동적 테스트 미수행·차단·환경 제한 등으로 확인 불가 |
+| `safe` | 의도적 방어 코드가 입증된 경우 |
+
+정적·동적 증거 충돌은 항상 동적 증거를 따르며, 충돌 기록은 `phase1_eval_state.conflicts`에 추가 전용으로 남깁니다. `phase2_review_assert.py`가 status 미완결이면 exit 1로 차단합니다.
 
 **Step 10 · 연계 분석**
-`safe` 판정을 제외한 후보가 2건 이상이면, 개별로는 낮은 위험이라도 연결 시 실제 공격이 되는 체인을 구성해 영향을 재평가합니다.
+`safe` 판정을 제외한 후보가 2건 이상이면 `chain-analysis` 서브스킬을 실행합니다. 개별로는 낮은 위험이라도 연결 시 실제 공격이 되는 체인을 구성해 영향을 재평가합니다. 결과는 `chain-analysis.md`에 저장되고 보고서 조립 시 `--chain` 인자로 전달됩니다.
 
 **Step 11 · 결과 검증**
-최종 상태와 증거의 정합성을 점검합니다.
+모든 후보 마스터 목록 항목을 포함하는 체크리스트를 출력하고 최종 상태의 정합성을 검증합니다.
+
+- 동적 테스트를 수행하지 않은 항목(`✗`)은 사유 태그(`[도구 한계]`/`[정보 부족]`/`[환경 제한]`)를 명시해야 합니다.
+  - `[도구 한계]`: 메인 에이전트가 직접 재테스트. 실패 시 `[환경 제한]`으로 재분류
+  - `[정보 부족]`: 사용자에게 추가 정보 요청
+  - `[환경 제한]`: `candidate`로 보고서에 포함
+- 모든 항목에 최종 상태가 확정되고 URL 경로가 특정된 후에만 Step 12로 진행합니다.
 
 ### 보고서 (Step 12)
 
 **Step 12 · 보고서 생성**
-`safe`로 분류된 항목도 왜 안전한지(safe 분류 6종)와 함께 별도 섹션으로 남깁니다.
-- **12-1 report-review** — 보고서 본문의 설명·스니펫·PoC를 다듬습니다(판정 불변).
-- **12-2** — `report_finalize.py`가 HTML 변환 → 검증 → 열기를 한 번에 처리합니다.
+`scan-report` 서브스킬에 모든 결과를 전달해 통합 보고서(`noah-sast-report.md` + `.html`) 1개를 생성합니다. 전달 데이터는 `master-list.json`, 스캐너별 Phase 1 결과, AI 자율 탐색 결과, Phase 2 동적 분석 결과, 연계 분석 결과, `SANDBOX_DOMAINS`, 이상 없음 스캐너 점검 요약, 미적용 스캐너 목록입니다. `safe`로 분류된 항목도 사유(safe 분류 6종)와 함께 별도 섹션으로 남깁니다.
+
+- **12-1 report-review** (후보 1건 이상 시) — 독립 에이전트가 보고서 본문의 설명·스니펫·PoC를 다듬습니다. 판정(`status`)은 변경하지 않습니다.
+- **12-2 검증·변환·열기** — `report_finalize.py`가 HTML 변환 → MD·HTML 동기화 검증 → 용어 lint → 링크 검증 → 브라우저 열기를 순서대로 처리합니다.
 
 ## Phase 1 후보 분류 (Safe-by-Proof)
 
