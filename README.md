@@ -125,7 +125,7 @@ flowchart TD
 스캔 대상 경로와 결과를 저장할 임시 디렉토리를 정합니다. 이전 스캔이 중단된 상태라면 이 단계에서 이어서 진행할지(resume)를 판단합니다.
 
 **Step 2 · 패턴 인덱싱**
-스캔을 시작하기 전에 코드베이스 전체를 **한 번만** 훑어, 각 스캐너의 semgrep 룰이 매치되는 위치를 미리 색인합니다(`semgrep_index.py`). 개별 스캐너가 같은 코드를 반복해서 뒤지는 낭비를 막습니다. 비-UTF8(EUC-KR 등) 파일도 UTF-8로 변환해 한국어 레거시 코드의 누락을 방지하며, 룰이 없는 의미 분석형 스캐너(business-logic 등)는 빈 색인으로 처리됩니다.
+스캔을 시작하기 전에 코드베이스 전체를 **한 번만** 훑어, 각 스캐너의 semgrep 룰이 매치되는 위치를 미리 색인합니다(`semgrep_index.py`). 개별 스캐너가 같은 코드를 반복해서 뒤지는 낭비를 막습니다. 비-UTF8(EUC-KR 등) 파일도 UTF-8로 변환해 한국어 레거시 코드의 누락을 방지하며, 룰이 없는 의미 분석형 스캐너(business-logic 등)는 빈 색인으로 처리됩니다. 결과는 스캐너별 `<scanner>.locindex.json`(위치 → tier/rule_ids)으로 저장됩니다.
 
 **Step 3 · 프로젝트 스택 파악**
 언어·프레임워크·인증 방식·DB 종류·프록시 구성 등 모든 스캐너가 공통으로 필요로 하는 프로젝트 정보를 먼저 수집합니다.
@@ -136,7 +136,7 @@ flowchart TD
 ### Phase 1 · 정적 분석 (Step 5–7)
 
 **Step 5 · 정적 분석**
-선별된 스캐너를 의미적 연관성에 따라 그룹으로 묶어 **병렬 실행**합니다. 각 스캐너는 Step 2의 색인을 출발점으로 위험 지점(sink)과 입력 출처(source)를 추적해 취약점 후보를 찾고, 결과를 파일로 저장합니다. 이후 `phase1_build_master_list.py`가 결과를 검증해 `master-list.json`을 만듭니다.
+선별된 스캐너를 의미적 연관성에 따라 그룹으로 묶어 **병렬 실행**합니다. 각 스캐너는 `locindex_summary.py`를 통해 Step 2의 색인을 **파일 목록(파일당 1줄, 전 스캐너 2,000줄 이내 보장)**으로 변환해 받고, tier·sink 룰 우선순위에 따라 각 파일을 Read해 위험 지점(sink)과 입력 출처(source)를 추적합니다. 취약점 후보를 찾아 결과를 파일로 저장하고, 이후 `phase1_build_master_list.py`가 결과를 검증해 `master-list.json`을 만듭니다.
 
 **Step 6 · AI 자율 분석**
 정해진 패턴에 얽매이지 않고 AI가 코드를 직접 읽으며, 스캐너가 구조적으로 놓치기 쉬운 취약점(비즈니스 로직 결함, 인가 흐름, Race Condition 등)을 자율적으로 탐색합니다. 발견한 후보는 `master-list.json`에 통합됩니다.
@@ -402,7 +402,10 @@ noah-8719/
 │       ├── SKILL.md               # 오케스트레이터 (실행 프로세스 상세)
 │       ├── scanners/              # 49개 취약점 스캐너 (각 phase1.md + phase2.md)
 │       ├── prompts/               # 서브 에이전트 지시 문서 (LLM 그룹 사전 단계 포함)
-│       ├── tools/                 # Python 유틸리티 스크립트 (LLM 채널 어댑터 포함)
+│       ├── tools/                 # Python 유틸리티 스크립트
+│       │   ├── semgrep_index.py   # semgrep 결과 → locindex.json 변환
+│       │   ├── locindex_summary.py# locindex.json → 파일 목록 요약 (Phase 1 입력)
+│       │   └── ...                # select_scanners, phase1_build_master_list 등
 │       ├── sub-skills/            # 내부 서브스킬
 │       │   ├── scan-report/       # 보고서 생성
 │       │   ├── scan-report-review/# 보고서 정확성 검증
