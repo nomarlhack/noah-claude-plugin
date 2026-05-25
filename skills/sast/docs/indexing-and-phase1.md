@@ -2,15 +2,51 @@
 
 ## 전체 흐름
 
-```
-① semgrep_index.py
-   코드베이스 전체를 한 번 스캔 → 스캐너별 locindex.json 생성
+```mermaid
+flowchart TD
+    SRC["프로젝트 소스코드"]
+    SRC -->|"47개 스캐너 룰 일괄 실행"| SEMGREP["semgrep"]
+    SEMGREP -->|"매치당 1건\n{check_id, path, line}"| IDX
 
-② locindex_summary.py  (Phase 1 에이전트가 Bash로 실행)
-   locindex.json → 파일 목록 요약 (파일당 1줄, 2,000줄 이내 보장)
+    subgraph IDX ["semgrep_index.py"]
+        direction TB
+        A1["① rule_id → tier 결정\n-taint  → taint\n-sink   → ast\n-pattern → ast\n그 외   → generic"]
+        A2["② 같은 file:line 병합\ntier 승격 (taint > ast > generic)\nrule_ids 배열로 모두 보존"]
+        A1 --> A2
+    end
 
-③ Phase 1 에이전트
-   파일 목록을 보고 각 파일을 Read → source→sink 추적 → 후보 등록
+    IDX --> LOC["scanner.locindex.json\n위치별 {tier, rule_ids}\n수천 ~ 수만 줄"]
+
+    LOC -->|"Read 2,000줄 제한으로\n직접 읽기 불가"| SUM
+
+    subgraph SUM ["locindex_summary.py"]
+        direction TB
+        B1["① 노이즈 제거\nvendor/ · .yaml: · .min.js: 등"]
+        B2["② 파일명 기준 그룹핑\nt/a/g 건수 집계 · [SINK] 표시"]
+        B3["③ tier 순 정렬 출력\ntaint → ast → generic"]
+        B1 --> B2 --> B3
+    end
+
+    SUM -->|"파일당 1줄\n≤ 2,000줄 보장"| LIST["파일 목록"]
+
+    LIST --> P1["Phase 1 에이전트"]
+
+    subgraph P1 ["Phase 1 에이전트"]
+        direction TB
+        C1["① [SINK] 파일 Read → sink 코드 확인"]
+        C2["② taint 파일 Read → source→sink 추적"]
+        C3["③ ast 파일 Read → 패턴 의미 확인"]
+        C4["④ generic 파일 → 클래스 판정"]
+        C1 --> C2 --> C3 --> C4
+    end
+
+    P1 --> OUT["후보 등록 / FALSE_POSITIVE\n결과 파일 저장"]
+
+    style SRC fill:#e94560,stroke:#e94560,color:#fff
+    style SEMGREP fill:#0f3460,stroke:#e94560,color:#eee
+    style LOC fill:#0f3460,stroke:#e94560,color:#eee
+    style LIST fill:#0f3460,stroke:#e94560,color:#eee
+    style OUT fill:#e94560,stroke:#e94560,color:#fff
 ```
 
 ---
