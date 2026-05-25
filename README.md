@@ -119,7 +119,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     SRC["프로젝트 소스코드"]
-    SRC -->|"47개 스캐너 룰 일괄 실행"| SEMGREP["semgrep"]
+    SRC -->|"49개 스캐너 룰 일괄 실행"| SEMGREP["semgrep"]
     SEMGREP -->|"매치당 1건\n{check_id, path, line}"| IDX
 
     subgraph IDX ["semgrep_index.py"]
@@ -147,11 +147,10 @@ flowchart TD
 
     subgraph P1 ["Phase 1 에이전트"]
         direction TB
-        C1["① [SINK] 파일 Read → sink 코드 확인"]
-        C2["② taint 파일 Read → source→sink 추적"]
-        C3["③ ast 파일 Read → 패턴 의미 확인"]
-        C4["④ generic 파일 → 클래스 판정"]
-        C1 --> C2 --> C3 --> C4
+        C1["① taint 파일 Read\nsource→sink 추적\n([SINK] 표시 = sink 룰 직접 매칭)"]
+        C2["② ast 파일 Read\n패턴 의미 확인"]
+        C3["③ generic 파일\n클래스 판정 후 대량 제외"]
+        C1 --> C2 --> C3
     end
 
     P1 --> OUT["후보 등록 / FALSE_POSITIVE\n결과 파일 저장"]
@@ -393,18 +392,3 @@ noah-8719/
 └── README.md
 ```
 
-## 상세 문서
-
-| 문서 | 경로 | 내용 |
-|------|------|------|
-| **semgrep 인덱싱 · Phase 1** | `skills/sast/docs/indexing-and-phase1.md` | locindex.json 구조, locindex_summary.py 동작, Phase 1 분석 순서 |
-| 오케스트레이터 | `skills/sast/SKILL.md` | Step 1~12 전체 프로세스 |
-| Phase 1 공통 지침 | `skills/sast/prompts/guidelines-phase1.md` | Sink-first + Source-first, 의미 기반 판정 |
-| Phase 2 공통 지침 | `skills/sast/prompts/guidelines-phase2.md` | 동적 테스트 절차, 차단 응답 처리 |
-| AI 자율 탐색 | `skills/sast/prompts/ai-discovery-agent.md` | 3단계 탐색, 7개 제외 필터 |
-| LLM 그룹 사전 단계 | `skills/sast/prompts/llm-endpoint-probe-agent.md` | LLM endpoint probe (full / connectivity-only / static-only) |
-| LLM 채널 어댑터 | `skills/sast/tools/llm_channel_probe.py` | HTTP / ws-raw / ws-stomp / SSE 단일 어댑터 |
-| 보고서 생성 | `skills/sast/sub-skills/scan-report/SKILL.md` | 스켈레톤 → 조립 → HTML 변환 |
-| 평가·리뷰 | `skills/sast/sub-skills/scan-report-review/SKILL.md` | phase1-review / phase2-review / report-review |
-| 연계 분석 | `skills/sast/sub-skills/chain-analysis/SKILL.md` | R1~R5 체인 구성 규칙 |
-| 개별 스캐너 | `skills/sast/scanners/{name}/phase1.md` | Sink 의미론, 판정 기준 |
