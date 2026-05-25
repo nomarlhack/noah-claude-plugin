@@ -1,5 +1,6 @@
 ---
 id_prefix: LOGINJ
+archetype: presence
 ---
 
 > ## 핵심 원칙: "로그에 들어간 사용자 입력은 개행 주입과 민감 정보 노출 두 가지를 동시에 야기한다"

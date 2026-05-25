@@ -1,5 +1,6 @@
 ---
 id_prefix: SECRET
+archetype: presence
 ---
 
 > ## 핵심 원칙: "코드에 박힌 비밀값은 그 자체로 취약점이다"
