@@ -42,6 +42,20 @@ rules:
           - pattern: $X
           - pattern-inside: |
               if $X == "..." { ... }
+      # map/slice 화이트리스트 패턴
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $MAP[$X] { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if !$MAP[$X] {
+                  ...
+                  return
+              }
+              ...
+              http.Get($X)
     metadata:
       category: security
       subcategory: [vuln]

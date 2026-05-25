@@ -48,6 +48,13 @@ rules:
       - pattern: strconv.Atoi($X)
       - pattern: strconv.ParseInt($X, ...)
       - pattern: strconv.ParseFloat($X, ...)
+      # 파라미터화 쿼리: $X가 fmt.Sprintf가 아닌 파라미터 인자로만 사용
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $DB.Query($Q, ..., $X, ...)
+          - pattern-not-inside: |
+              $DB.Query(fmt.Sprintf(...), ...)
 
     metadata:
       category: security

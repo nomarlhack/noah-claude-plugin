@@ -34,7 +34,8 @@ rules:
       - pattern: searchParams.get($K)
       - pattern: searchParams[$K]
       - pattern: params[$K]
-      - pattern: request.nextUrl.searchParams.get($K)
+      - pattern: $REQ.nextUrl.searchParams.get($K)
+      - pattern: $REQ.nextUrl.searchParams.get($K, ...)
       - pattern: (await params).$K
       # Fastify
       - pattern: request.query[$K]

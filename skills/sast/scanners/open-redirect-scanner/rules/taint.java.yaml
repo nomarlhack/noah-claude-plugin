@@ -50,6 +50,8 @@ rules:
           - pattern: $X
           - pattern-inside: |
               if ($X.startsWith("/")) { ... }
+      # 3항 연산자 sanitize는 semgrep taint의 구조적 한계로 미지원.
+      # startsWith("/") 3항 연산자 패턴은 Phase 1 에이전트가 코드 컨텍스트로 판단.
 
     metadata:
       category: security
