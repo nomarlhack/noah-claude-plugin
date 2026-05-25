@@ -20,6 +20,8 @@ rules:
       - pattern-regex: 'github_pat_[a-zA-Z0-9_]{82}'
       - pattern-regex: 'AKIA[0-9A-Z]{16}'
       - pattern-regex: 'AIzaSy[0-9A-Za-z\-_]{33}'
+      # Django/Rails 프레임워크 secret key
+      - pattern-regex: '(?i)(secret[_-]?key)\s*[=:]\s*[''"][^${\s(]{20,}[''"]'
       # DB 비밀번호 하드코딩
       - pattern-regex: '(?i)(db[_-]?pass(word)?|database[_-]?pass(word)?|mysql[_-]?pass|postgres[_-]?pass)\s*[=:]\s*[''"][^${\s]{8,}[''"]'
       # JWT secret 하드코딩

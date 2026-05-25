@@ -44,6 +44,14 @@ rules:
       - pattern: $LOG.error($X)
       # print (일부 환경에서 로그로 집계)
       - pattern: print($X)
+      # extra= dict로 민감 정보 전달 (structlog/Django logging)
+      - pattern: "logger.warning($MSG, extra={..., $K: $X, ...})"
+      - pattern: "logger.info($MSG, extra={..., $K: $X, ...})"
+      - pattern: "logger.error($MSG, extra={..., $K: $X, ...})"
+      - pattern: "logger.debug($MSG, extra={..., $K: $X, ...})"
+      - pattern: "$LOGGER.warning($MSG, extra={..., $K: $X, ...})"
+      - pattern: "$LOGGER.info($MSG, extra={..., $K: $X, ...})"
+      - pattern: "$LOGGER.error($MSG, extra={..., $K: $X, ...})"
 
     pattern-sanitizers:
       - patterns:
