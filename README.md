@@ -429,6 +429,7 @@ noah-8719/
 
 | 문서 | 경로 | 내용 |
 |------|------|------|
+| **semgrep 인덱싱 · Phase 1 상세** | `skills/sast/docs/indexing-and-phase1.md` | semgrep 원본 JSON 구조, locindex.json 생성 방식, locindex_summary.py 동작, Phase 1 분석 순서 |
 | 오케스트레이터 | `skills/sast/SKILL.md` | 전체 실행 프로세스 (Step 1~12), 스캐너 그룹 편성, 동적 분석 Tier, 결과 검증 |
 | Phase 1 공통 지침 | `skills/sast/prompts/guidelines-phase1.md` | Sink-first + Source-first 분석, 래퍼 추적, 의미 기반 판정, Source 도달성 |
 | Phase 2 공통 지침 | `skills/sast/prompts/guidelines-phase2.md` | 동적 테스트 절차, 에러 핸들링, 차단 응답 처리, 도메인 안전 규칙 |
