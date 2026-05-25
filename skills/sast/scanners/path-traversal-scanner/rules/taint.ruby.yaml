@@ -1,0 +1,74 @@
+rules:
+  - id: noah-ruby-pathtrv-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby에서 params/request.params가 File.open/send_file/IO.read 등 파일 I/O sink에
+      경로 검증 없이 들어가면 Path Traversal. 안전: File.basename, File.expand_path +
+      allowed_dir.start_with? 검증, Rack::Utils.clean_path_info.
+    pattern-sources:
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: request.params[$K]
+      - pattern: env["PATH_INFO"]
+
+    pattern-sinks:
+      - pattern: File.open($X, ...)
+      - pattern: File.open($X)
+      - pattern: File.read($X, ...)
+      - pattern: File.read($X)
+      - pattern: File.write($X, ...)
+      - pattern: File.delete($X)
+      - pattern: IO.read($X, ...)
+      - pattern: IO.write($X, ...)
+      - pattern: IO.binread($X, ...)
+      - pattern: open($X, ...)
+      - pattern: Dir.glob($X)
+      - pattern: Pathname.new($X)
+      - pattern: send_file($X, ...)
+      - pattern: send_file $X
+      - pattern: "render(file: $X, ...)"
+      - pattern: load($X)
+      - pattern: require($X)
+      - pattern: require_relative($X)
+      - pattern: FileUtils.cp($X, ...)
+      - pattern: FileUtils.mv($X, ...)
+      - pattern: FileUtils.rm($X, ...)
+      - pattern: Rack::File.new($X)
+
+    pattern-sanitizers:
+      - pattern: File.basename($X)
+      - pattern: Rack::Utils.clean_path_info($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $SAFE = File.expand_path($X, $BASE)
+              raise ... unless $SAFE.start_with?($BASE)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $X.include?("..")
+                ...
+              end
+      - pattern: $X.gsub("..", "")
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Path Traversal
+      owasp:
+        - "A01:2021 Broken Access Control"
+      technology:
+        - ruby
+        - rails
+        - sinatra
+        - rack

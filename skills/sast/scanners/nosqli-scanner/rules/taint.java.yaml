@@ -1,0 +1,74 @@
+rules:
+  - id: noah-java-nosqli-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력(@RequestParam/@PathVariable/@RequestBody)이
+      MongoDB BasicDBObject/Document/MongoTemplate 쿼리에 검증 없이 들어가면
+      NoSQL Injection. 안전: BasicDBObject에 개별 필드 할당(직접 where 파라미터화),
+      Spring Data MongoDB @Query 파라미터 바인딩.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+
+    pattern-sinks:
+      # MongoTemplate
+      - pattern: $TPL.find(new Query(Criteria.where($FIELD).is($X)), ...)
+      - pattern: $TPL.findOne(new Query(Criteria.where($FIELD).regex($X)), ...)
+      - pattern: $TPL.find(Query.query(Criteria.where($FIELD).in($X)), ...)
+      # BasicDBObject / Document 직접 쿼리
+      - pattern: new BasicDBObject($X)
+      - pattern: new Document($X)
+      - pattern: Document.parse($X)
+      # MongoCollection
+      - pattern: $COL.find($X)
+      - pattern: $COL.find(new Document($X))
+      - pattern: $COL.deleteMany(new Document($X))
+      - pattern: $COL.updateOne(new Document($X), ...)
+
+    pattern-sanitizers:
+      - pattern: Integer.parseInt($X)
+      - pattern: Long.parseLong($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($X instanceof String) { ... }
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-943: Improper Neutralization of Special Elements in Data Query Logic"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - java
+        - spring
+        - mongodb
+        - mongotemplate

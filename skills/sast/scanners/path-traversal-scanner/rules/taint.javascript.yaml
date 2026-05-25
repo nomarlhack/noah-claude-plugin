@@ -18,6 +18,14 @@ rules:
       - pattern: req.body.$X
       - pattern: ctx.query
       - pattern: ctx.params
+      # Next.js App Router
+      - pattern: searchParams.get($K)
+      - pattern: searchParams[$K]
+      - pattern: params[$K]
+      - pattern: request.nextUrl.searchParams.get($K)
+      # Fastify
+      - pattern: request.query[$K]
+      - pattern: request.params[$K]
     pattern-sinks:
       - pattern: fs.readFile($X, ...)
       - pattern: fs.readFileSync($X, ...)

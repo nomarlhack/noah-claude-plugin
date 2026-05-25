@@ -7,35 +7,24 @@ rules:
       path-traversal-scanner Phase 1 sink/source 패턴 매치 (Ruby 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'fs\.readFile'
-      - pattern-regex: 'fs\.readFileSync'
-      - pattern-regex: 'fs\.createReadStream'
-      - pattern-regex: 'path\.join\s*\('
-      - pattern-regex: 'path\.resolve\s*\('
-      - pattern-regex: 'fs\.writeFile'
-      - pattern-regex: 'send_file'
-      - pattern-regex: 'render.*file:'
-      - pattern-regex: 'File\.open'
-      - pattern-regex: 'File\.read'
-      - pattern-regex: 'file_get_contents\s*\('
-      - pattern-regex: 'include\s*\('
-      - pattern-regex: 'require\s*\('
-      - pattern-regex: 'open\s*\('
-      - pattern-regex: 'readFile'
-      - pattern-regex: 'new File\s*\('
-      - pattern-regex: 'Paths\.get\s*\('
-      - pattern-regex: 'Files\.newInputStream'
-      - pattern-regex: 'fs\.createWriteStream'
-      - pattern-regex: 'fs\.writeFileSync'
-      - pattern-regex: 'sendFile\s*\('
-      - pattern-regex: 'os\.Open\s*\('
-      - pattern-regex: 'os\.ReadFile\s*\('
-      - pattern-regex: 'os\.Create\s*\('
-      - pattern-regex: 'searchParams\.get\s*\('
-      - pattern-regex: '@RequestParam'
-      - pattern-regex: '@PathVariable'
-      - pattern-regex: 'req\.query'
-      - pattern-regex: 'req\.params'
+      # Ruby file I/O sinks
+      - pattern-regex: 'File\.open\s*\('
+      - pattern-regex: 'File\.read\s*\('
+      - pattern-regex: 'File\.write\s*\('
+      - pattern-regex: 'File\.delete\s*\('
+      - pattern-regex: 'IO\.read\s*\('
+      - pattern-regex: 'IO\.write\s*\('
+      - pattern-regex: 'Pathname\.new\s*\('
+      - pattern-regex: 'FileUtils\.'
+      # Rails/Sinatra 응답
+      - pattern-regex: 'send_file\s'
+      - pattern-regex: 'send_file\('
+      - pattern-regex: 'render\s.*file:'
+      # Rack 파일 서빙
+      - pattern-regex: 'Rack::File\.new\s*\('
+      # source
+      - pattern-regex: 'params\['
+      - pattern-regex: 'request\.params\['
     metadata:
       category: security
       subcategory:

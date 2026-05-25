@@ -1,0 +1,87 @@
+rules:
+  - id: noah-kotlin-ssrf-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Kotlin + Spring 컨트롤러 입력(@RequestParam/@PathVariable/@RequestBody)이
+      RestTemplate/WebClient/OkHttpClient/HttpURLConnection URL로 들어가면 SSRF.
+      안전: URL 호스트 화이트리스트 + 내부망 IP 차단.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestBody $X: $T, ...) { ... }
+
+    pattern-sinks:
+      # RestTemplate
+      - pattern: $RT.getForObject($X, ...)
+      - pattern: $RT.getForEntity($X, ...)
+      - pattern: $RT.postForObject($X, ...)
+      - pattern: $RT.postForEntity($X, ...)
+      - pattern: $RT.exchange($X, ...)
+      # WebClient (Reactor)
+      - pattern: $WC.get().uri($X)
+      - pattern: $WC.post().uri($X)
+      - pattern: $WC.put().uri($X)
+      - pattern: $WC.delete().uri($X)
+      - pattern: WebClient.create($X)
+      # OkHttp
+      - pattern: "Request.Builder().url($X)"
+      - pattern: "OkHttpClient().newCall(Request.Builder().url($X).build())"
+      # java.net.URL
+      - pattern: "URL($X)"
+      - pattern: "URI.create($X)"
+      - pattern: "HttpRequest.newBuilder().uri(URI.create($X))"
+      # Ktor client
+      - pattern: $CLIENT.get($X)
+      - pattern: $CLIENT.post($X)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              val $URI = URI.create($X)
+              require($WHITELIST.contains($URI.host)) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($WHITELIST.contains(URL($X).host)) { ... }
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-918: Server-Side Request Forgery"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - SSRF
+      owasp:
+        - "A10:2021 Server-Side Request Forgery"
+      technology:
+        - kotlin
+        - spring
+        - resttemplate
+        - webclient
+        - okhttp
+        - ktor

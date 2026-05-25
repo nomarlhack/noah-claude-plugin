@@ -9,10 +9,25 @@ rules:
       URL.Parse 후 hostname 화이트리스트 비교.
     pattern-sources:
       - pattern: r.URL.Query().Get($K)
+      - pattern: r.URL.Query()[$K]
       - pattern: r.FormValue($K)
+      - pattern: r.Header.Get($K)
+      - pattern: mux.Vars(r)[$K]
+      # Gin
       - pattern: c.Query($K)
       - pattern: c.Param($K)
       - pattern: c.PostForm($K)
+      - pattern: c.GetHeader($K)
+      # Echo
+      - pattern: c.QueryParam($K)
+      - pattern: c.Param($K)
+      - pattern: c.FormValue($K)
+      # Fiber
+      - pattern: c.Query($K)
+      - pattern: c.Params($K)
+      - pattern: c.FormValue($K)
+      # Chi
+      - pattern: chi.URLParam(r, $K)
     pattern-sinks:
       - pattern: http.Get($X)
       - pattern: http.Post($X, ...)

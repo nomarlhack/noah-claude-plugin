@@ -22,6 +22,11 @@ rules:
       - pattern: ctx.Param($K)
       - pattern: ctx.Query($K)
       - pattern: chi.URLParam(r, $K)
+      # Echo
+      - pattern: c.QueryParam($K)
+      # Fiber
+      - pattern: c.Params($K)
+      - pattern: c.FormValue($K)
 
     pattern-sinks:
       - patterns:

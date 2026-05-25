@@ -43,6 +43,19 @@ rules:
                 $CUR = $CUR[$K];
                 ...
               })
+      # lodash — 사용자 제어 path를 객체 할당에 전달
+      - pattern: _.set($OBJ, $X, $VAL)
+      - pattern: _.merge($OBJ, $X)
+      - pattern: _.mergeWith($OBJ, $X, ...)
+      - pattern: _.defaultsDeep($OBJ, $X)
+      - pattern: lodash.set($OBJ, $X, $VAL)
+      - pattern: lodash.merge($OBJ, $X)
+      # deepmerge
+      - pattern: deepmerge($OBJ, $X, ...)
+      - pattern: deepmerge.all([$OBJ, $X, ...])
+      # object-path
+      - pattern: objectPath.set($OBJ, $X, $VAL)
+      - pattern: set($OBJ, $X, $VAL)
     pattern-sanitizers:
       # Object.create(null) 초기값
       - pattern: Object.create(null)

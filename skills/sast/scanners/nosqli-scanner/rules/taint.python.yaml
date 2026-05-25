@@ -1,0 +1,76 @@
+rules:
+  - id: noah-python-nosqli-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 HTTP 입력(request.GET/POST/json)이 pymongo find/update 쿼리에
+      객체로 직접 들어가면 NoSQL Injection ($ne/$gt/$where 연산자 주입).
+      안전: str() 캐스트로 타입 고정, marshmallow/pydantic 스키마 검증,
+      $where 연산자 사용 금지.
+    pattern-sources:
+      - pattern: request.GET[$K]
+      - pattern: request.POST[$K]
+      - pattern: request.GET.get($K, ...)
+      - pattern: request.POST.get($K, ...)
+      - pattern: request.json
+      - pattern: request.json[$K]
+      - pattern: request.args[$K]
+      - pattern: request.args.get($K, ...)
+      - pattern: request.form[$K]
+      - pattern: request.data
+      - pattern: request.body
+
+    pattern-sinks:
+      # pymongo
+      - pattern: $COL.find($X, ...)
+      - pattern: $COL.find_one($X, ...)
+      - pattern: $COL.find_one_and_update($X, ...)
+      - pattern: $COL.find_one_and_delete($X, ...)
+      - pattern: $COL.count_documents($X, ...)
+      - pattern: $COL.delete_one($X, ...)
+      - pattern: $COL.delete_many($X, ...)
+      - pattern: $COL.update_one($X, ...)
+      - pattern: $COL.update_many($X, ...)
+      - pattern: $COL.aggregate($X, ...)
+      # mongoengine
+      - pattern: $MODEL.objects($X)
+      - pattern: $MODEL.objects.filter($X)
+      - pattern: $MODEL.objects.get($X)
+
+    pattern-sanitizers:
+      - pattern: str($X)
+      - pattern: int($X)
+      - pattern: float($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if isinstance($X, str):
+                  ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $SCHEMA = $S()
+              $V = $SCHEMA.load($X)
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-943: Improper Neutralization of Special Elements in Data Query Logic"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - python
+        - pymongo
+        - mongoengine
+        - django
+        - flask
+        - fastapi

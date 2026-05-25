@@ -14,6 +14,14 @@ rules:
       - pattern: req.params
       - pattern: req.body
       - pattern: req.body.$X
+      # Next.js App Router
+      - pattern: searchParams.get($K)
+      - pattern: searchParams[$K]
+      - pattern: params[$K]
+      - pattern: request.nextUrl.searchParams.get($K)
+      # Fastify
+      - pattern: request.query[$K]
+      - pattern: request.params[$K]
     pattern-sinks:
       - pattern: res.redirect($X)
       - pattern: res.redirect($CODE, $X)

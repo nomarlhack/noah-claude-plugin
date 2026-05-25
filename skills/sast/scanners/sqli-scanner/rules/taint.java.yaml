@@ -66,6 +66,20 @@ rules:
               - pattern: $STMT.executeUpdate("..." + $V)
               - pattern: $STMT.execute("..." + $V)
           - pattern-not: $STMT.executeQuery("...")
+      # JOOQ — DSL.condition/field 문자열 결합
+      - pattern: $DSL.resultQuery("..." + $X, ...)
+      - pattern: $DSL.execute("..." + $X)
+      - pattern: $DSL.condition("..." + $X)
+      - pattern: DSL.field("..." + $X)
+      # MyBatis — @Select/@Update 어노테이션 내 문자열 결합은 정적 분석 한계로
+      # 동적 SQL Provider 패턴만 커버
+      - pattern: new SQL().SELECT($X).FROM($T)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public String $M(String $X) {
+                  return new SQL().SELECT(...).WHERE($X).toString();
+              }
 
     pattern-sanitizers:
       - pattern: Integer.parseInt($X)

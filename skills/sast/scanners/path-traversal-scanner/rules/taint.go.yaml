@@ -9,10 +9,22 @@ rules:
       filepath.Clean 후 prefix 검사.
     pattern-sources:
       - pattern: r.URL.Query().Get($K)
+      - pattern: r.URL.Query()[$K]
       - pattern: r.FormValue($K)
+      - pattern: r.Header.Get($K)
       - pattern: mux.Vars(r)[$K]
+      # Gin
       - pattern: c.Query($K)
       - pattern: c.Param($K)
+      - pattern: c.PostForm($K)
+      # Echo
+      - pattern: c.QueryParam($K)
+      - pattern: c.Param($K)
+      # Fiber
+      - pattern: c.Query($K)
+      - pattern: c.Params($K)
+      # Chi
+      - pattern: chi.URLParam(r, $K)
     pattern-sinks:
       - pattern: os.Open($X)
       - pattern: os.ReadFile($X)

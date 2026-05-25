@@ -68,6 +68,31 @@ rules:
               - pattern: $DB.session.execute("..." + $V)
               - pattern: $DB.session.execute("..." % $V)
       - pattern: RawSQL($Q, ...)
+      # asyncpg (async PostgreSQL)
+      - patterns:
+          - pattern-either:
+              - pattern: await $CONN.fetch(f"$STR")
+              - pattern: await $CONN.fetch("..." + $V)
+              - pattern: await $CONN.fetchrow(f"$STR")
+              - pattern: await $CONN.fetchrow("..." + $V)
+              - pattern: await $CONN.fetchval(f"$STR")
+              - pattern: await $CONN.execute(f"$STR")
+              - pattern: await $CONN.execute("..." + $V)
+          - pattern-not: await $CONN.fetch("...", *$ARGS)
+          - pattern-not: await $CONN.execute("...", *$ARGS)
+      # aiomysql / aiosqlite
+      - patterns:
+          - pattern-either:
+              - pattern: await $CUR.execute(f"$STR")
+              - pattern: await $CUR.execute("..." + $V)
+          - pattern-not: await $CUR.execute("...", $PARAMS)
+      # Databases (async query builder)
+      - pattern: await $DB.fetch_all(f"$STR")
+      - pattern: await $DB.fetch_one(f"$STR")
+      - pattern: await $DB.execute(f"$STR")
+      # Tortoise ORM
+      - pattern: await $M.raw(f"$STR")
+      - pattern: await $M.filter(RawSQL(f"$STR"))
 
     pattern-sanitizers:
       - pattern: int($X)

@@ -1,0 +1,75 @@
+rules:
+  - id: noah-ruby-ssrf-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby에서 params/request.params가 Net::HTTP/HTTParty/Faraday/open-uri URL로
+      직접 들어가면 SSRF. 안전: URI.parse 후 host 화이트리스트 비교,
+      SSRFFilter gem, 내부 IP 대역 차단.
+    pattern-sources:
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: request.params[$K]
+
+    pattern-sinks:
+      # Net::HTTP
+      - pattern: Net::HTTP.get(URI($X), ...)
+      - pattern: Net::HTTP.get_response(URI($X), ...)
+      - pattern: Net::HTTP.post(URI($X), ...)
+      - pattern: Net::HTTP.start($X, ...)
+      - pattern: URI.open($X, ...)
+      - pattern: open($X, ...)
+      # HTTParty
+      - pattern: HTTParty.get($X, ...)
+      - pattern: HTTParty.post($X, ...)
+      - pattern: HTTParty.put($X, ...)
+      - pattern: HTTParty.delete($X, ...)
+      # Faraday
+      - pattern: Faraday.get($X, ...)
+      - pattern: Faraday.new($X, ...)
+      - pattern: "Faraday.new(url: $X, ...)"
+      # RestClient
+      - pattern: RestClient.get($X, ...)
+      - pattern: RestClient.post($X, ...)
+      # Typhoeus
+      - pattern: Typhoeus.get($X, ...)
+      - pattern: Typhoeus::Request.new($X, ...)
+      # Excon
+      - pattern: Excon.get($X, ...)
+      - pattern: Excon.new($X, ...)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $URI = URI.parse($X)
+              raise ... unless $WHITELIST.include?($URI.host)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $ALLOWED_HOSTS.include?(URI.parse($X).host)
+                ...
+              end
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-918: Server-Side Request Forgery"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - SSRF
+      owasp:
+        - "A10:2021 Server-Side Request Forgery"
+      technology:
+        - ruby
+        - rails
+        - httparty
+        - faraday
+        - net-http
+        - sinatra

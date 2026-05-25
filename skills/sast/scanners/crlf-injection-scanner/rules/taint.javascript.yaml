@@ -16,6 +16,14 @@ rules:
       - pattern: req.body
       - pattern: req.body.$X
       - pattern: req.headers[$X]
+      # Next.js App Router
+      - pattern: searchParams.get($K)
+      - pattern: searchParams[$K]
+      - pattern: params[$K]
+      - pattern: request.nextUrl.searchParams.get($K)
+      # Fastify
+      - pattern: request.query[$K]
+      - pattern: request.params[$K]
     pattern-sinks:
       - pattern: res.setHeader($N, $X)
       - pattern: res.writeHead($C, $X)

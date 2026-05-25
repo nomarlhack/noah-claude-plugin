@@ -15,7 +15,23 @@ rules:
       - pattern: req.query
       - pattern: req.query.$X
       - pattern: req.params
+      # Next.js App Router
+      - pattern: searchParams.get($K)
+      - pattern: params[$K]
+      - pattern: request.nextUrl.searchParams.get($K)
+      # Fastify
+      - pattern: request.query[$K]
+      - pattern: request.body
     pattern-sinks:
+      # Vercel AI SDK
+      - pattern: "generateText({..., prompt: $X, ...})"
+      - pattern: "generateText({..., messages: $X, ...})"
+      - pattern: "streamText({..., prompt: $X, ...})"
+      - pattern: "streamText({..., messages: $X, ...})"
+      - pattern: "generateObject({..., prompt: $X, ...})"
+      # @langchain/anthropic, @langchain/openai
+      - pattern: $MODEL.invoke($X)
+      - pattern: $MODEL.stream($X)
       - pattern: openai.chat.completions.create(...)
       - pattern: $CLIENT.chat.completions.create(...)
       - pattern: $CLIENT.completions.create(...)

@@ -30,6 +30,16 @@ rules:
       - pattern: context.params
       - pattern: ctx.query
       - pattern: ctx.request.body
+      # Next.js App Router (Next.js 13+)
+      - pattern: searchParams.get($K)
+      - pattern: searchParams[$K]
+      - pattern: params[$K]
+      - pattern: request.nextUrl.searchParams.get($K)
+      - pattern: (await params).$K
+      # Fastify
+      - pattern: request.query[$K]
+      - pattern: request.params[$K]
+      - pattern: request.body
 
     pattern-sinks:
       - patterns:

@@ -26,6 +26,14 @@ rules:
       - pattern: vm.runInNewContext($X, ...)
       - pattern: vm.runInThisContext($X, ...)
       - pattern: vm.runInContext($X, ...)
+      # vm2
+      - pattern: new VM({...}).run($X)
+      - pattern: new NodeVM({...}).run($X, ...)
+      - pattern: $VM.run($X)
+      # isolated-vm
+      - pattern: $ISOLATE.compileScript($X)
+      - pattern: $ISOLATE.compileScriptSync($X)
+      - pattern: new ivm.Script($X)
     pattern-sanitizers:
       - pattern: JSON.parse($X)
       - pattern: Number($X)

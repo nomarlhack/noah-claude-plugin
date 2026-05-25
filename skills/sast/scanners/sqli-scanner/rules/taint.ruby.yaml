@@ -1,0 +1,69 @@
+rules:
+  - id: noah-ruby-sqli-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby에서 HTTP 입력(params/request.params)이 ActiveRecord .where(문자열보간) /
+      find_by_sql / connection.execute / Sequel.lit에 문자열 결합으로 들어가면 SQLi.
+      안전: 파라미터 바인딩 (.where("id = ?", id), .where(id: id)), sanitize_sql.
+    pattern-sources:
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: "params.permit($K)[$K]"
+      - pattern: "$X.to_s"
+        pattern-inside: |
+          $X = params[$K]
+      - pattern: request.params[$K]
+
+    pattern-sinks:
+      # ActiveRecord where 문자열 보간 (Ruby 문자열 보간 #{})
+      - pattern: $M.where($QUERY)
+      - pattern: $M.having($QUERY)
+      - pattern: $M.joins($QUERY)
+      - pattern: $M.order($QUERY)
+      - pattern: $M.group($QUERY)
+      # find_by_sql
+      - pattern: $M.find_by_sql($QUERY)
+      # connection.execute
+      - pattern: $CONN.execute($QUERY)
+      - pattern: $CONN.exec_query($QUERY)
+      - pattern: ActiveRecord::Base.connection.execute($QUERY)
+      - pattern: ActiveRecord::Base.connection.exec_query($QUERY)
+      # Sequel
+      - pattern: $DB.run($QUERY)
+      - pattern: "$DB[$T].where(Sequel.lit($QUERY))"
+
+    pattern-sanitizers:
+      - pattern: $M.sanitize_sql($X)
+      - pattern: $M.sanitize_sql_array($X)
+      - pattern: ActiveRecord::Base.sanitize_sql($X)
+      - pattern: $X.to_i
+      - pattern: Integer($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $WHITELIST.include?($X)
+                ...
+              end
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-89: SQL Injection"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Injection
+      owasp:
+        - "A03:2021 Injection"
+      technology:
+        - ruby
+        - rails
+        - activerecord
+        - sequel
+        - sinatra

@@ -1,0 +1,80 @@
+rules:
+  - id: noah-kotlin-pathtrv-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Kotlin + Spring 컨트롤러 입력(@RequestParam/@PathVariable)이 File/Paths.get/
+      InputStreamResource 등 파일 I/O sink에 경로 검증 없이 들어가면 Path Traversal.
+      안전: Path.normalize().startsWith(baseDir), FilenameUtils.getName.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestBody $X: $T, ...) { ... }
+
+    pattern-sinks:
+      - pattern: "Paths.get($X, ...)"
+      - pattern: "Paths.get($A, $X)"
+      - pattern: "File($X)"
+      - pattern: "File($A, $X)"
+      - pattern: "FileInputStream($X)"
+      - pattern: "FileOutputStream($X)"
+      - pattern: "FileReader($X)"
+      - pattern: "Files.newInputStream(Paths.get($X), ...)"
+      - pattern: "Files.newOutputStream(Paths.get($X), ...)"
+      - pattern: "Files.readAllBytes(Paths.get($X))"
+      - pattern: "Files.readAllLines(Paths.get($X), ...)"
+      - pattern: "Files.write(Paths.get($X), ...)"
+      - pattern: "Files.delete(Paths.get($X))"
+      - pattern: "ClassPathResource($X)"
+      - pattern: "InputStreamResource(FileInputStream($X))"
+      - pattern: "ResponseEntity.ok().body(Resource(File($X)))"
+
+    pattern-sanitizers:
+      - pattern: FilenameUtils.getName($X)
+      - pattern: FilenameUtils.normalize($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              val $NORM = Paths.get($BASE).resolve($X).normalize()
+              if (!$NORM.startsWith($BASE)) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              require($X.startsWith("/") || $X.contains("..")) { ... }
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class:
+        - Path Traversal
+      owasp:
+        - "A01:2021 Broken Access Control"
+      technology:
+        - kotlin
+        - spring
+        - java-io
