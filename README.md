@@ -500,7 +500,9 @@ noah-8719/
 │       │   ├── review-modes.md
 │       │   ├── single-source-of-truth.md
 │       │   ├── scanner-authoring-guide.md
-│       │   └── resume.md
+│       │   ├── resume.md
+│       │   ├── automation-plan.md
+│       │   └── lint-reader-layer.md
 │       │
 │       └── tests/
 │           ├── source-reachability/     # source 도달성 회귀 테스트
