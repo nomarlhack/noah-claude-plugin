@@ -50,7 +50,7 @@ flowchart TD
     User["사용자: /noah-8719:sast"] --> S1["Step 1: 실행 경로 확정"]
     S1 --> S2["Step 2: 패턴 인덱싱"]
     S2 --> S3["Step 3: 프로젝트 스택 파악"]
-    S3 --> S4["Step 4: 스캐너 선별\n(다국어 의존성 + AI 검토)"]
+    S3 --> S4["Step 4: 스캐너 선별\n(다중 언어 의존성 + AI 검토)"]
     S4 --> S5["Step 5: 정적 분석\n(그룹 병렬 → 파일 저장)"]
     S5 --> BML2["phase1_build_master_list.py\n결과 검증 + master-list.json"]
     BML2 --> S6["Step 6: AI 자율 분석\n(내부 3단계)"]
@@ -124,7 +124,7 @@ flowchart TD
 
     subgraph IDX ["semgrep_index.py"]
         direction TB
-        A1["① rule_id → tier 결정\n끝이 -taint          → taint\n언어 포함 패턴 룰    → ast\n범용 phase1-pattern  → generic\n그 외                → ast"]
+        A1["① rule_id → tier 결정\nnoah-java-xss-taint          → taint\nnoah-xss-phase1-pattern      → generic\nnoah-java-xss-phase1-pattern → ast\nnoah-java-xss-sink-pattern   → ast"]
         A2["② 같은 file:line 병합\ntier 승격 (taint > ast > generic)\nrule_ids 배열로 모두 보존"]
         A1 --> A2
     end
@@ -161,6 +161,16 @@ flowchart TD
     style LIST fill:#0f3460,stroke:#e94560,color:#eee
     style OUT fill:#e94560,stroke:#e94560,color:#fff
 ```
+
+tier는 rule ID 이름만으로 자동 결정됩니다.
+
+| tier | 판정 기준 | 예시 rule ID |
+|------|-----------|-------------|
+| `taint` | 끝이 `-taint` | `noah-java-xss-taint` |
+| `generic` | 끝이 `-phase1-pattern`이고 언어 없음 | `noah-xss-phase1-pattern` |
+| `ast` | 끝이 `-phase1-pattern`이고 언어 있음, 또는 그 외 모두 | `noah-java-xss-phase1-pattern`, `noah-java-xss-sink-pattern` |
+
+"언어 있음"이란 rule ID 두 번째 토큰이 `java`, `javascript`, `python`, `kotlin` 등 언어 이름인 경우입니다.
 
 **Step 3 · 프로젝트 스택 파악**
 모든 스캐너에 공통으로 필요한 프로젝트 정보를 수집합니다.

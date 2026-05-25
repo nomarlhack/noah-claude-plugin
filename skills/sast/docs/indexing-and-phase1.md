@@ -10,7 +10,7 @@ flowchart TD
 
     subgraph IDX ["semgrep_index.py"]
         direction TB
-        A1["① rule_id → tier 결정\n...-taint           → taint\nnoa-{lang}-...-pattern → ast\nnoa-...-phase1-pattern → generic\n그 외               → ast"]
+        A1["① rule_id → tier 결정\nnoah-java-xss-taint          → taint\nnoah-xss-phase1-pattern      → generic\nnoah-java-xss-phase1-pattern → ast\nnoah-java-xss-sink-pattern   → ast"]
         A2["② 같은 file:line 병합\ntier 승격 (taint > ast > generic)\nrule_ids 배열로 모두 보존"]
         A1 --> A2
     end
@@ -115,11 +115,13 @@ semgrep은 룰이 매칭될 때마다 다음 정보를 반환합니다.
 
 tier는 semgrep이 어떤 방식으로 매칭했는지를 나타냅니다. 룰 ID 이름으로 자동 결정됩니다.
 
-| tier | 결정 기준 | 의미 |
-|------|-----------|------|
-| `taint` | rule_id가 `-taint`로 끝남 | dataflow 분석으로 source→sink 흐름 확정. 신뢰도 최고 |
-| `ast` | rule_id에 언어 prefix 포함 (`noah-javascript-...`, `noah-java-...` 등) 또는 `-taint`가 아닌 그 외 | 언어 파서로 구문 매칭. 위치는 정확하나 source·sanitizer는 미확인 |
-| `generic` | rule_id가 `noah-<slug>-phase1-pattern` 형식이고 언어 prefix 없음 (예: `noah-xss-phase1-pattern`) | 범용 정규식 매칭. 언어 무관, 노이즈가 많고 신뢰도 최저 |
+| tier | 판정 기준 | 예시 rule ID | 의미 |
+|------|-----------|-------------|------|
+| `taint` | 끝이 `-taint` | `noah-java-xss-taint` | dataflow 분석으로 source→sink 흐름 확정. 신뢰도 최고 |
+| `generic` | 끝이 `-phase1-pattern`이고 언어 없음 | `noah-xss-phase1-pattern` | 범용 정규식 매칭. 언어 무관, 노이즈 많음. 신뢰도 최저 |
+| `ast` | 끝이 `-phase1-pattern`이고 언어 있음, 또는 그 외 모두 | `noah-java-xss-phase1-pattern`, `noah-java-xss-sink-pattern` | 언어 파서로 구문 매칭. 위치는 정확하나 source·sanitizer는 미확인 |
+
+"언어 있음"이란 rule ID 두 번째 토큰이 `java`, `javascript`, `python`, `kotlin` 등 언어 이름인 경우입니다.
 
 ---
 
