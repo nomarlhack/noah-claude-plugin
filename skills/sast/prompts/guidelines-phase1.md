@@ -240,6 +240,7 @@ Sink-first 분석 완료 후, Source-first 탐색을 수행한다.
 - 전이 의존성에만 존재하고 소스코드에서 직접 사용하지 않는 경우
 - 빌드 스크립트, 테스트 코드, 개발 도구에만 해당하는 경우
 - Sink의 실제 인자가 컴파일 타임 상수, 하드코딩 리터럴, 또는 내부적으로만 생성되는 값(UUID, 서버 시간, 내부 ID 등)이며, 변수 역추적 시 사용자 제어 Source에 도달하지 않는 경우 (Source 도달성 실패)
+  > **예외 — presence 아키타입**: `hardcoded-secrets-scanner`와 `log-injection-scanner`는 이 기준을 적용하지 않는다. 하드코딩 리터럴·비밀값 자체가 탐지 대상이므로 Source 도달성 실패를 이유로 폐기하면 안 된다. `decision-framework.md §3 아키타입 표 "presence"` 참조.
 
 단, 서버 검증 여부를 확인할 수 없는 경우에는 후보로 유지한다.
 

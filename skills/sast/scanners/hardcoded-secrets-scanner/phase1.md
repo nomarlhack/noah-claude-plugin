@@ -44,6 +44,15 @@ id_prefix: SECRET
 | 환경 변수 참조 또는 명시적 placeholder | 제외 |
 | 테스트 코드의 픽스처 (프로덕션 코드와 분리됨) | 제외 |
 
+## Phase 1 manifest 작성 시 주의
+
+이 스캐너는 **presence 아키타입**이다. 일반 injection 스캐너와 다른 점:
+- `url_path`: HTTP 엔드포인트가 없으므로 **빈 문자열(`""`)** 또는 파일 경로로 기입
+- `source`: 탐지된 변수명 또는 패턴 (예: `STRIPE_SECRET_KEY`)
+- `sink`: 탐지된 파일:라인 (예: `config/settings.py:86`)
+- **Source 도달성 역추적 불필요**: 하드코딩 리터럴이 곧 취약점 증거. `_principles.md §1 예외` + `guidelines-phase1.md §8 예외` 적용.
+- `decision-framework.md §2-D O2(reachability)` 의무 생략. O4(sink 의미론 정합 — 실제 비밀값 형태인지)만 확인.
+
 ## 후보 판정 제한
 
 - `.env.example`, `README.md` 내 예시 값은 제외

@@ -61,6 +61,14 @@ id_prefix: LOGINJ
 | 개행 제거 후 로깅 | 제외 (CRLF) |
 | 구조화 로깅으로 값 분리 + 민감 정보 아닌 필드 | 제외 |
 
+## Phase 1 manifest 작성 시 주의
+
+이 스캐너는 **presence 아키타입**이다:
+- `url_path`: CRLF는 HTTP 요청을 통해 트리거되므로 취약 로그 호출이 있는 라우트 경로 기입. 민감 정보 로깅은 빈 문자열 또는 엔드포인트 경로.
+- `source`: 사용자 입력 변수명 (예: `request.POST.get("username")`)
+- `sink`: 로그 호출 파일:라인 (예: `views.py:134 logger.warning(...)`)
+- **Source 도달성**: log-injection은 taint로 source→sink를 추적하므로 taint 매치는 단축 절차 적용. `extra=` dict 패턴(generic tier)은 source 변수 역추적으로 확인.
+
 ## 후보 판정 제한
 
 순수 로컬 내부 값(서버 생성 로그 ID, 타임스탬프, 고정 상수)은 제외. 분석 도구 자체 로그 출력은 제외.
