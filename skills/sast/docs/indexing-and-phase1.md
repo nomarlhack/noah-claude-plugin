@@ -1,71 +1,57 @@
-# semgrep 인덱싱과 Phase 1 분석 상세
+# semgrep 인덱싱과 Phase 1 분석
 
-## 1. 전체 흐름 개요
+## 전체 흐름
 
 ```
-프로젝트 소스코드
-        ↓
-semgrep_index.py (Step 2)
-        ↓
-<scanner>.locindex.json (스캐너별)
-        ↓
-locindex_summary.py (Phase 1 에이전트가 Bash로 실행)
-        ↓
-파일 목록 (파일당 1줄, 2000줄 이내)
-        ↓
-파일별 Read → source→sink 추적 → 후보 등록
+① semgrep_index.py
+   코드베이스 전체를 한 번 스캔 → 스캐너별 locindex.json 생성
+
+② locindex_summary.py  (Phase 1 에이전트가 Bash로 실행)
+   locindex.json → 파일 목록 요약 (파일당 1줄, 2,000줄 이내 보장)
+
+③ Phase 1 에이전트
+   파일 목록을 보고 각 파일을 Read → source→sink 추적 → 후보 등록
 ```
 
 ---
 
-## 2. semgrep 인덱싱 (semgrep_index.py)
+## semgrep 인덱싱
 
-### 2-1. semgrep이 만드는 raw JSON
+### semgrep이 만드는 결과
 
-semgrep을 실행하면 매칭 항목당 이런 구조가 나옵니다:
+semgrep은 룰이 매칭될 때마다 다음 정보를 반환합니다.
 
 ```json
 {
   "check_id": "noah-javascript-xss-phase1-pattern",
   "path": "/path/to/NowRender.js",
-  "start": {"line": 22, "col": 22},
-  "end":   {"line": 22, "col": 30},
+  "start": {"line": 22},
   "extra": {
-    "lines": "this.$nowList.append(jQuery(list.map((item) => {",
-    "severity": "WARNING"
+    "lines": "this.$nowList.append(jQuery(list.map((item) => {"
   }
 }
 ```
 
-- `check_id` — 어느 룰에 매칭됐는지
-- `path` + `start.line` — 파일 경로와 라인 번호
-- `extra.lines` — 매칭된 코드 한 줄
+`semgrep_index.py`는 이 결과를 받아서 스캐너별로 두 파일로 가공합니다.
 
-### 2-2. semgrep_index.py가 하는 일
+---
 
-raw JSON을 받아 스캐너별로 두 파일을 생성합니다.
+### 생성되는 파일
 
-**① `<scanner>.json` — 평평한 인덱스**
+**`<scanner>.json` — 룰별 위치 목록**
 
-룰 ID별로 매칭 위치 목록을 저장합니다.
+룰 ID를 키로, 해당 룰이 매칭된 위치 목록을 값으로 저장합니다.
 
 ```json
 {
-  "noah-javascript-xss-phase1-pattern": [
-    "/path/NowRender.js:22",
-    "/path/B.Profile.js:296",
-    ...
-  ],
-  "noah-java-spring-xss-taint": [
-    "/path/ArticleController.java:313",
-    ...
-  ]
+  "noah-javascript-xss-phase1-pattern": ["NowRender.js:22", "B.Profile.js:296", ...],
+  "noah-java-spring-xss-taint":         ["ArticleController.java:313", ...]
 }
 ```
 
-**② `<scanner>.locindex.json` — 위치 중심 인덱스**
+**`<scanner>.locindex.json` — 위치별 매칭 정보**
 
-같은 위치(파일:라인)에 여러 룰이 매칭되면 1개로 합치고, 신뢰도가 높은 tier로 승격합니다.
+같은 위치에 여러 룰이 걸리면 1개로 합칩니다. tier는 셋 중 가장 높은 것으로 승격하고, 어떤 룰들이 걸렸는지는 `rule_ids`에 모두 남깁니다.
 
 ```json
 {
@@ -75,66 +61,68 @@ raw JSON을 받아 스캐너별로 두 파일을 생성합니다.
     "tier_counts": {"taint": 379, "ast": 3310, "generic": 1049}
   },
   "locations": {
-    "/path/NowRender.js:22": {
-      "rule_ids": ["noah-javascript-xss-phase1-pattern", "noah-xss-phase1-pattern"],
+    "NowRender.js:22": {
       "tier": "ast",
-      "severity": "WARNING"
+      "rule_ids": ["noah-javascript-xss-phase1-pattern", "noah-xss-phase1-pattern"]
     },
-    "/path/ArticleController.java:313": {
-      "rule_ids": ["noah-java-spring-xss-taint"],
+    "ArticleController.java:313": {
       "tier": "taint",
-      "severity": "ERROR"
+      "rule_ids": ["noah-java-spring-xss-taint"]
     }
   }
 }
 ```
 
-### 2-3. tier 결정 규칙
+---
 
-룰 ID 이름으로 tier를 자동 결정합니다.
+### tier 의미
 
-| 룰 ID 패턴 | tier | 의미 |
-|---|---|---|
-| `...-taint` | `taint` | semgrep dataflow 분석으로 source→sink 흐름 확정 |
-| `...-sink` | `ast` (고신뢰) | 실제 위험 함수(innerHTML 등) 정밀 매칭 |
-| `...-pattern` | `ast` | 언어 파서 기반 매칭, source/sanitizer 미확인 |
-| generic regex | `generic` | 정규식 매칭, 최저 신뢰도 |
+tier는 semgrep이 어떤 방식으로 매칭했는지를 나타냅니다. 룰 ID 이름으로 자동 결정됩니다.
 
-같은 위치에 taint + ast가 동시에 걸리면 → tier는 `taint`로 승격, rule_ids에는 둘 다 보존.
+| tier | 결정 기준 | 의미 |
+|------|-----------|------|
+| `taint` | 룰 ID에 `-taint` 포함 | dataflow 분석으로 source→sink 흐름까지 확정. 신뢰도 최고 |
+| `ast` | 룰 ID에 `-sink` 또는 `-pattern` 포함 | 언어 파서로 구문 매칭. 위치는 정확하나 source·sanitizer는 미확인 |
+| `generic` | 그 외 | 정규식 매칭. 노이즈가 많고 신뢰도 최저 |
 
-### 2-4. 결과 규모 (brunch 프로젝트 기준)
+---
+
+### 파일 크기 문제
+
+`locindex.json`은 매칭 건수에 비례해 커집니다.
 
 | 스캐너 | 매칭 건수 | locindex 줄 수 |
-|---|---|---|
+|--------|-----------|----------------|
 | xss-scanner | 4,738건 | 36,861줄 |
 | idor-scanner | 5,370건 | 39,705줄 |
 | unbounded-consumption | 8,788건 | 66,129줄 |
 | **전체 합계** | **66,910건** | — |
 
-locindex.json은 파일 크기가 커서 Read 도구(2,000줄 제한)로 직접 읽으면 JSON 파싱이 실패합니다.
+Read 도구는 기본 2,000줄 제한이 있습니다. 에이전트가 직접 Read하면 JSON이 잘려 파싱에 실패합니다. 이 문제를 해결하기 위해 `locindex_summary.py`를 사용합니다.
 
 ---
 
-## 3. locindex_summary.py
+## locindex_summary.py
 
-locindex.json을 Phase 1 에이전트가 소화할 수 있는 크기로 변환합니다.
+### 하는 일
 
-### 3-1. 하는 일
+`locindex.json`을 읽어 **파일 단위로 묶어** 요약합니다.
 
-1. locindex.json을 Python으로 읽음
-2. 노이즈 경로 제거 (`vendor/`, `.min.js:`, `.yaml:`, 룰 파일 자기 매칭 등)
-3. 남은 항목을 **파일명 기준으로 그룹핑**
-4. 파일별로 best_tier / taint 건수 / ast 건수 / generic 건수 집계
-5. sink 룰(`-sink`, `-taint` 이름 포함) 매칭 여부 → `[SINK]` 표시
-6. 정렬: taint → ast → generic, 동 tier 내 taint 건수 내림차순
-7. stdout으로 출력 (파일 저장 없음)
+1. 노이즈 경로 제거 — `vendor/`, `.min.js:`, `.yaml:` 등 실제 프로젝트 코드가 아닌 파일
+2. 남은 항목을 파일명 기준으로 그룹핑
+3. 파일별 best_tier / taint·ast·generic 건수 집계
+4. `-sink` 또는 `-taint` 룰이 걸린 파일에 `[SINK]` 표시
+5. 정렬: taint → ast → generic 순, 동 tier 내 taint 건수 내림차순
+6. stdout 출력 (파일 저장 없음)
 
-### 3-2. 출력 형식
+파일 수는 매칭 건수보다 훨씬 적어서, **47개 스캐너 모두 2,000줄 이내가 보장**됩니다.
+
+### 출력 예시
 
 ```
 === xss-scanner 매칭 파일 요약 ===
 총 4738건 → 실제 3824건 / 노이즈 제거 914건
-tier: taint=379 ast=3310 generic=1049
+tier: taint=379  ast=3310  generic=1049
 파일 수: 510개
 
 best_tier    t     a     g  파일명
@@ -146,17 +134,13 @@ ast          0     2     0  B.Sign.SignupConfirm.js [SINK]
 ast          0     1     0  NowRender.js
 ...
 generic      0     0     2  DonateSuccessModal.svelte
-...
 
-[노이즈 제거] 914건 (ast=8 generic=906) — vendor/min/YAML/룰파일
+[노이즈 제거] 914건 — vendor/min/YAML/룰파일
 ```
 
-- **파일 수 기준으로 전 47개 스캐너에서 2,000줄 이내가 보장**됩니다. (가장 큰 스캐너도 파일 수 ~2,000개 이하)
-- `(N개 경로)` — 같은 파일명이 여러 디렉토리에 있을 때 표시
+Phase 1 에이전트는 이 출력을 보고 어느 파일을 먼저 Read할지 결정합니다.
 
-### 3-3. 사용법
-
-Phase 1 에이전트가 Bash로 실행합니다. 파일로 저장하지 않고 stdout을 바로 읽습니다.
+### 실행 방법
 
 ```bash
 python3 <NOAH_SAST_DIR>/tools/locindex_summary.py \
@@ -165,87 +149,74 @@ python3 <NOAH_SAST_DIR>/tools/locindex_summary.py \
 
 ---
 
-## 4. Phase 1 분석 상세
+## Phase 1 분석
 
-### 4-1. 에이전트가 받는 입력
+### 분석 순서
 
-각 그룹 에이전트는 다음을 받습니다:
+파일 목록을 받은 에이전트는 우선순위에 따라 파일을 Read합니다.
 
-- `phase1.md` — 스캐너별 sink 의미론 / 안전 패턴 / 판정 기준
-- `locindex_summary.py` 실행 명령 — 파일 목록 확보용
-- 결과 파일 경로 — 분석 결과를 저장할 위치
+**1) `[SINK]` 파일 — 먼저 확인**
 
-### 4-2. 분석 순서
-
-**① locindex_summary.py 실행**
-
-파일 목록을 확보합니다.
-
-**② [SINK] 파일 우선 분석**
-
-sink 룰 직접 매칭 파일입니다. 실제 XSS sink 함수(`innerHTML`, `.html($Y)` 등)가 있는 파일이므로 우선 Read합니다.
+sink 룰이 직접 매칭된 파일입니다. `innerHTML`, `.html($Y)` 등 실제 위험 함수가 있는 파일이므로 가장 먼저 봅니다.
 
 ```
 B.Sign.SignupConfirm.js [SINK]
-  → Read → $userNameError.html(r.responseJSON.desc) 확인
+  → $userNameError.html(r.responseJSON.desc) 확인
   → source 추적: r.responseJSON.desc = 서버 하드코딩 메시지
   → FALSE_POSITIVE
 ```
 
-**③ taint 파일 분석**
+**2) `best_tier=taint` 파일 — source→sink 흐름 확인**
 
-semgrep dataflow 분석이 source→sink 흐름을 확정한 파일입니다.
-
-```
-ArticleController.java (taint 39건)
-  → Read → @RequestParam String title 확인 (source)
-  → sink까지 경로 추적: DB 저장 → /v1/article/recent → NowRender.js
-  → NowRender.js Read → jQuery.append(template_literal) 확인 (sink)
-  → XSS-1 후보 등록
-```
-
-**④ ast 파일 분석**
-
-파일당 1회 Read해서 패턴 의미를 확인합니다. 대부분은 `@RequestParam` 선언부(source이지만 sink 아님) 또는 안전한 패턴으로 FALSE_POSITIVE 처리됩니다.
-
-**⑤ generic 파일 분석**
-
-정규식 매칭 파일입니다. 클래스 판정으로 대량 제외가 가능합니다.
+semgrep이 dataflow 분석으로 흐름을 확정한 파일입니다.
 
 ```
-DonateSuccessModal.svelte (generic 2건)
-  → Read → {@html title} 확인
-  → has_taint=true이나 generic도 검토 (FN 방지)
+ArticleController.java  (taint 39건)
+  → @RequestParam String title 확인 (source)
+  → DB 저장 → /v1/article/recent → NowRender.js 경로 추적
+  → NowRender.js: jQuery.append(template_literal) 확인 (sink)
+  → 방어 코드 없음 → XSS-1 후보 등록
+```
+
+**3) `best_tier=ast` 파일 — 패턴 의미 확인**
+
+파일당 1회 Read해서 실제 sink인지 판단합니다. 대부분은 `@RequestParam` 선언부(source이지 sink 아님)라 FALSE_POSITIVE로 처리됩니다.
+
+**4) `best_tier=generic` 파일 — 클래스 판정**
+
+정규식 매칭이라 노이즈가 많습니다. "이 파일들은 전부 Svelte `{value}` 보간 — 자동 escape" 같은 클래스 판정으로 묶어서 제외할 수 있습니다.
+
+```
+DonateSuccessModal.svelte  (generic 2건)
+  → {@html title} 확인 — Svelte raw HTML 렌더링 (generic이어도 실제 sink)
   → source 추적: articleTitle → DonationCommentCompleteMessage → title
   → XSS-2 후보 등록
 ```
 
-**⑥ Source-first 추가 탐색**
+**5) Source-first 추가 탐색**
 
-locindex에 없는 파일에서 추가 패턴을 grep으로 탐색합니다.
-
-### 4-3. COVERAGE 감사
-
-200건 초과 스캐너는 결과 파일에 전체 매칭 건수를 어떻게 처리했는지 기록해야 합니다.
-
-```
-<!-- COVERAGE matches=4738 accounted=4738 method="
-  taint 379건 전수 분석(admin 게이트, DB 파생값),
-  sink JS 380건(vendor 52 제외, admin-only 76 제외, 2건 후보),
-  generic 1049건(Svelte 자동 escape, vm 정적 문자열),
-  노이즈 914건 포함" -->
-```
-
-`phase1_review_assert.py` 게이트가 `accounted == matches`를 기계로 검증합니다. 설명되지 않은 잔여가 있으면 exit 7로 차단합니다.
+locindex에 없는 파일에서 취약 패턴을 grep으로 직접 탐색합니다. semgrep이 놓친 경로를 보완합니다.
 
 ---
 
-## 5. 관련 파일
+### COVERAGE 감사
+
+매칭이 200건을 넘는 스캐너는 전체 건수를 어떻게 처리했는지 결과 파일에 기록해야 합니다. `phase1_review_assert.py` 게이트가 이를 검증하고, 설명되지 않은 잔여가 있으면 exit 7로 차단합니다.
+
+```
+<!-- COVERAGE matches=4738 accounted=4738
+     method="taint 379건 전수 분석 / sink JS 380건(vendor 52 제외, 2건 후보) /
+             generic 1049건(Svelte 자동 escape) / 노이즈 914건" -->
+```
+
+---
+
+## 관련 파일
 
 | 파일 | 역할 |
-|---|---|
-| `tools/semgrep_index.py` | semgrep 실행 + locindex.json 생성 |
+|------|------|
+| `tools/semgrep_index.py` | semgrep 실행 → locindex.json 생성 |
 | `tools/locindex_summary.py` | locindex.json → 파일 목록 요약 |
 | `tools/phase1_review_assert.py` | COVERAGE 감사 게이트 |
-| `prompts/phase1-group-agent.md` | Phase 1 에이전트 지시 (Bash 실행 방법 포함) |
+| `prompts/phase1-group-agent.md` | Phase 1 에이전트 지시 (§3 Bash 실행 방법) |
 | `prompts/guidelines-phase1.md` | Phase 1 분석 공통 지침 (§6-A-1 locindex 사용법) |
