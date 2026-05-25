@@ -1,0 +1,37 @@
+rules:
+  - id: noah-python-graphql-stacktrace-sink
+    severity: WARNING
+    languages:
+      - python
+    message: |
+      GraphQL 에러 응답에 스택트레이스 노출 가능 (INFO_LEAK).
+      ariadne: GraphQL(debug=True)는 에러 응답에 extensions.exception.stacktrace를 포함.
+      graphene-django: settings.DEBUG=True이면 프로덕션에서도 스택트레이스 노출.
+      안전: debug=False(프로덕션 기본), graphene-django settings.GRAPHENE["SUBSCRIPTION_CHANNEL_DEFAULT"]
+            대신 GRAPHENE["MIDDLEWARE"]에 DjangoDebugMiddleware 제외 + DEBUG=False.
+    pattern-either:
+      # ariadne debug=True
+      - pattern: GraphQL(..., debug=True, ...)
+      # ariadne make_executable_schema + server 조합에서 debug
+      - pattern: GraphQL(schema, debug=True)
+      # strawberry Django view debug 노출
+      - pattern: GraphQLView.as_view(..., graphiql=True, ...)
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-209: Generation of Error Message Containing Sensitive Information"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Information Disclosure
+      owasp:
+        - "A05:2021 Security Misconfiguration"
+      technology:
+        - python
+        - graphql
+        - ariadne
+        - graphene
+        - strawberry

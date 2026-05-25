@@ -1,0 +1,44 @@
+rules:
+  - id: noah-javascript-graphql-stacktrace-sink
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+    message: |
+      GraphQL 에러 응답에 스택트레이스/내부 경로 노출 가능 (INFO_LEAK).
+      Apollo Server debug:true는 extensions.exception.stacktrace를 클라이언트에 노출하며,
+      formatError 원문 반환은 내부 파일 경로·SQL 쿼리를 포함할 수 있습니다.
+      graphql-yoga maskedErrors:false는 에러 마스킹을 비활성화합니다.
+      express-graphql customFormatErrorFn 원문 반환도 동일합니다.
+      안전: Apollo 4+ 프로덕션 기본값 확인, formatError에서 message만 반환,
+            maskedErrors:true(기본값), customFormatErrorFn에서 스택 제거.
+    pattern-either:
+      # Apollo Server 2/3 debug:true → extensions.exception.stacktrace 노출
+      - pattern: "new ApolloServer({..., debug: true, ...})"
+      # graphql-yoga v3 maskedErrors:false → 내부 에러 원문 클라이언트 노출
+      - pattern: "createYoga({..., maskedErrors: false, ...})"
+      # graphql-yoga v2 createServer maskedErrors:false
+      - pattern: "createServer({..., maskedErrors: false, ...})"
+      # formatError가 에러 원문 그대로 반환 (화살표 함수 — regex로 매칭)
+      - pattern-regex: 'formatError\s*:\s*\(?err\)?\s*=>\s*err\b'
+      # customFormatErrorFn 원문 반환 (express-graphql)
+      - pattern-regex: 'customFormatErrorFn\s*:\s*\(?err\)?\s*=>\s*err\b'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-209: Generation of Error Message Containing Sensitive Information"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Information Disclosure
+      owasp:
+        - "A05:2021 Security Misconfiguration"
+      technology:
+        - nodejs
+        - graphql
+        - apollo-server
+        - graphql-yoga
+        - express-graphql

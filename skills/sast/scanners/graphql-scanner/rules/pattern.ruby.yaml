@@ -23,6 +23,9 @@ rules:
       - pattern-regex: 'IntrospectionQuery'
       - pattern-regex: '__type'
       - pattern-regex: 'depthLimit'
+      - pattern-regex: 'formatError'
+      - pattern-regex: 'stacktrace'
+      - pattern-regex: 'debug.*true'
     metadata:
       category: security
       subcategory:

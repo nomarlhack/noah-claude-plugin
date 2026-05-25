@@ -1,0 +1,34 @@
+rules:
+  - id: noah-ruby-graphql-stacktrace-sink
+    severity: WARNING
+    languages:
+      - ruby
+    message: |
+      GraphQL 에러 응답에 스택트레이스 노출 가능 (INFO_LEAK).
+      graphql-ruby: Schema.execute(debug: true) 또는 GraphQL::Query.new(debug: true)는
+      backtrace를 에러 응답의 extensions에 포함하여 클라이언트에 노출합니다.
+      안전: debug: Rails.env.development? 형태로 프로덕션 false 보장,
+            또는 rescue_from으로 에러를 핸들링해 메시지만 반환.
+    pattern-either:
+      # Schema.execute debug:true
+      - pattern: "$SCHEMA.execute(..., debug: true, ...)"
+      # GraphQL::Query.new debug:true
+      - pattern: "GraphQL::Query.new(..., debug: true, ...)"
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-209: Generation of Error Message Containing Sensitive Information"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Information Disclosure
+      owasp:
+        - "A05:2021 Security Misconfiguration"
+      technology:
+        - ruby
+        - graphql
+        - graphql-ruby
+        - rails
