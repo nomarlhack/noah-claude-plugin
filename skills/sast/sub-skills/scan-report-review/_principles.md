@@ -6,7 +6,7 @@
 
 ## 1. Source 도달성 판정
 
-> **적용 범위**: injection·taint 계열 스캐너(sqli, ssrf, xss, cmdi 등 `decision-framework.md` injection-with-safe-form·capability·absence 아키타입)에만 적용한다. **presence 아키타입** (`hardcoded-secrets`, `log-injection`)은 "값 자체가 취약점"이므로 이 판정을 적용하지 않는다 — `decision-framework.md §3 아키타입 표` 참조.
+> **적용 제외**: `hardcoded-secrets-scanner`와 `log-injection-scanner`는 이 판정을 적용하지 않는다. 두 스캐너는 "값/패턴 자체가 취약점"(`decision-framework.md §3 presence 아키타입`)이므로 Source 도달성을 묻는 것 자체가 무의미하다. 나머지 모든 스캐너에는 이 판정이 적용된다.
 
 Sink 인자가 외부 행위자(공격자·타 사용자·외부 시스템·외부 쓰기 가능 저장소)에 의해 제어 가능한지 판정한다.
 
