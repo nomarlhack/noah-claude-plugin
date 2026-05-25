@@ -93,33 +93,26 @@ Phase 1 분석은 세 단계로 구성된다. 모두 수행해야 한다.
 
 #### 6-A-1: tier 우선순위 검토 (locindex 사이드카가 있을 때)
 
-`semgrep_index.py`는 패턴 인덱스(`<scanner>.json`)와 함께 **위치 중심 사이드카 `<scanner>.locindex.json`**을 생성한다. 이 파일이 프롬프트에 제공되거나 같은 디렉토리에 존재하면, 평평한 패턴 인덱스 대신 이것을 1차 작업 큐로 사용한다. 구조:
+`semgrep_index.py`는 패턴 인덱스(`<scanner>.json`)와 함께 **위치 중심 사이드카 `<scanner>.locindex.json`**을 생성한다. locindex는 같은 file:line의 다중 룰 매치를 1개 위치로 병합하고 최고 tier로 승격하되 `rule_ids` 배열로 모든 매치 룰을 보존한다.
 
-```json
-{
-  "_scanner": {"has_taint": true, "tier_counts": {"taint": 1, "ast": 4, "generic": 1}},
-  "locations": {
-    "<file>:<line>": {"rule_ids": [...], "tier": "taint|ast|generic", "severity": "ERROR|WARNING"}
-  }
-}
+**[필수] locindex는 Read 도구로 직접 읽지 않는다.** 파일이 수만 줄에 달해 Read 2,000줄 제한으로 JSON 파싱이 실패하기 때문이다. 대신 `phase1-group-agent.md §3`에 명시된 대로 `locindex_summary.py`를 Bash로 실행하여 파일별 요약을 얻는다:
+
+```bash
+python3 <NOAH_SAST_DIR>/tools/locindex_summary.py <PATTERN_INDEX_DIR>/<scanner>.locindex.json
 ```
 
-**핵심: 같은 file:line이 여러 룰에 매치되면 locindex가 1개 위치로 병합하고 최고 tier로 승격하되 `rule_ids` 배열에 모든 매치 룰을 보존한다.** 따라서 위치는 **한 번만** 검토하되, `rule_ids`로 다중 취약점 관점을 함께 확인한다 (한 줄을 N번 중복 분석하지 않는다).
+출력은 매칭 파일 목록(파일별 1줄)으로, `_scanner.has_taint` / `tier_counts` / `[SINK]` 표시를 포함한다. **검토 순서:**
 
-**검토 순서 (tier 내림차순):**
+1. **`[SINK]` 표시 파일** — sink 룰(innerHTML-sink 등) 직접 매치. 우선 Read하여 실제 sink 코드와 source 추적.
+2. **`best_tier=taint` 파일** — dataflow source 도달성 + sanitizer 부재 확정. §6-D-3 단축 절차 적용.
+3. **`best_tier=ast` 파일** — 언어 파서로 위치는 정밀하나 source/sanitizer 미확인. 파일당 1회 Read로 패턴 의미 확인.
+4. **`best_tier=generic` 파일** — regex 매치, 최저 신뢰. 클래스 판정 후 대량 제외 가능.
 
-1. **`tier: taint` 위치 먼저** — dataflow가 source 도달성 + sanitizer 부재를 이미 확정. §6-D-3 단축 절차 적용(변수 역추적·±30줄 sanitizer Read 생략). URL 경로 확정(§6-C)·트리거 현실성(§10)만 보강하여 후보 등록.
-2. **`tier: ast` 위치** — 언어 파서로 위치는 정밀하나 source/sanitizer 미확인. 기존 5단계 골격 전체 적용.
-3. **`tier: generic` 위치** — regex 매치, 최저 신뢰.
+**`has_taint == false` 시 (generic/ast만 있는 스캐너):** ast·generic이 유일 신호이므로 전수 분석한다. 후순위·상한 적용 금지.
 
-**generic-only 위치의 조건부 처리 (FN 방지):**
+**`has_taint == true` 시:** taint·ast 파일을 먼저 처리한 뒤 generic 파일을 검토한다. 컨텍스트 예산 소진 시 남은 generic 파일을 `[INCOMPLETE: generic-tier N개 파일 미검토 — <scanner>]`로 표기한다.
 
-`_scanner.has_taint`는 **"이번 스캔에서 taint tier 매치가 1건이라도 발생했는지"**를 뜻한다 (스캐너의 룰 보유 여부가 아니라 실제 매치 발생 여부).
-
-- **`has_taint == false`** (taint 매치 0건 — pattern-only 스캐너이거나, taint 룰이 있어도 이 프로젝트에서 dataflow 신호가 안 잡힌 경우): ast/generic이 유일 신호이므로 **전수 분석한다. 후순위·상한 적용 금지.**
-- **`has_taint == true`** (taint 매치 발생 — dataflow 신호가 이 프로젝트에서 작동): taint·ast 위치를 먼저 모두 처리한 뒤 generic-only 위치를 검토한다. 컨텍스트 예산이 소진되면 **남은 generic-only 위치를 버리지 말고** 반환 요약에 `[INCOMPLETE: generic-tier N건 미검토 — <scanner>]`로 표기한다 (메인 에이전트가 후속 처리). 이는 하드 컷이 아니라 검토 순서이며, 놓침이 아니라 후속 대상 명시이다.
-
-locindex가 없으면 기존 평평한 패턴 인덱스를 전수 분석한다.
+locindex가 없으면 평평한 패턴 인덱스 JSON을 Read하여 전수 분석한다.
 
 #### 6-A-2: 커버리지 감사 (고볼륨 스캐너 필수)
 

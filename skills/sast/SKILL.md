@@ -204,11 +204,12 @@ mkdir -p <PHASE1_RESULTS_DIR>
 - xss-scanner
   - phase1.md: <NOAH_SAST_DIR>/scanners/xss-scanner/phase1.md
   - 패턴 인덱스: <PATTERN_INDEX_DIR>/xss-scanner.json
-  - locindex(우선): <PATTERN_INDEX_DIR>/xss-scanner.locindex.json (있으면 tier 우선순위로 검토; §6-A-1)
+  - locindex 요약 명령: python3 <NOAH_SAST_DIR>/tools/locindex_summary.py <PATTERN_INDEX_DIR>/xss-scanner.locindex.json
   - 결과 파일: <PHASE1_RESULTS_DIR>/xss-scanner.md
 - dom-xss-scanner
   - phase1.md: <NOAH_SAST_DIR>/scanners/dom-xss-scanner/phase1.md
   - 패턴 인덱스: <PATTERN_INDEX_DIR>/dom-xss-scanner.json
+  - locindex 요약 명령: python3 <NOAH_SAST_DIR>/tools/locindex_summary.py <PATTERN_INDEX_DIR>/dom-xss-scanner.locindex.json
   - 결과 파일: <PHASE1_RESULTS_DIR>/dom-xss-scanner.md
 - ...(그룹의 모든 스캐너)
 ```
