@@ -1,0 +1,63 @@
+rules:
+  - id: noah-go-codeinj-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go에서 HTTP 입력이 yaegi/otto/goja 스크립트 인터프리터에 직접 전달되면
+      Code Injection → RCE.
+      안전: 사용자 입력을 스크립트 소스가 아닌 데이터(변수 바인딩)로만 전달.
+    pattern-sources:
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.URL.Query()[$K]
+      - pattern: r.FormValue($K)
+      - pattern: r.Header.Get($K)
+      - pattern: mux.Vars(r)[$K]
+      - pattern: c.Query($K)
+      - pattern: c.Param($K)
+      - pattern: c.QueryParam($K)
+      - pattern: c.Params($K)
+      - pattern: chi.URLParam(r, $K)
+
+    pattern-sinks:
+      # yaegi (Go interpreter)
+      - pattern: $INTERP.Eval($X)
+      - pattern: $INTERP.EvalWithContext($CTX, $X)
+      # otto (JavaScript in Go)
+      - pattern: $VM.Run($X)
+      - pattern: $VM.Eval($X)
+      - pattern: otto.Run($X)
+      # goja (V8 in Go)
+      - pattern: $RT.RunString($X)
+      - pattern: goja.New().RunString($X)
+      # Tengo (scripting language for Go)
+      - pattern: $SCRIPT.Add($K, $X)
+      # go-lua
+      - pattern: $L.DoString($X)
+      - pattern: lua.DoString($L, $X)
+      # expr-lang / govaluate (expression evaluation)
+      - pattern: govaluate.NewEvaluableExpression($X)
+      - pattern: expr.Compile($X, ...)
+      - pattern: expr.Eval($X, ...)
+      # Go plugin (dynamic loading)
+      - pattern: plugin.Open($X)
+
+    pattern-sanitizers:
+      - pattern: strconv.Atoi($X)
+      - pattern: strconv.ParseInt($X, ...)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $WHITELIST[$X] { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-94: Improper Control of Generation of Code (Code Injection)"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Code Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [go, yaegi, otto, goja]

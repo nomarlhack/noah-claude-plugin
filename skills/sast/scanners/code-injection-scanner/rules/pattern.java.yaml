@@ -9,7 +9,7 @@ rules:
     patterns:
       - pattern-either:
           - pattern-regex: '\bScriptEngine\b'
-          - pattern-regex: '\.eval\s*\('
+          - pattern-regex: '\$ENGINE\.eval\s*\(|ScriptEngine.*\.eval\s*\('
           - pattern-regex: '\bGroovyShell\b'
           - pattern-regex: '\bEval\.me\b'
           - pattern-regex: '\bGroovyClassLoader\b'

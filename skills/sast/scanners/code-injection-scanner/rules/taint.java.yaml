@@ -1,0 +1,91 @@
+rules:
+  - id: noah-java-codeinj-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring 컨트롤러 입력이 ScriptEngine.eval / GroovyShell.evaluate /
+      Janino ClassBodyEvaluator에 직접 전달되면 Code Injection → RCE.
+      안전: 사용자 입력을 코드가 아닌 데이터로만 전달, 화이트리스트 검증.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathVariable(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @QueryParam($K) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathParam($K) $X, ...) { ... }
+      - pattern: $CTX.queryParam($K)
+      - pattern: $CTX.pathParam($K)
+      - pattern: $REQ.getParameter($K)
+
+    pattern-sinks:
+      # JSR-223 ScriptEngine (JavaScript/Groovy/Python via javax.script)
+      - pattern: $ENGINE.eval($X)
+      - pattern: $ENGINE.eval($X, ...)
+      - pattern: new ScriptEngineManager().getEngineByName($N).eval($X)
+      # Groovy
+      - pattern: new GroovyShell().evaluate($X)
+      - pattern: $SHELL.evaluate($X)
+      - pattern: new GroovyShell($BINDING).evaluate($X)
+      - pattern: new GroovyClassLoader().parseClass($X)
+      - pattern: $GCL.parseClass($X)
+      # Janino (Java runtime compiler)
+      - pattern: new ClassBodyEvaluator().cook($X)
+      - pattern: new ExpressionEvaluator().cook($X)
+      - pattern: new SimpleCompiler().cook($X)
+      - pattern: new ScriptEvaluator().cook($X)
+      # Java Compiler API (javax.tools)
+      - pattern: $COMPILER.getTask($W, $FM, $DL, $OPT, $CL, $SRC)
+      # Reflection-based dynamic invocation
+      - pattern: Class.forName($X).newInstance()
+      - pattern: Class.forName($X).getDeclaredMethod($M).invoke(...)
+      # SpEL (Spring Expression Language) — ssti-scanner와 cross-ref
+      - pattern: $PARSER.parseExpression($X).getValue(...)
+      - pattern: new SpelExpressionParser().parseExpression($X)
+      # MVEL
+      - pattern: MVEL.eval($X, ...)
+      - pattern: MVEL.executeExpression($X, ...)
+      # OGNL
+      - pattern: Ognl.getValue($X, ...)
+
+    pattern-sanitizers:
+      - pattern: Integer.parseInt($X)
+      - pattern: Long.parseLong($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($WHITELIST.contains($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-94: Improper Control of Generation of Code (Code Injection)"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Code Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [java, spring, groovy, janino, scriptengine]

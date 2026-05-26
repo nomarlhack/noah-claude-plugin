@@ -1,0 +1,70 @@
+rules:
+  - id: noah-kotlin-codeinj-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Kotlin + Spring 컨트롤러 입력이 ScriptEngine.eval / GroovyShell에
+      직접 전달되면 Code Injection → RCE.
+      안전: 사용자 입력을 코드가 아닌 데이터로만 전달.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestBody $X: $T, ...) { ... }
+
+    pattern-sinks:
+      # JSR-223 ScriptEngine
+      - pattern: $ENGINE.eval($X)
+      - pattern: $ENGINE.eval($X, ...)
+      # Groovy
+      - pattern: GroovyShell().evaluate($X)
+      - pattern: $SHELL.evaluate($X)
+      - pattern: GroovyClassLoader().parseClass($X)
+      # Kotlin scripting
+      - pattern: "KotlinJsr223JvmLocalScriptEngine().eval($X, ...)"
+      # Janino
+      - pattern: "ClassBodyEvaluator().cook($X)"
+      - pattern: "ExpressionEvaluator().cook($X)"
+      # SpEL
+      - pattern: $PARSER.parseExpression($X).getValue(...)
+      - pattern: "SpelExpressionParser().parseExpression($X)"
+      # MVEL / OGNL
+      - pattern: "MVEL.eval($X, ...)"
+      - pattern: "Ognl.getValue($X, ...)"
+
+    pattern-sanitizers:
+      - pattern: $X.toInt()
+      - pattern: $X.toLong()
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($WHITELIST.contains($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-94: Improper Control of Generation of Code (Code Injection)"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Code Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [kotlin, spring, groovy, scriptengine]

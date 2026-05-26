@@ -40,6 +40,17 @@ rules:
       - pattern: eval($X)
       - pattern: exec($X)
       - pattern: compile($X, ...)
+      # 동적 모듈 로딩 (import 기반 코드 실행)
+      - pattern: __import__($X)
+      - pattern: importlib.import_module($X)
+      - pattern: importlib.__import__($X, ...)
+      - pattern: runpy.run_module($X, ...)
+      - pattern: runpy.run_path($X, ...)
+      # code.InteractiveConsole
+      - pattern: code.InteractiveConsole().runsource($X)
+      - pattern: $CONSOLE.runsource($X)
+      # timeit (eval 기반)
+      - pattern: timeit.timeit($X, ...)
     pattern-sanitizers:
       - pattern: int($X)
       - pattern: float($X)

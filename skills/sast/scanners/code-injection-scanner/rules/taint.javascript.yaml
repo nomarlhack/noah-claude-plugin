@@ -68,6 +68,15 @@ rules:
       - pattern: $ISOLATE.compileScript($X)
       - pattern: $ISOLATE.compileScriptSync($X)
       - pattern: new ivm.Script($X)
+      # setTimeout/setInterval 문자열 인자 (eval과 동등)
+      - pattern: "setTimeout($X, ...)"
+      - pattern: "setInterval($X, ...)"
+      # Module._compile (Node.js 내부)
+      - pattern: Module._compile($X, ...)
+      - pattern: $MOD._compile($X, ...)
+      # Worker threads (문자열 코드)
+      - pattern: new Worker($X)
+      - pattern: new Worker($X, ...)
     pattern-sanitizers:
       - pattern: JSON.parse($X)
       - pattern: Number($X)
