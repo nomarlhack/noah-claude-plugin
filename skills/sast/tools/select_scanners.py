@@ -75,7 +75,8 @@ SCANNERS = [
     "tls-scanner", "validation-logic-scanner",
     "prompt-injection-scanner", "system-prompt-leakage-scanner",
     "insecure-output-handling-scanner", "unbounded-consumption-scanner",
-    "android-deeplink-scanner",
+    "android-deeplink-scanner", "android-webview-scanner",
+    "android-ipc-scanner", "android-manifest-scanner",
     "hardcoded-secrets-scanner", "log-injection-scanner",
 ]
 
@@ -519,7 +520,7 @@ def check_exclude(scanner):
         pass  # TLS 설정은 모든 웹 프로젝트에 해당
     elif scanner == "validation-logic-scanner":
         pass  # 유효성 검사 로직은 모든 웹 프로젝트에 해당
-    elif scanner == "android-deeplink-scanner":
+    elif scanner in ("android-deeplink-scanner", "android-webview-scanner", "android-ipc-scanner", "android-manifest-scanner"):
         if not has_file(
             "AndroidManifest.xml",
             "*.kt", "*.kts",
@@ -622,7 +623,7 @@ BASE_GROUPS = {
     "data-export": ["csv-injection-scanner"],
     "protocol-check": ["graphql-scanner", "websocket-scanner", "soapaction-spoofing-scanner", "ldap-injection-scanner", "xpath-injection-scanner"],
     "business-logic": ["business-logic-scanner", "validation-logic-scanner"],
-    "mobile": ["android-deeplink-scanner"],
+    "mobile": ["android-deeplink-scanner", "android-webview-scanner", "android-ipc-scanner", "android-manifest-scanner"],
     "secrets-logging": ["hardcoded-secrets-scanner", "log-injection-scanner"],
 }
 
@@ -652,6 +653,10 @@ SPLIT_HINTS = {
     "protocol-check": [
         ["graphql-scanner", "websocket-scanner", "xpath-injection-scanner"],
         ["soapaction-spoofing-scanner", "ldap-injection-scanner"],
+    ],
+    "mobile": [
+        ["android-webview-scanner", "android-deeplink-scanner"],
+        ["android-ipc-scanner", "android-manifest-scanner"],
     ],
 }
 

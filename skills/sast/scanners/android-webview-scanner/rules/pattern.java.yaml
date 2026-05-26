@@ -1,0 +1,36 @@
+rules:
+  - id: noah-java-android-webview-phase1-pattern
+    severity: WARNING
+    languages:
+      - java
+    message: |
+      android-webview-scanner Phase 1 sink/config 패턴 매치 (Java 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(로드 대상 신뢰도, 주입값 이스케이프, 설정 값)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'evaluateJavascript'
+      - pattern-regex: 'loadUrl'
+      - pattern-regex: 'loadData\s*\('
+      - pattern-regex: 'loadDataWithBaseURL'
+      - pattern-regex: 'javascript:'
+      - pattern-regex: 'data:text/html'
+      - pattern-regex: 'addJavascriptInterface'
+      - pattern-regex: '@JavascriptInterface'
+      - pattern-regex: 'setJavaScriptEnabled\s*\(\s*true\s*\)'
+      - pattern-regex: 'setAllowFileAccess\s*\(\s*true\s*\)'
+      - pattern-regex: 'setAllowFileAccessFromFileURLs\s*\(\s*true\s*\)'
+      - pattern-regex: 'setAllowUniversalAccessFromFileURLs\s*\(\s*true\s*\)'
+      - pattern-regex: 'setAllowContentAccess\s*\(\s*true\s*\)'
+      - pattern-regex: 'setMixedContentMode\s*\(\s*[A-Za-z0-9_.]*MIXED_CONTENT_ALWAYS_ALLOW'
+      - pattern-regex: 'setSavePassword'
+      - pattern-regex: 'onReceivedSslError'
+      - pattern-regex: 'shouldOverrideUrlLoading'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-749: Exposed Dangerous Method (WebView JS Interface)"
+        - "CWE-79: Improper Neutralization (WebView XSS)"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

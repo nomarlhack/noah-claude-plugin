@@ -1,0 +1,29 @@
+rules:
+  - id: noah-android-manifest-phase1-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      android-manifest-scanner Phase 1 하드닝 위반 패턴 매치 (AndroidManifest.xml).
+      후보 수집용 — 정탐 판정은 컴포넌트 노출/권한 컨텍스트를 확인한 후 수행.
+    paths:
+      include:
+        - "*AndroidManifest.xml"
+    pattern-either:
+      - pattern-regex: 'android:debuggable\s*=\s*"true"'
+      - pattern-regex: 'android:allowBackup\s*=\s*"true"'
+      - pattern-regex: 'android:usesCleartextTraffic\s*=\s*"true"'
+      - pattern-regex: 'android:exported\s*=\s*"true"'
+      - pattern-regex: 'android:grantUriPermissions\s*=\s*"true"'
+      - pattern-regex: 'android:testOnly\s*=\s*"true"'
+      - pattern-regex: 'android:protectionLevel\s*=\s*"normal"'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-926: Improper Export of Android Application Components"
+        - "CWE-276: Incorrect Default Permissions"
+      confidence: LOW
+      likelihood: LOW
+      impact: MEDIUM

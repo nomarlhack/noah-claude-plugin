@@ -1,0 +1,32 @@
+rules:
+  - id: noah-java-android-ipc-phase1-pattern
+    severity: WARNING
+    languages:
+      - java
+    message: |
+      android-ipc-scanner Phase 1 sink/source 패턴 매치 (Java 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(외부 인텐트 신뢰도, PendingIntent 가변성, 리시버 노출)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'getParcelableExtra'
+      - pattern-regex: 'getSerializableExtra'
+      - pattern-regex: 'Intent\.parseUri'
+      - pattern-regex: 'startActivity\s*\('
+      - pattern-regex: 'startActivityForResult'
+      - pattern-regex: 'startService\s*\('
+      - pattern-regex: 'PendingIntent\.getActivity'
+      - pattern-regex: 'PendingIntent\.getBroadcast'
+      - pattern-regex: 'PendingIntent\.getService'
+      - pattern-regex: 'FLAG_MUTABLE'
+      - pattern-regex: 'registerReceiver\s*\('
+      - pattern-regex: 'sendBroadcast\s*\('
+      - pattern-regex: 'sendOrderedBroadcast\s*\('
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-927: Exposed IPC / Intent Redirection"
+        - "CWE-926: Improper Export of Components"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

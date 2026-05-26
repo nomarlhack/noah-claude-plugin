@@ -20,6 +20,12 @@ rules:
       - pattern-regex: 'FileInputStream\s*\('
       - pattern-regex: 'FileOutputStream\s*\('
       - pattern-regex: 'FileReader\s*\('
+      # Android content provider / file URI 신뢰 경계
+      - pattern-regex: 'openFileDescriptor\s*\('
+      - pattern-regex: 'openAssetFileDescriptor\s*\('
+      - pattern-regex: 'contentResolver\.openInputStream\s*\('
+      - pattern-regex: 'grantUriPermission\s*\('
+      - pattern-regex: 'FileProvider\.getUriForFile'
       # Spring Resource/Download
       - pattern-regex: 'ClassPathResource\s*\('
       - pattern-regex: 'InputStreamResource\s*\('

@@ -23,6 +23,12 @@ rules:
       - pattern-regex: 'open\s*\('
       - pattern-regex: 'readFile'
       - pattern-regex: 'new File\s*\('
+      # Android content provider / file URI 신뢰 경계
+      - pattern-regex: 'openFileDescriptor\s*\('
+      - pattern-regex: 'openAssetFileDescriptor\s*\('
+      - pattern-regex: 'openInputStream\s*\('
+      - pattern-regex: 'grantUriPermission\s*\('
+      - pattern-regex: 'FileProvider\.getUriForFile'
       - pattern-regex: 'Paths\.get\s*\('
       - pattern-regex: 'Files\.newInputStream'
       - pattern-regex: 'fs\.createWriteStream'

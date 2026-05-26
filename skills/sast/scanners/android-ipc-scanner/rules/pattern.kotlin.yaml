@@ -1,0 +1,35 @@
+rules:
+  - id: noah-kotlin-android-ipc-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      android-ipc-scanner Phase 1 sink/source 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(외부 인텐트 신뢰도, PendingIntent 가변성, 리시버 노출)를 확인한 후 수행.
+    pattern-either:
+      # Intent redirection: 외부에서 받은 Intent/extra를 그대로 재실행
+      - pattern-regex: 'getParcelableExtra'
+      - pattern-regex: 'getSerializableExtra'
+      - pattern-regex: 'Intent\.parseUri'
+      - pattern-regex: 'startActivity\s*\('
+      - pattern-regex: 'startActivityForResult'
+      - pattern-regex: 'startService\s*\('
+      # PendingIntent 가변성 (FLAG_MUTABLE + 빈 base intent = 하이재킹)
+      - pattern-regex: 'PendingIntent\.getActivity'
+      - pattern-regex: 'PendingIntent\.getBroadcast'
+      - pattern-regex: 'PendingIntent\.getService'
+      - pattern-regex: 'FLAG_MUTABLE'
+      # 브로드캐스트 / 동적 리시버 노출
+      - pattern-regex: 'registerReceiver\s*\('
+      - pattern-regex: 'sendBroadcast\s*\('
+      - pattern-regex: 'sendOrderedBroadcast\s*\('
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-927: Exposed IPC / Intent Redirection"
+        - "CWE-926: Improper Export of Components"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

@@ -32,6 +32,9 @@ rules:
       - pattern-regex: '(?i)password\s*[=:]\s*[''"][^${\s]{8,}[''"]'
       # OAuth client secret
       - pattern-regex: '(?i)(client[_-]?secret|oauth[_-]?secret)\s*[=:]\s*[''"][a-zA-Z0-9_\-]{16,}[''"]'
+      # Android 안전하지 않은 저장 모드 (world-readable/writeable = 타 앱 노출)
+      - pattern-regex: 'MODE_WORLD_READABLE'
+      - pattern-regex: 'MODE_WORLD_WRITEABLE'
     metadata:
       category: security
       subcategory:

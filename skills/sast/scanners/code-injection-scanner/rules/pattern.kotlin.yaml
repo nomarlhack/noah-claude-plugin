@@ -14,6 +14,11 @@ rules:
       # Groovy 동적 실행
       - pattern-regex: 'GroovyShell\s*\('
       - pattern-regex: 'GroovyClassLoader\s*\('
+      # Android 동적 코드 로딩 (외부/쓰기가능 경로 dex 로딩 = 코드 주입)
+      - pattern-regex: 'DexClassLoader\s*\('
+      - pattern-regex: 'PathClassLoader\s*\('
+      - pattern-regex: 'InMemoryDexClassLoader\s*\('
+      - pattern-regex: 'BaseDexClassLoader\s*\('
       # Spring Expression Language (SpEL) — 사용자 입력이 표현식으로 사용되는 경우
       - pattern-regex: 'SpelExpressionParser\s*\('
       - pattern-regex: 'parseExpression\s*\('
