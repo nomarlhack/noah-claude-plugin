@@ -161,6 +161,11 @@ FLOW_OPTIONAL_SCANNERS = {
     "cookie-security-scanner",
     "springboot-hardening-scanner",
     "tls-scanner",
+    # Android config-archetype 발견(WebSettings 플래그 / PendingIntent 플래그 / 매니페스트 속성)은
+    # source→sink dataflow가 없으므로 Flow 섹션을 면제한다.
+    "android-webview-scanner",
+    "android-ipc-scanner",
+    "android-manifest-scanner",
 }
 
 REQUIRED_SECTIONS = [
