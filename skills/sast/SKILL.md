@@ -182,6 +182,7 @@ python3 <NOAH_SAST_DIR>/tools/select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_RO
 | business-logic | business-logic, validation-logic |
 | llm | prompt-injection, system-prompt-leakage, insecure-output-handling, unbounded-consumption |
 | mobile | android-deeplink, android-webview, android-ipc, android-manifest |
+| ios | ios-webview, ios-storage, ios-crypto |
 | secrets-logging | hardcoded-secrets, log-injection |
 
 과부하 시 분할 예시: `auth-protocol`이 분할되면 → `auth-protocol-1` (jwt, oauth, saml) + `auth-protocol-2` (csrf, idor).

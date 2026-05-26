@@ -166,6 +166,11 @@ FLOW_OPTIONAL_SCANNERS = {
     "android-webview-scanner",
     "android-ipc-scanner",
     "android-manifest-scanner",
+    # iOS config-archetype: ios-storage(저장 설정)·ios-crypto(알고리즘/모드)는
+    # 설정값 자체가 취약점이므로 source→sink Flow 섹션을 면제한다.
+    # ios-webview는 taint 룰이 있어 Flow 섹션 작성 가능 — 면제 대상 아님.
+    "ios-storage-scanner",
+    "ios-crypto-scanner",
 }
 
 REQUIRED_SECTIONS = [
