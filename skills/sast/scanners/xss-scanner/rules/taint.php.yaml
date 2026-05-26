@@ -64,6 +64,11 @@ rules:
       - pattern: printf($X, ...);
       - pattern: print_r($X);
       - pattern: print_r($X, ...);
+      # HTTP 응답 header 조작 — header injection / reflected XSS 경로
+      - pattern: "header('Location: ' . $X)"
+      - pattern: setcookie($N, $X, ...)
+      # Twig |raw 필터 — escape 없이 출력
+      - pattern-regex: '\|\s*raw'
     pattern-sanitizers:
       - pattern: htmlspecialchars($X, ...)
       - pattern: htmlspecialchars($X)

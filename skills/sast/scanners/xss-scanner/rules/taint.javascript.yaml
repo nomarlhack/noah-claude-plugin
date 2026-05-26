@@ -57,6 +57,19 @@ rules:
       - pattern: request.payload
       - pattern: request.payload.$K
       - pattern: request.query.$K
+      # DOM-based XSS sources (client-side)
+      - pattern: location.hash
+      - pattern: location.search
+      - pattern: location.href
+      - pattern: document.referrer
+      - pattern: document.URL
+      - pattern: document.documentURI
+      - pattern: document.cookie
+      - pattern: window.name
+      - pattern: URLSearchParams.get($K)
+      - pattern: new URLSearchParams($S).get($K)
+      - pattern: localStorage.getItem($K)
+      - pattern: sessionStorage.getItem($K)
     pattern-sinks:
       - pattern: $E.innerHTML = $X
       - pattern: $E.outerHTML = $X
@@ -68,6 +81,17 @@ rules:
       - pattern: 'dangerouslySetInnerHTML: { __html: $X }'
       - pattern: '{ __html: $X }'
       - pattern: res.send($X)
+      # DOM-based XSS sinks
+      - pattern: $E.srcdoc = $X
+      - pattern: $E.src = $X
+      - pattern: $E.href = $X
+      - pattern: $E.action = $X
+      - pattern: location.href = $X
+      - pattern: location.assign($X)
+      - pattern: location.replace($X)
+      - pattern: window.location.href = $X
+      - pattern: $RANGE.createContextualFragment($X)
+      - pattern: document.createRange().createContextualFragment($X)
     pattern-sanitizers:
       - pattern: DOMPurify.sanitize($X, ...)
       - pattern: sanitizeHtml($X, ...)

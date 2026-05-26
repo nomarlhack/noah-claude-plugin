@@ -1,0 +1,77 @@
+rules:
+  - id: noah-kotlin-spring-xss-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Kotlin + Spring MVC 컨트롤러 입력이 @ResponseBody String, ResponseEntity<String>,
+      Thymeleaf th:utext 등 raw HTML sink로 들어가면 XSS.
+      안전: HtmlUtils.htmlEscape, OWASP Encoder.forHtml, Thymeleaf th:text(자동 escape).
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable(...) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestBody $X: $T, ...) { ... }
+      # JAX-RS / Quarkus
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @QueryParam($K) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathParam($K) $X: $T, ...) { ... }
+
+    pattern-sinks:
+      # Spring @ResponseBody String — HTML이 그대로 응답
+      - pattern: ResponseEntity.ok($X)
+      - pattern: ResponseEntity.ok().body($X)
+      - pattern: ResponseEntity.status($S).body($X)
+      # PrintWriter 직접 출력
+      - pattern: $RESP.writer.print($X)
+      - pattern: $RESP.writer.println($X)
+      - pattern: $RESP.writer.write($X)
+      # Ktor
+      - pattern: "call.respondText($X)"
+      - pattern: "call.respondText($X, ...)"
+      - pattern: "call.respond($X)"
+      # Spring model
+      - pattern: "model[$K] = $X"
+      - pattern: model.addAttribute($K, $X)
+      # sendRedirect
+      - pattern: $RESP.sendRedirect($X)
+
+    pattern-sanitizers:
+      - pattern: HtmlUtils.htmlEscape($X)
+      - pattern: HtmlUtils.htmlEscape($X, ...)
+      - pattern: Encode.forHtml($X)
+      - pattern: StringEscapeUtils.escapeHtml4($X)
+      - pattern: $X.replace("<", "&lt;")
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [kotlin, spring, ktor, thymeleaf]

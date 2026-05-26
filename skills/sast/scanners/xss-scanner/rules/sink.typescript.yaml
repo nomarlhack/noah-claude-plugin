@@ -19,3 +19,13 @@ rules:
           - pattern: document.writeln($Y)
           - pattern: $EL.html($Y)
           - pattern: dangerouslySetInnerHTML={$Y}
+          # DOM-based XSS additional sinks
+          - pattern: $X.srcdoc = $Y
+          - pattern: $X.src = $Y
+          - pattern: $X.href = $Y
+          - pattern: $X.action = $Y
+          - pattern: location.href = $Y
+          - pattern: location.assign($Y)
+          - pattern: location.replace($Y)
+          - pattern: window.location.href = $Y
+          - pattern: $RANGE.createContextualFragment($Y)

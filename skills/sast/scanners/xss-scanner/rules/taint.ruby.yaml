@@ -1,0 +1,56 @@
+rules:
+  - id: noah-ruby-xss-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby on Rails에서 params/request.params가 html_safe/raw()/concat 등을 통해
+      HTML escape 없이 뷰에 출력되면 XSS.
+      안전: ERB 자동 escape 활용(interpolation #{} 그대로), html_escape/h() 명시 사용.
+    pattern-sources:
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: request.params[$K]
+      - pattern: request.query_string
+      - pattern: cookies[$K]
+      - pattern: request.headers[$K]
+
+    pattern-sinks:
+      # Rails html_safe — escape를 무력화하고 그대로 출력
+      - pattern: $X.html_safe
+      - pattern: $X.html_safe.freeze
+      # raw() 헬퍼 — 뷰에서 escape 없이 출력
+      - pattern: raw($X)
+      # concat — SafeBuffer에 비 escape 문자열 추가
+      - pattern: $SAFE.concat($X)
+      - pattern: $SAFE << $X
+      # ERB 인라인 render
+      - pattern: "render inline: $X"
+      - pattern: "render inline: \"#{$X}\""
+      # ActionController::Base#render :text
+      - pattern: "render plain: $X"
+      - pattern: "render html: $X"
+      # content_tag로 unescaped 속성
+      - pattern: content_tag($T, $X.html_safe)
+      # ActiveSupport::SafeBuffer 직접 조작
+      - pattern: ActiveSupport::SafeBuffer.new($X)
+
+    pattern-sanitizers:
+      - pattern: ERB::Util.html_escape($X)
+      - pattern: ERB::Util.h($X)
+      - pattern: CGI.escapeHTML($X)
+      - pattern: Rack::Utils.escape_html($X)
+      - pattern: h($X)
+      - pattern: sanitize($X, ...)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [ruby, rails, sinatra, erb]

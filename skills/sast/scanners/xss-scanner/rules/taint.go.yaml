@@ -1,0 +1,62 @@
+rules:
+  - id: noah-go-xss-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go에서 HTTP 입력이 template.HTML() 타입 변환 또는 fmt.Fprintf(w, "%s", input)로
+      HTML escape 없이 응답에 출력되면 XSS.
+      안전: html/template 패키지의 자동 escape 활용, text/template은 HTML 응답에 사용 금지.
+    pattern-sources:
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.URL.Query()[$K]
+      - pattern: r.FormValue($K)
+      - pattern: r.PostFormValue($K)
+      - pattern: r.Header.Get($K)
+      - pattern: mux.Vars(r)[$K]
+      # Gin
+      - pattern: c.Query($K)
+      - pattern: c.Param($K)
+      - pattern: c.PostForm($K)
+      - pattern: c.GetHeader($K)
+      # Echo
+      - pattern: c.QueryParam($K)
+      # Fiber
+      - pattern: c.Query($K)
+      - pattern: c.Params($K)
+      # Chi
+      - pattern: chi.URLParam(r, $K)
+
+    pattern-sinks:
+      # template.HTML() 타입 변환 — html/template의 auto-escape 우회
+      - pattern: template.HTML($X)
+      - pattern: template.JS($X)
+      - pattern: template.URL($X)
+      - pattern: template.CSS($X)
+      - pattern: template.Attr($X)
+      # text/template으로 HTML 응답 — escape 없음
+      - pattern: $TMPL.Execute($W, $X)
+      - pattern: $TMPL.ExecuteTemplate($W, $NAME, $X)
+      # fmt.Fprintf 직접 HTTP 응답 (format string에 %s 포함시)
+      - pattern: fmt.Fprintf($W, $FORMAT, $X)
+      - pattern: fmt.Fprintf($W, $FORMAT, ..., $X, ...)
+      # w.Write 직접 출력
+      - pattern: $W.Write([]byte($X))
+      - pattern: io.WriteString($W, $X)
+
+    pattern-sanitizers:
+      - pattern: html.EscapeString($X)
+      - pattern: template.HTMLEscapeString($X)
+      - pattern: template.HTMLEscape($W, $X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [go, net/http, gin, echo, fiber, chi]

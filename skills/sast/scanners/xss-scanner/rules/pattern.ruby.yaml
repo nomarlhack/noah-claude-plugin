@@ -7,10 +7,7 @@ rules:
       xss-scanner Phase 1 sink/source 패턴 매치 (Ruby 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'innerHTML'
-      - pattern-regex: 'dangerouslySetInnerHTML'
       - pattern-regex: 'html_safe'
-      - pattern-regex: 'mark_safe'
       - pattern-regex: 'Markup\s*\('
       - pattern-regex: '\|\s*safe'
       - pattern-regex: 'v-html'
@@ -28,7 +25,6 @@ rules:
       - pattern-regex: 'raw\s*\('
       - pattern-regex: '<%=='
       - pattern-regex: 'bypassSecurityTrustHtml'
-      - pattern-regex: '\[innerHTML\]'
       - pattern-regex: '\{\{\{'
       - pattern-regex: 'DomSanitizer'
       - pattern-regex: 'createContextualFragment\s*\('

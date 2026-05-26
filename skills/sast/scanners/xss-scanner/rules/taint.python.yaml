@@ -43,6 +43,15 @@ rules:
       - pattern: render_template_string($X, ...)
       - pattern: HttpResponse($X, ...)
       - pattern: HttpResponse($X)
+      # Django 추가 sink
+      - pattern: StreamingHttpResponse($X)
+      - pattern: render_to_string($TMPL, $CTX)
+      # Flask/Jinja2 — Response 직접 생성
+      - pattern: make_response($X)
+      - pattern: Response($X, ...)
+      # FastAPI HTMLResponse
+      - pattern: HTMLResponse(content=$X)
+      - pattern: HTMLResponse($X)
     pattern-sanitizers:
       - pattern: bleach.clean($X, ...)
       - pattern: html.escape($X)

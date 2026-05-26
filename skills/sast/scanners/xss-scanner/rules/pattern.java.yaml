@@ -9,8 +9,6 @@ rules:
     pattern-either:
       - pattern-regex: 'innerHTML'
       - pattern-regex: 'dangerouslySetInnerHTML'
-      - pattern-regex: 'html_safe'
-      - pattern-regex: 'mark_safe'
       - pattern-regex: 'Markup\s*\('
       - pattern-regex: '\|\s*safe'
       - pattern-regex: 'v-html'

@@ -69,6 +69,20 @@ rules:
       - pattern: $RESP.getWriter().println($X)
       - pattern: response.getWriter().write($X)
       - pattern: model.addAttribute($K, $X)
+      # JSP/Servlet 직접 출력
+      - pattern: out.print($X)
+      - pattern: out.println($X)
+      - pattern: $OUT.print($X)
+      - pattern: $OUT.println($X)
+      - pattern: $OS.write($X.getBytes())
+      # Spring @ResponseBody / ResponseEntity<String>
+      - pattern: ResponseEntity.ok($X)
+      - pattern: ResponseEntity.ok().body($X)
+      - pattern: ResponseEntity.status($S).body($X)
+      # Thymeleaf th:utext (unescaped) — Spring 모델 attribute
+      - pattern: model.addAttribute($K, $X)
+      # JSP EL unescaped: ${XSS} — 정적 분석 한계, 패턴으로 source 추적
+      - pattern: $RESP.sendRedirect($X)
     pattern-sanitizers:
       - pattern: HtmlUtils.htmlEscape($X)
       - pattern: HtmlUtils.htmlEscape($X, ...)
