@@ -37,6 +37,20 @@ rules:
       - pattern: $CLIENT.Get($X)
       - pattern: $CLIENT.Post($X, ...)
       - pattern: $CLIENT.Do($REQ)
+      # resty
+      - pattern: resty.New().R().Get($X)
+      - pattern: resty.New().R().Post($X)
+      - pattern: $R.Get($X)
+      - pattern: $R.Post($X)
+      # retryablehttp
+      - pattern: retryablehttp.NewClient().Get($X)
+      - pattern: $RC.Get($X)
+      # httputil.ReverseProxy — 프록시 SSRF
+      - pattern: httputil.NewSingleHostReverseProxy(url.Parse($X))
+      # net.Dial (raw TCP — blind SSRF)
+      - pattern: net.Dial("tcp", $X)
+      - pattern: net.DialTimeout("tcp", $X, ...)
+      - pattern: $DIALER.Dial("tcp", $X)
     pattern-sanitizers:
       - patterns:
           - pattern: $X

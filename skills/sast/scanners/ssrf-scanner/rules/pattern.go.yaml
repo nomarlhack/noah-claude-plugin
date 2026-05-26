@@ -7,20 +7,14 @@ rules:
       ssrf-scanner Phase 1 sink/source 패턴 매치 (Go 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'axios'
       - pattern-regex: 'node-fetch'
       - pattern-regex: 'http\.get\s*\('
       - pattern-regex: 'https\.get\s*\('
       - pattern-regex: 'http\.request\s*\('
-      - pattern-regex: 'urllib'
       - pattern-regex: 'httpx'
       - pattern-regex: 'aiohttp'
       - pattern-regex: 'HttpURLConnection'
-      - pattern-regex: 'RestTemplate'
-      - pattern-regex: 'WebClient'
-      - pattern-regex: 'Net::HTTP'
       - pattern-regex: 'open-uri'
-      - pattern-regex: 'HTTParty'
       - pattern-regex: 'Faraday'
       - pattern-regex: 'RestClient'
       - pattern-regex: 'http-proxy-middleware'
@@ -35,7 +29,6 @@ rules:
       - pattern-regex: 'new URL\s*\('
       - pattern-regex: 'URL\s*\('
       - pattern-regex: 'curl_exec\s*\('
-      - pattern-regex: 'curl_init\s*\('
       - pattern-regex: 'Guzzle'
       - pattern-regex: 'GuzzleHttp'
       - pattern-regex: 'WebRequest\.Create'

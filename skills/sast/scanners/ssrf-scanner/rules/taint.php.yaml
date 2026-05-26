@@ -64,6 +64,18 @@ rules:
       - pattern: $CLIENT->request($M, $X, ...)
       - pattern: $CLIENT->get($X, ...)
       - pattern: $CLIENT->post($X, ...)
+      # Symfony HttpClient
+      - pattern: HttpClient::create()->request($M, $X, ...)
+      - pattern: $HTTPCLIENT->request($M, $X, ...)
+      # Guzzle (명시적 클래스)
+      - pattern: $C->request($M, $X, ...)
+      - pattern: $GUZZLE->get($X, ...)
+      - pattern: $GUZZLE->post($X, ...)
+      - pattern: $GUZZLE->send(new Request($M, $X))
+      # WordPress HTTP API
+      - pattern: wp_remote_get($X, ...)
+      - pattern: wp_remote_post($X, ...)
+      - pattern: wp_safe_remote_get($X, ...)
     pattern-sanitizers:
       - pattern: filter_var($X, FILTER_VALIDATE_URL)
       - patterns:

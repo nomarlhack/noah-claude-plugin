@@ -78,6 +78,31 @@ rules:
       - pattern: request($X, ...)
       - pattern: superagent.get($X, ...)
       - pattern: undici.fetch($X, ...)
+      # got 확장 메서드
+      - pattern: got.post($X, ...)
+      - pattern: got.put($X, ...)
+      - pattern: got.patch($X, ...)
+      - pattern: got.delete($X, ...)
+      - pattern: got.stream($X, ...)
+      # ky (fetch wrapper)
+      - pattern: ky.get($X, ...)
+      - pattern: ky.post($X, ...)
+      - pattern: ky.put($X, ...)
+      - pattern: $KY.get($X, ...)
+      - pattern: $KY.post($X, ...)
+      # needle
+      - pattern: needle($M, $X, ...)
+      - pattern: needle.get($X, ...)
+      - pattern: needle.post($X, ...)
+      # axios instance (axios.create로 생성)
+      - pattern: $AXIOS.get($X, ...)
+      - pattern: $AXIOS.post($X, ...)
+      # superagent 추가 메서드
+      - pattern: superagent.post($X, ...)
+      - pattern: superagent.put($X, ...)
+      - pattern: superagent.patch($X, ...)
+      - pattern: $AGENT.get($X)
+      - pattern: $AGENT.post($X)
     pattern-sanitizers:
       - patterns:
           - pattern: $X

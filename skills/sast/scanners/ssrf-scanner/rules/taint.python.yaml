@@ -44,6 +44,26 @@ rules:
       - pattern: httpx.post($X, ...)
       - pattern: aiohttp.ClientSession().get($X, ...)
       - pattern: aiohttp.request($M, $X, ...)
+      # httpx async client
+      - pattern: "httpx.AsyncClient().get($X, ...)"
+      - pattern: "httpx.AsyncClient().post($X, ...)"
+      - pattern: "await $CLIENT.get($X, ...)"
+      - pattern: "await $CLIENT.post($X, ...)"
+      # requests.Session
+      - pattern: $SESSION.get($X, ...)
+      - pattern: $SESSION.post($X, ...)
+      - pattern: $SESSION.put($X, ...)
+      - pattern: $SESSION.request($M, $X, ...)
+      # urllib3
+      - pattern: "$POOL.request($M, $X, ...)"
+      - pattern: "urllib3.PoolManager().request($M, $X, ...)"
+      # pycurl
+      - pattern: "$C.setopt(pycurl.URL, $X)"
+      # grequests
+      - pattern: "grequests.get($X, ...)"
+      - pattern: "grequests.post($X, ...)"
+      # boto3 / AWS SDK (S3 presigned URL 등)
+      - pattern: "$S3.generate_presigned_url($OP, Params={..., 'Bucket': $X, ...})"
     pattern-sanitizers:
       - patterns:
           - pattern: $X

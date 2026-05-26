@@ -71,6 +71,32 @@ rules:
       - pattern: new URL($X, ...)
       - pattern: HttpClient.newHttpClient().send($REQ, ...)
       - pattern: HttpRequest.newBuilder().uri(URI.create($X))
+      # OkHttp
+      - pattern: "Request.Builder().url($X).build()"
+      - pattern: "OkHttpClient().newCall(Request.Builder().url($X).build())"
+      - pattern: $BUILDER.url($X)
+      # Apache HttpClient 4 (CloseableHttpClient)
+      - pattern: HttpClients.createDefault().execute(new HttpGet($X))
+      - pattern: $CLIENT.execute(new HttpGet($X))
+      - pattern: $CLIENT.execute(new HttpPost($X))
+      - pattern: new HttpGet($X)
+      - pattern: new HttpPost($X)
+      - pattern: new HttpPut($X)
+      - pattern: new HttpDelete($X)
+      # Apache HttpClient 5 (CloseableHttpClient 5.x)
+      - pattern: ClassicRequestBuilder.get($X)
+      - pattern: ClassicRequestBuilder.post($X)
+      # Spring 6 RestClient
+      - pattern: RestClient.create($X)
+      - pattern: $RC.get().uri($X)
+      - pattern: $RC.post().uri($X)
+      - pattern: $RC.put().uri($X)
+      # JAX-RS Client API
+      - pattern: ClientBuilder.newClient().target($X)
+      - pattern: $CLIENT.target($X)
+      - pattern: $WT.path($X)
+      # OpenFeign — URL은 @FeignClient baseUrl로 제어 (동적 URL은 드묾)
+      - pattern: $FEIGN.target($T, $X)
     pattern-sanitizers:
       - patterns:
           - pattern: $X
