@@ -78,12 +78,14 @@ SCANNERS = [
     "android-deeplink-scanner", "android-webview-scanner",
     "android-ipc-scanner", "android-manifest-scanner",
     "hardcoded-secrets-scanner", "log-injection-scanner",
+    "ios-webview-scanner", "ios-storage-scanner", "ios-crypto-scanner",
 ]
 
 pkg = read_pkg_json()
 has_requirements = has_file("requirements.txt", "Pipfile", "pyproject.toml")
 has_gemfile = has_file("Gemfile")
 has_pom = has_file("pom.xml", "build.gradle")
+has_ios = has_file("*.xcodeproj", "*.xcworkspace", "Podfile", "Package.swift", "Info.plist")
 
 # --- Python 의존성 파싱 ---
 def read_python_deps():
@@ -532,6 +534,9 @@ def check_exclude(scanner):
         pass  # 하드코딩 비밀값은 모든 프로젝트에 해당
     elif scanner == "log-injection-scanner":
         pass  # 로그 인젝션은 모든 웹 프로젝트에 해당
+    elif scanner in ("ios-webview-scanner", "ios-storage-scanner", "ios-crypto-scanner"):
+        if not has_ios:
+            return "iOS 프로젝트 아님 (*.xcodeproj/Podfile/Package.swift/Info.plist 없음)"
     elif _scanner_prereq_group.get(scanner) == "llm":
         if not has_dep_any(
             # Python
@@ -624,6 +629,7 @@ BASE_GROUPS = {
     "protocol-check": ["graphql-scanner", "websocket-scanner", "soapaction-spoofing-scanner", "ldap-injection-scanner", "xpath-injection-scanner"],
     "business-logic": ["business-logic-scanner", "validation-logic-scanner"],
     "mobile": ["android-deeplink-scanner", "android-webview-scanner", "android-ipc-scanner", "android-manifest-scanner"],
+    "ios": ["ios-webview-scanner", "ios-storage-scanner", "ios-crypto-scanner"],
     "secrets-logging": ["hardcoded-secrets-scanner", "log-injection-scanner"],
 }
 

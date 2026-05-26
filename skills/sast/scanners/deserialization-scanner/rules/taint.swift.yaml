@@ -1,0 +1,39 @@
+rules:
+  - id: noah-swift-deser-taint
+    severity: ERROR
+    languages:
+      - swift
+    mode: taint
+    message: |
+      Swift에서 네트워크/외부 데이터가 NSKeyedUnarchiver / NSCoding에 직접 전달되면
+      Insecure Deserialization → RCE. 안전: Codable/JSONDecoder 사용, NSKeyedUnarchiver는
+      requiringSecureCoding: true + allowedClasses 명시.
+    pattern-sources:
+      - pattern: "$TASK.originalRequest?.httpBody"
+      - pattern: "try Data(contentsOf: $URL)"
+      - pattern: "$RESPONSE.data"
+      - pattern: "URLSession.shared.data(from: $URL)"
+
+    pattern-sinks:
+      # NSKeyedUnarchiver (취약 — 클래스 제한 없음)
+      - pattern: "NSKeyedUnarchiver.unarchiveObject(with: $DATA)"
+      - pattern: "NSKeyedUnarchiver.unarchiveTopLevelObjectWithData($DATA)"
+      - pattern: "try NSKeyedUnarchiver.unarchivedObject(ofClass: $C, from: $DATA)"
+      # NSCoding
+      - pattern: "NSCoding.init(coder: $X)"
+
+    pattern-sanitizers:
+      # requiringSecureCoding: true + 클래스 지정은 상대적으로 안전
+      - pattern: "try NSKeyedUnarchiver.unarchivedObject(ofClasses: $CLASSES, from: $DATA)"
+      - pattern: "try NSKeyedUnarchiver.unarchivedArrayOfObjects(ofClass: $C, from: $DATA)"
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Deserialization]
+      owasp: ["A08:2021 Software and Data Integrity Failures"]
+      technology: [ios, swift, nskeyedunarchiver]

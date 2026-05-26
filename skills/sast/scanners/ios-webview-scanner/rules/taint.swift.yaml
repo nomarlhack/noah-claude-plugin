@@ -1,0 +1,46 @@
+rules:
+  - id: noah-swift-ios-webview-js-inject-taint
+    severity: ERROR
+    languages:
+      - swift
+    mode: taint
+    message: |
+      외부 입력(URL queryItem / AppDelegate openURL / URLRequest 헤더)이
+      WKWebView evaluateJavaScript에 이스케이프 없이 보간되면 JS Injection.
+      안전: 사용자 입력을 JS에 전달하지 않거나, JSON 직렬화 후 고정 함수만 호출.
+    pattern-sources:
+      # URL query parameter (deeplink/universal link)
+      - pattern: "$URL.queryParameters[$K]"
+      - pattern: "$COMPONENTS.queryItems"
+      - pattern: "$ITEM.value"
+      - pattern: "URLComponents(url: $U, resolvingAgainstBaseURL: $B)?.queryItems"
+      # AppDelegate / SceneDelegate openURL
+      - pattern: "$URL.absoluteString"
+      - pattern: "$URL.path"
+      - pattern: "$URL.host"
+      # URLRequest / HTTP response
+      - pattern: "$REQ.url?.absoluteString"
+
+    pattern-sinks:
+      - pattern: "$WV.evaluateJavaScript($X)"
+      - pattern: "$WV.evaluateJavaScript($X, completionHandler: $H)"
+      - pattern: "$UIW.stringByEvaluatingJavaScript(from: $X)"
+      - pattern: "$WV.loadHTMLString($X, baseURL: $BASE)"
+      - pattern: "$WV.load($X)"
+
+    pattern-sanitizers:
+      # JSON 직렬화 (JS-safe string)
+      - pattern: "String(data: JSONSerialization.data(withJSONObject: $X, options: ...), encoding: .utf8)"
+      # URL encode
+      - pattern: "$X.addingPercentEncoding(withAllowedCharacters: ...)"
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-79: Improper Neutralization (WebView XSS)"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [XSS, Code Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [ios, swift, wkwebview]

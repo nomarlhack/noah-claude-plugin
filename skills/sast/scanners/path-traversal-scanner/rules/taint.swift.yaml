@@ -1,0 +1,53 @@
+rules:
+  - id: noah-swift-pathtrv-taint
+    severity: ERROR
+    languages:
+      - swift
+    mode: taint
+    message: |
+      Swift에서 사용자 입력(URL query / deeplink param)이 FileManager 경로에
+      검증 없이 보간되면 Path Traversal → 앱 샌드박스 파일 탈취.
+      안전: URL.standardized, lastPathComponent, 샌드박스 경로 prefix 검증.
+    pattern-sources:
+      - pattern: "$COMPONENTS.queryItems"
+      - pattern: "$ITEM.value"
+      - pattern: "$URL.lastPathComponent"
+      - pattern: "$URL.path"
+      - pattern: "url.absoluteString"
+      - pattern: "UserDefaults.standard.string(forKey: $K)"
+
+    pattern-sinks:
+      # FileManager
+      - pattern: "FileManager.default.contents(atPath: $X)"
+      - pattern: "FileManager.default.fileExists(atPath: $X)"
+      - pattern: "FileManager.default.createFile(atPath: $X, contents: $D)"
+      - pattern: "FileManager.default.removeItem(atPath: $X)"
+      - pattern: "FileManager.default.copyItem(atPath: $X, toPath: $DST)"
+      - pattern: "FileManager.default.moveItem(atPath: $X, toPath: $DST)"
+      - pattern: "FileManager.default.contentsOfDirectory(atPath: $X)"
+      # URL 기반
+      - pattern: "try Data(contentsOf: URL(fileURLWithPath: $X))"
+      - pattern: "try String(contentsOfFile: $X)"
+      - pattern: "try Data(contentsOf: $URL)"
+      # Bundle
+      - pattern: "Bundle.main.path(forResource: $X, ofType: $T)"
+
+    pattern-sanitizers:
+      - pattern: "URL(fileURLWithPath: $X).standardized.path"
+      - pattern: "($X as NSString).lastPathComponent"
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              let $SAFE = URL(fileURLWithPath: $X).standardized
+              guard $SAFE.path.hasPrefix($BASE) else { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-22: Path Traversal"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Path Traversal]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [ios, swift, filemanager]

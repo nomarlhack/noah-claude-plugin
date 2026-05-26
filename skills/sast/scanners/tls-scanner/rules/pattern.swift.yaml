@@ -1,0 +1,63 @@
+rules:
+  - id: noah-swift-tls-phase1-pattern
+    severity: WARNING
+    languages:
+      - swift
+    message: |
+      tls-scanner Phase 1 iOS/Swift TLS 설정 패턴 매치.
+      후보 수집용 — TLS 검증 비활성화·약한 설정 컨텍스트를 확인 후 판정.
+    pattern-either:
+      # URLSession SSL 검증 무시
+      - pattern-regex: 'urlSession\s*\(.*didReceive challenge.*completionHandler'
+      - pattern-regex: 'completionHandler\s*\(\s*\.useCredential'
+      - pattern-regex: 'URLCredential\s*\(\s*trust'
+      # ATS 우회 (Info.plist — generic 룰도 적용)
+      - pattern-regex: 'NSAllowsArbitraryLoads'
+      - pattern-regex: 'NSExceptionAllowsInsecureHTTPLoads'
+      - pattern-regex: 'NSTemporaryExceptionAllowsInsecureHTTPLoads'
+      # 약한 TLS 설정
+      - pattern-regex: 'tlsMinimumSupportedProtocolVersion'
+      - pattern-regex: 'tls_protocol_version_TLSv10'
+      - pattern-regex: 'tls_protocol_version_TLSv11'
+      # Certificate pinning 비활성화
+      - pattern-regex: 'ServerTrustPolicyManager'
+      - pattern-regex: 'DisabledEvaluator\s*\('
+      - pattern-regex: 'RevocationTrustEvaluator'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-295: Improper Certificate Validation"
+        - "CWE-326: Inadequate Encryption Strength"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH
+
+  # 고신뢰: URLSession SSL 검증 무조건 통과
+  - id: noah-swift-tls-ssl-bypass-sink
+    severity: ERROR
+    languages:
+      - swift
+    message: |
+      URLSessionDelegate에서 SSL 인증서 검증을 무조건 통과 (.useCredential 또는 .performDefaultHandling
+      없이 trust 기반 credential 생성) → MITM.
+      안전: challenge.protectionSpace.serverTrust를 실제로 검증 후 .useCredential 또는 .cancelAuthenticationChallenge.
+    pattern: |
+      func urlSession($SESSION: URLSession, didReceive $CHALLENGE: URLAuthenticationChallenge, completionHandler $H: ...) {
+        ...
+        let $CRED = URLCredential(trust: $TRUST)
+        ...
+        $H(.useCredential, $CRED)
+        ...
+      }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-295: Improper Certificate Validation"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Improper Certificate Validation]
+      owasp: ["A02:2021 Cryptographic Failures"]
+      technology: [ios, swift, urlsession, tls]

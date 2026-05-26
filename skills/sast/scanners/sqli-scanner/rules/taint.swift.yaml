@@ -1,0 +1,55 @@
+rules:
+  - id: noah-swift-sqli-taint
+    severity: ERROR
+    languages:
+      - swift
+    mode: taint
+    message: |
+      Swift에서 HTTP 입력(URL query / URLRequest body)이 SQLite raw query 또는
+      FMDB executeQuery에 문자열 보간으로 들어가면 SQL Injection.
+      안전: SQLite prepared statement (sqlite3_bind_*), FMDB executeQuery 파라미터 바인딩.
+    pattern-sources:
+      # URL query parameter
+      - pattern: "$COMPONENTS.queryItems"
+      - pattern: "$ITEM.value"
+      - pattern: "$URL.queryParameters[$K]"
+      - pattern: "$REQ.url?.queryParameters[$K]"
+      # URLRequest body
+      - pattern: "$TASK.originalRequest?.httpBody"
+      - pattern: "String(data: $DATA, encoding: .utf8)"
+      # Codable decoded from network
+      - pattern: "try JSONDecoder().decode($T.self, from: $DATA)"
+
+    pattern-sinks:
+      # SQLite3 직접 호출 (문자열 보간)
+      - pattern: "sqlite3_exec($DB, $SQL, nil, nil, nil)"
+      - pattern: "sqlite3_prepare_v2($DB, $SQL, ...)"
+      # FMDB
+      - pattern: "$DB.executeQuery($SQL, withArgumentsIn: ...)"
+      - pattern: "$DB.executeUpdate($SQL, withArgumentsIn: ...)"
+      - pattern: "$DB.executeQuery($SQL)"
+      - pattern: "$DB.executeUpdate($SQL)"
+      # Core Data NSPredicate raw format
+      - pattern: "NSPredicate(format: $FORMAT)"
+      - pattern: "NSPredicate(format: $FORMAT, argumentArray: $ARGS)"
+
+    pattern-sanitizers:
+      # 파라미터 바인딩 (sqlite3_bind_*)
+      - pattern: "sqlite3_bind_text($STMT, $IDX, $X, ...)"
+      - pattern: "sqlite3_bind_int($STMT, $IDX, $X)"
+      # FMDB 파라미터 배열 바인딩
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $DB.executeQuery($SQL, withArgumentsIn: [$X, ...])
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [ios, swift, sqlite, fmdb]

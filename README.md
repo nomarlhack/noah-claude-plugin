@@ -1,6 +1,6 @@
 # noah-8719
 
-> Claude Code 보안 분석 플러그인. 52개 취약점 스캐너 + AI 자율 탐색으로 정적 분석 + 동적 테스트 + 보고서 생성.
+> Claude Code 보안 분석 플러그인. 55개 취약점 스캐너 + AI 자율 탐색으로 정적 분석 + 동적 테스트 + 보고서 생성.
 
 ## 설치
 
@@ -28,7 +28,7 @@ cd noah-8719 && git pull   # 업데이트
 
 ## 개요
 
-Noah SAST는 Claude Code의 **스킬(Skill)** 위에서 동작하는 소스코드 취약점 분석 프레임워크입니다. 52개 전용 스캐너와 AI 자율 탐색을 결합해 **정적 분석 → 동적 검증 → 보고서 생성**까지 한 번에 수행합니다.
+Noah SAST는 Claude Code의 **스킬(Skill)** 위에서 동작하는 소스코드 취약점 분석 프레임워크입니다. 55개 전용 스캐너와 AI 자율 탐색을 결합해 **정적 분석 → 동적 검증 → 보고서 생성**까지 한 번에 수행합니다.
 
 전체 파이프라인은 네 묶음으로 이어집니다.
 
@@ -119,7 +119,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     SRC["프로젝트 소스코드"]
-    SRC -->|"52개 스캐너 룰 일괄 실행"| SEMGREP["semgrep"]
+    SRC -->|"55개 스캐너 룰 일괄 실행"| SEMGREP["semgrep"]
     SEMGREP -->|"매치당 1건\n{check_id, path, line}"| IDX
 
     subgraph IDX ["semgrep_index.py"]
@@ -181,7 +181,7 @@ tier는 rule ID 이름만으로 자동 결정됩니다.
 - 환경 설정 파일·CORS·OAuth 설정 등에서 sandbox/dev 도메인 추출 → `SANDBOX_DOMAINS`에 보관 (보고서 PoC URL에 사용)
 
 **Step 4 · 스캐너 선별**
-52개 스캐너 중 이 프로젝트에 해당하는 것만 고릅니다. **"포함이 기본, 제외에는 근거가 필요"** 원칙으로 동작합니다.
+55개 스캐너 중 이 프로젝트에 해당하는 것만 고릅니다. **"포함이 기본, 제외에는 근거가 필요"** 원칙으로 동작합니다.
 
 - **Step 4-1** `select_scanners.py`가 패턴 인덱스 매치 건수 + 프로젝트 아키텍처로 자동 선별합니다. 매치 1건 이상이면 반드시 포함, 0건이면 스크립트가 아키텍처 조건을 검사해 제외 가능 여부를 판단합니다. `_expected_scanners.json`을 작성해 Phase 1 완료 후 누락 파일을 자동 감지합니다.
 - **Step 4-2** 라이브러리 의존성·매치 수만으로는 놓치는 케이스를 AI가 재검토합니다. 내장 API 직접 구현(예: `fetch()`로 서버사이드 요청 → SSRF), 프레임워크 내장 기능(예: `RestTemplate` → SSRF), 멀티 언어 서브프로젝트 등이 해당합니다.
@@ -446,7 +446,7 @@ noah-8719/
 │   └── sast/
 │       ├── SKILL.md                     # 오케스트레이터 (Step 1~12 상세)
 │       │
-│       ├── scanners/                    # 52개 취약점 스캐너
+│       ├── scanners/                    # 55개 취약점 스캐너
 │       │   ├── xss-scanner/
 │       │   │   ├── phase1.md            # Sink 의미론, 판정 기준
 │       │   │   ├── phase2.md            # 동적 테스트 cheat sheet

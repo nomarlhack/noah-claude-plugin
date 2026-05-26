@@ -1,0 +1,83 @@
+rules:
+  - id: noah-swift-ios-crypto-weak-pattern
+    severity: WARNING
+    languages:
+      - swift
+    message: |
+      ios-crypto-scanner Phase 1 약한 암호화 패턴 매치 (Swift).
+      후보 수집용 — 알고리즘/모드/키 컨텍스트를 확인 후 판정.
+    pattern-either:
+      # 약한 알고리즘
+      - pattern-regex: 'kCCAlgorithmDES\b'
+      - pattern-regex: 'kCCAlgorithm3DES\b'
+      - pattern-regex: 'kCCAlgorithmRC4\b'
+      - pattern-regex: 'kCCAlgorithmRC2\b'
+      - pattern-regex: 'kCCAlgorithmBlowfish\b'
+      # ECB 모드
+      - pattern-regex: 'kCCOptionECBMode\b'
+      # 약한 해시
+      - pattern-regex: 'CC_MD5\s*\('
+      - pattern-regex: 'CC_SHA1\s*\('
+      - pattern-regex: 'Insecure\.MD5'
+      - pattern-regex: 'Insecure\.SHA1'
+      # CommonCrypto 직접 호출 (파라미터 검토 필요)
+      - pattern-regex: 'CCCrypt\s*\('
+      - pattern-regex: 'CCKeyDerivationPBKDF\s*\('
+      # 취약 난수
+      - pattern-regex: '\barc4random\b'
+      - pattern-regex: '\bdrand48\b'
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-327: Use of a Broken or Risky Cryptographic Algorithm"
+        - "CWE-330: Use of Insufficiently Random Values"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH
+
+  # 고신뢰: ECB 모드 직접 탐지
+  - id: noah-swift-ios-aes-ecb-sink
+    severity: ERROR
+    languages:
+      - swift
+    message: |
+      AES-ECB 모드 사용 (kCCOptionECBMode). ECB는 동일 평문 블록이 동일 암호문을 생성 →
+      패턴 노출. 안전: CBC + 랜덤 IV 또는 CryptoKit AES.GCM.
+    pattern-either:
+      - pattern: "CCCrypt(kCCEncrypt, kCCAlgorithmAES, kCCOptionECBMode, ...)"
+      - pattern: "CCCrypt(kCCDecrypt, kCCAlgorithmAES, kCCOptionECBMode, ...)"
+      - pattern-regex: 'CCCrypt\([^)]*kCCOptionECBMode[^)]*\)'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-327: Use of a Broken or Risky Cryptographic Algorithm"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Weak Cryptography]
+      owasp: ["A02:2021 Cryptographic Failures"]
+      technology: [ios, swift, commoncrypto]
+
+  # 고신뢰: 정적 IV
+  - id: noah-swift-ios-static-iv-pattern
+    severity: ERROR
+    languages:
+      - swift
+    message: |
+      AES 암호화에 0으로 채운 정적 IV 사용. 동일 IV 재사용 → 암호문 패턴 노출.
+      안전: SecRandomCopyBytes로 생성한 랜덤 IV를 매 암호화마다 사용.
+    pattern-either:
+      - pattern: "[UInt8](repeating: 0, count: $N)"
+      - pattern: "Array(repeating: 0 as UInt8, count: $N)"
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-330: Use of Insufficiently Random Values"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Weak Cryptography]
+      owasp: ["A02:2021 Cryptographic Failures"]
+      technology: [ios, swift]

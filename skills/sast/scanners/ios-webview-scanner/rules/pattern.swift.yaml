@@ -1,0 +1,58 @@
+rules:
+  - id: noah-swift-ios-webview-phase1-pattern
+    severity: WARNING
+    languages:
+      - swift
+    message: |
+      ios-webview-scanner Phase 1 sink/config 패턴 매치 (Swift).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(로드 대상 신뢰도, JS 인자 이스케이프, delegate 검증)를 확인한 후 수행.
+    pattern-either:
+      # JS 실행 sink
+      - pattern: $WV.evaluateJavaScript($X)
+      - pattern: "$WV.evaluateJavaScript($X, completionHandler: $H)"
+      # URL 로드 sink
+      - pattern: "$WV.load($REQ)"
+      - pattern: "$WV.loadHTMLString($HTML, baseURL: $BASE)"
+      - pattern: "$WV.load($DATA, mimeType: $MIME, characterEncodingName: $ENC, baseURL: $BASE)"
+      # JS bridge 노출
+      - pattern: "$CTRL.add($HANDLER, name: $NAME)"
+      # UIWebView (deprecated but dangerous)
+      - pattern: UIWebView(...)
+      - pattern: "$UIW.loadRequest($REQ)"
+      - pattern: "$UIW.loadHTMLString($HTML, baseURL: $BASE)"
+      - pattern: "$UIW.stringByEvaluatingJavaScript(from: $X)"
+      # ATS 우회 패턴 (Info.plist 는 generic 룰이 커버)
+      - pattern: "WKWebpagePreferences()"
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-79: Improper Neutralization (WebView XSS)"
+        - "CWE-749: Exposed Dangerous Method"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH
+
+  - id: noah-swift-ios-webview-nav-unvalidated-pattern
+    severity: WARNING
+    languages:
+      - swift
+    message: |
+      WKNavigationDelegate decidePolicyFor 에서 decisionHandler(.allow) 무조건 호출 패턴.
+      URL scheme/host 검증 없이 모든 네비게이션 허용 → 임의 URL 로드 가능.
+    pattern: |
+      func webView($WV: WKWebView, decidePolicyFor $ACTION: WKNavigationAction, decisionHandler $H: ...) {
+        ...
+        $H(.allow)
+        ...
+      }
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-601: URL Redirection to Untrusted Site"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM

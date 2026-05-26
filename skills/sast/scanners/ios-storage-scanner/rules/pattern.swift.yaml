@@ -1,0 +1,61 @@
+rules:
+  - id: noah-swift-ios-storage-phase1-pattern
+    severity: WARNING
+    languages:
+      - swift
+    message: |
+      ios-storage-scanner Phase 1 민감 데이터 저장 패턴 매치 (Swift).
+      후보 수집용 — 변수 컨텍스트(민감 데이터 여부)와 저장 옵션을 확인 후 판정.
+    pattern-either:
+      # UserDefaults 저장
+      - pattern: "UserDefaults.standard.set($V, forKey: $K)"
+      - pattern: "$DEFAULTS.set($V, forKey: $K)"
+      # 파일 쓰기 (FileProtection 옵션 없는 형태)
+      - pattern: "try $DATA.write(to: $URL)"
+      - pattern: "$DATA.write(to: $URL, atomically: $B)"
+      - pattern: "FileManager.default.createFile(atPath: $P, contents: $D)"
+      # Keychain 저장
+      - pattern: "SecItemAdd($QUERY, $RESULT)"
+      - pattern: "SecItemUpdate($QUERY, $ATTRS)"
+      - pattern: "kSecAttrAccessibleAlways"
+      - pattern: "kSecAttrAccessibleAlwaysThisDeviceOnly"
+      # 클립보드
+      - pattern: "UIPasteboard.general.string = $V"
+      - pattern: "$BOARD.string = $V"
+      # CoreData
+      - pattern: "NSPersistentStoreCoordinator(...)"
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-312: Cleartext Storage of Sensitive Information"
+        - "CWE-922: Insecure Storage of Sensitive Information"
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+
+  # 고신뢰: kSecAttrAccessibleAlways 직접 탐지
+  - id: noah-swift-ios-keychain-overaccessible-sink
+    severity: ERROR
+    languages:
+      - swift
+    message: |
+      Keychain 항목에 kSecAttrAccessibleAlways / kSecAttrAccessibleAlwaysThisDeviceOnly 설정.
+      기기 잠금 해제 없이 Keychain 접근 가능 → 기기 탈취 시 즉시 탈취.
+      안전: kSecAttrAccessibleWhenUnlocked 또는 kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly.
+    pattern-either:
+      - pattern: |
+          $QUERY[kSecAttrAccessible as String] = kSecAttrAccessibleAlways as AnyObject
+      - pattern: |
+          $QUERY[kSecAttrAccessible as String] = kSecAttrAccessibleAlwaysThisDeviceOnly as AnyObject
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-312: Cleartext Storage of Sensitive Information"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Insecure Storage]
+      owasp: ["A02:2021 Cryptographic Failures"]
+      technology: [ios, swift, keychain]

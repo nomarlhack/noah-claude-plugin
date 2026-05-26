@@ -1,0 +1,59 @@
+rules:
+  - id: noah-swift-ssrf-taint
+    severity: ERROR
+    languages:
+      - swift
+    mode: taint
+    message: |
+      Swift에서 사용자 제어 URL(URL query / deeplink / request body)이
+      URLSession/Alamofire에 검증 없이 전달되면 SSRF.
+      안전: URL scheme(https만), host 화이트리스트 검증.
+    pattern-sources:
+      # URL query parameter
+      - pattern: "$COMPONENTS.queryItems"
+      - pattern: "$ITEM.value"
+      - pattern: "$URL.absoluteString"
+      # Deeplink / openURL
+      - pattern: "url.absoluteString"
+      - pattern: "$URL.path"
+      # Request body decoded
+      - pattern: "try JSONDecoder().decode($T.self, from: $DATA)"
+      # UserDefaults (stored URL)
+      - pattern: "UserDefaults.standard.string(forKey: $K)"
+
+    pattern-sinks:
+      # URLSession
+      - pattern: "URLSession.shared.dataTask(with: URL(string: $X)!)"
+      - pattern: "URLSession.shared.dataTask(with: URL(string: $X)!, completionHandler: $H)"
+      - pattern: "URLSession.shared.data(from: URL(string: $X)!)"
+      - pattern: "URLSession.shared.dataTask(with: $URL)"
+      - pattern: "URLSession.shared.dataTask(with: $REQ)"
+      - pattern: "$SESSION.dataTask(with: $URL)"
+      - pattern: "$SESSION.dataTask(with: $URL, completionHandler: $H)"
+      # Alamofire
+      - pattern: "AF.request($X)"
+      - pattern: "AF.request($X, method: $M)"
+      - pattern: "Alamofire.request($X)"
+      # URLRequest 생성
+      - pattern: "URLRequest(url: URL(string: $X)!)"
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              guard $X.hasPrefix("https://") else { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if let $URL = URL(string: $X), $ALLOWED.contains($URL.host ?? "") { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-918: Server-Side Request Forgery"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [SSRF]
+      owasp: ["A10:2021 Server-Side Request Forgery"]
+      technology: [ios, swift, urlsession, alamofire]
