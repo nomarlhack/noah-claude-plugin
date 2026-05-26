@@ -1,0 +1,62 @@
+rules:
+  - id: noah-csharp-cmdi-taint
+    severity: ERROR
+    languages:
+      - csharp
+    mode: taint
+    message: |
+      C#에서 사용자 입력이 Process.Start(fileName) / ProcessStartInfo.FileName에
+      직접 전달되면 Command Injection → RCE.
+      안전: 실행 파일 경로는 화이트리스트로 고정하고 사용자 입력은 Arguments로만 전달
+      (단, Arguments도 shell=false + 토큰 분리 방식 사용).
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromQuery] $X $NAME, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromBody] $X $NAME, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromRoute] $X $NAME, ...) { ... }
+      - pattern: Request.Query[$K]
+      - pattern: Request.Form[$K]
+      - pattern: HttpContext.Request.Query[$K]
+
+    pattern-sinks:
+      # Process.Start 직접 호출
+      - pattern: Process.Start($X)
+      - pattern: Process.Start($X, ...)
+      # ProcessStartInfo
+      - pattern: new ProcessStartInfo($X)
+      - pattern: new ProcessStartInfo($X, $ARGS)
+      - pattern: "$INFO.FileName = $X"
+      - pattern: "$INFO.Arguments = $X"
+      # cmd /c
+      - pattern: new ProcessStartInfo("cmd", "/c " + $X)
+      - pattern: new ProcessStartInfo("cmd.exe", "/c " + $X)
+      # PowerShell
+      - pattern: new ProcessStartInfo("powershell", "-Command " + $X)
+      - pattern: new ProcessStartInfo("powershell.exe", "-Command " + $X)
+
+    pattern-sanitizers:
+      - pattern: int.Parse($X)
+      - pattern: double.Parse($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($WHITELIST.Contains($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-78: Improper Neutralization of Special Elements used in an OS Command"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Command Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [csharp, dotnet]

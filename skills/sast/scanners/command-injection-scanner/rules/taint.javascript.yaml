@@ -64,6 +64,25 @@ rules:
               - pattern: 'spawnSync($X, ..., { shell: true })'
               - pattern: 'child_process.spawn($X, ..., { shell: true })'
       - pattern: shelljs.exec($X)
+      # execa (popular Node.js exec wrapper)
+      - pattern: execa($X, ...)
+      - pattern: execa.command($X, ...)
+      - pattern: execa.commandSync($X, ...)
+      - pattern: execaSync($X, ...)
+      # execFile
+      - pattern: execFile($X, ...)
+      - pattern: execFileSync($X, ...)
+      - pattern: child_process.execFile($X, ...)
+      - pattern: child_process.execFileSync($X, ...)
+      # cross-spawn
+      - pattern: crossSpawn($X, ...)
+      - pattern: crossSpawn.sync($X, ...)
+      # fork (Node.js child process — module path injection)
+      - pattern: fork($X, ...)
+      - pattern: child_process.fork($X, ...)
+      # zx (Google's shell scripting for Node)
+      - pattern: $`$X`
+      - pattern: $SHELL.exec($X)
     pattern-sanitizers:
       - pattern: shellQuote.quote([$X])
       - patterns:

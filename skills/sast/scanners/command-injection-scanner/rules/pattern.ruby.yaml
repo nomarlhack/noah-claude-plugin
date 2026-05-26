@@ -7,7 +7,6 @@ rules:
       command-injection-scanner Phase 1 sink/source 패턴 매치 (Ruby 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'child_process'
       - pattern-regex: 'exec\s*\('
       - pattern-regex: 'execSync\s*\('
       - pattern-regex: 'execFile\s*\('
@@ -15,10 +14,6 @@ rules:
       - pattern-regex: 'spawnSync\s*\('
       - pattern-regex: 'os\.system\s*\('
       - pattern-regex: 'os\.popen\s*\('
-      - pattern-regex: 'subprocess\.call\s*\('
-      - pattern-regex: 'subprocess\.run\s*\('
-      - pattern-regex: 'subprocess\.Popen\s*\('
-      - pattern-regex: 'subprocess\.check_output\s*\('
       - pattern-regex: 'commands\.getoutput\s*\('
       - pattern-regex: 'Runtime\.getRuntime'
       - pattern-regex: 'ProcessBuilder'

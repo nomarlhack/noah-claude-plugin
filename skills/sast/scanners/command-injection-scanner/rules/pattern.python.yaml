@@ -7,7 +7,6 @@ rules:
       command-injection-scanner Phase 1 sink/source 패턴 매치 (Python 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'child_process'
       - pattern-regex: 'exec\s*\('
       - pattern-regex: 'execSync\s*\('
       - pattern-regex: 'execFile\s*\('
@@ -25,7 +24,6 @@ rules:
       - pattern-regex: '%x{'
       - pattern-regex: 'shell\s*:\s*true'
       - pattern-regex: 'shell\s*=\s*True'
-      - pattern-regex: 'shell_exec\s*\('
       - pattern-regex: 'passthru\s*\('
       - pattern-regex: '\bsystem\s*\('
       - pattern-regex: 'popen\s*\('

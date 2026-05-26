@@ -15,3 +15,19 @@ rules:
           metavariable: $X
           patterns:
             - pattern-not: "\"...\""
+
+  - id: noah-java-cmdi-windows-sink
+    severity: WARNING
+    languages: [java]
+    message: |
+      Windows CMD / PowerShell 명령 실행 sink 능력형 매치.
+    metadata:
+      capability_sink: true
+      cwe: ["CWE-78: OS Command Injection"]
+    patterns:
+      - pattern-either:
+          - pattern: new ProcessBuilder("cmd", "/c", $X)
+          - pattern: new ProcessBuilder("cmd.exe", "/c", $X)
+          - pattern: new ProcessBuilder("powershell", "-Command", $X)
+          - pattern: new ProcessBuilder("powershell.exe", "-Command", $X)
+          - pattern: new ProcessBuilder("powershell", "-c", $X)

@@ -65,6 +65,16 @@ rules:
       - pattern: new ProcessBuilder($X)
       - pattern: new ProcessBuilder("sh", "-c", $X)
       - pattern: new ProcessBuilder("bash", "-c", $X)
+      # Windows CMD
+      - pattern: new ProcessBuilder("cmd", "/c", $X)
+      - pattern: new ProcessBuilder("cmd.exe", "/c", $X)
+      - pattern: Runtime.getRuntime().exec(new String[]{"cmd", "/c", $X})
+      # PowerShell
+      - pattern: new ProcessBuilder("powershell", "-Command", $X)
+      - pattern: new ProcessBuilder("powershell.exe", "-Command", $X)
+      - pattern: new ProcessBuilder("powershell", "-c", $X)
+      # zsh
+      - pattern: new ProcessBuilder("zsh", "-c", $X)
     pattern-sanitizers:
       - pattern: $X.matches($P)
     metadata:

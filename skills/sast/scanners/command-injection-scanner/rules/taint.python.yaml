@@ -49,6 +49,23 @@ rules:
           - pattern-not: subprocess.run([...])
           - pattern-not: subprocess.Popen([...])
       - pattern: commands.getoutput($X)
+      # asyncio subprocess (async Python)
+      - pattern: await asyncio.create_subprocess_shell($X, ...)
+      - pattern: await asyncio.create_subprocess_exec($X, ...)
+      - pattern: asyncio.create_subprocess_shell($X, ...)
+      - pattern: asyncio.create_subprocess_exec($X, ...)
+      # os.exec* (프로세스 교체 방식)
+      - pattern: os.execv($X, ...)
+      - pattern: os.execve($X, ...)
+      - pattern: os.execvp($X, ...)
+      - pattern: os.execvpe($X, ...)
+      # os.spawn* 계열
+      - pattern: os.spawnl($M, $X, ...)
+      - pattern: os.spawnle($M, $X, ...)
+      - pattern: os.spawnlp($M, $X, ...)
+      - pattern: os.spawnv($M, $X, ...)
+      # pty 기반
+      - pattern: pty.spawn($X, ...)
     pattern-sanitizers:
       - pattern: shlex.quote($X)
       - pattern: re.match($P, $X)

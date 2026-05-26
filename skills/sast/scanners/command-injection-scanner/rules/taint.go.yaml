@@ -22,6 +22,15 @@ rules:
       - pattern: exec.Command($X, ...)
       - pattern: exec.CommandContext($CTX, "sh", "-c", $X)
       - pattern: exec.CommandContext($CTX, "bash", "-c", $X)
+      # arg injection — 첫 인자는 고정이지만 추가 인자가 사용자 입력
+      - pattern: exec.Command($CMD, $X)
+      - pattern: exec.Command($CMD, $X, ...)
+      - pattern: exec.CommandContext($CTX, $CMD, $X)
+      - pattern: exec.CommandContext($CTX, $CMD, $X, ...)
+      # Windows
+      - pattern: exec.Command("cmd", "/c", $X)
+      - pattern: exec.Command("powershell", "-Command", $X)
+      - pattern: exec.Command("cmd.exe", "/c", $X)
     pattern-sanitizers:
       - patterns:
           - pattern: $X
