@@ -33,7 +33,10 @@ rules:
       # Alamofire
       - pattern: "AF.request($X)"
       - pattern: "AF.request($X, method: $M)"
+      - pattern: "AF.download($X)"
       - pattern: "Alamofire.request($X)"
+      - pattern: "$SESSION.request($X)"
+      - pattern: "$SESSION.request($X, method: $M)"
       # URLRequest 생성
       - pattern: "URLRequest(url: URL(string: $X)!)"
 

@@ -10,6 +10,9 @@ rules:
       # UserDefaults 저장
       - pattern: "UserDefaults.standard.set($V, forKey: $K)"
       - pattern: "$DEFAULTS.set($V, forKey: $K)"
+      # NSUserDefaults (Objective-C 스타일 — Swift에서도 사용)
+      - pattern-regex: 'NSUserDefaults\.standardUserDefaults\s*\(\s*\)'
+      - pattern-regex: '\[NSUserDefaults standardUserDefaults\]'
       # 파일 쓰기 (FileProtection 옵션 없는 형태)
       - pattern: "try $DATA.write(to: $URL)"
       - pattern: "$DATA.write(to: $URL, atomically: $B)"

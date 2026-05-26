@@ -29,6 +29,9 @@ rules:
       - pattern: "$DB.executeUpdate($SQL, withArgumentsIn: ...)"
       - pattern: "$DB.executeQuery($SQL)"
       - pattern: "$DB.executeUpdate($SQL)"
+      - pattern: "$DB.executeStatements($SQL)"
+      - pattern: "$DB.executeQueryWithFormat($SQL, ...)"
+      - pattern: "$DB.executeUpdateWithFormat($SQL, ...)"
       # Core Data NSPredicate raw format
       - pattern: "NSPredicate(format: $FORMAT)"
       - pattern: "NSPredicate(format: $FORMAT, argumentArray: $ARGS)"
