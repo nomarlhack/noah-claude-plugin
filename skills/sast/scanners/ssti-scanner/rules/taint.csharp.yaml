@@ -1,0 +1,75 @@
+rules:
+  - id: noah-csharp-ssti-taint
+    severity: ERROR
+    languages:
+      - csharp
+    mode: taint
+    message: |
+      C#에서 사용자 입력이 Scriban/DotLiquid/RazorEngine 템플릿 문자열 컴파일·렌더링에
+      직접 전달되면 SSTI → RCE.
+      안전: 템플릿은 파일로 관리하고 사용자 입력은 모델 객체로만 전달.
+    pattern-sources:
+      # ASP.NET MVC / Core controller parameters
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromQuery] $X $NAME, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromBody] $X $NAME, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromRoute] $X $NAME, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromForm] $X $NAME, ...) { ... }
+      # HttpContext / Request
+      - pattern: Request.Query[$K]
+      - pattern: Request.Form[$K]
+      - pattern: Request.QueryString[$K]
+      - pattern: HttpContext.Request.Query[$K]
+      # ASP.NET parameter — simple string (semgrep C# taint는 decorator pattern 추적 제한)
+      - pattern: this.Request.Query[$K]
+      - pattern: this.Request.Form[$K]
+      - pattern: context.Request.Query[$K]
+
+    pattern-sinks:
+      # Scriban
+      - pattern: Template.Parse($X)
+      - pattern: Template.ParseLiquid($X)
+      - pattern: ScriptObject.Import($X)
+      # DotLiquid
+      - pattern: DotLiquid.Template.Parse($X)
+      - pattern: DotLiquid.Template.Parse($X).Render(...)
+      # RazorEngine / RazorLight
+      - pattern: Engine.Razor.RunCompile($X, ...)
+      - pattern: Engine.Razor.Compile($X, ...)
+      - pattern: $ENGINE.CompileRenderAsync($X, ...)
+      - pattern: RazorEngine.Compile($X)
+      # Fluid (Liquid for .NET)
+      - pattern: FluidParser.TryParse($X, ...)
+      # Handlebars.NET
+      - pattern: Handlebars.Compile($X)
+      - pattern: Handlebars.CompileView($X)
+      # NVelocity
+      - pattern: $ENGINE.Evaluate($CTX, $W, $TAG, $X)
+
+    pattern-sanitizers:
+      - pattern: System.Web.HttpUtility.HtmlEncode($X)
+      - pattern: System.Net.WebUtility.HtmlEncode($X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code"
+        - "CWE-1336: Improper Neutralization in Template Engine"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [csharp, dotnet, scriban, dotliquid, razorengine, handlebars]

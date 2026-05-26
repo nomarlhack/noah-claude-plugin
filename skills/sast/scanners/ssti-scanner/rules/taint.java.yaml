@@ -72,6 +72,17 @@ rules:
       - pattern: new GStringTemplateEngine().createTemplate($X)
       # Mustache.java
       - pattern: new DefaultMustacheFactory().compile(new StringReader($X), $NAME)
+      # VelocityEngine (별도 API — Velocity.evaluate와 다른 진입점)
+      - pattern: $ENGINE.mergeTemplate($X, $ENCODING, $CTX, $W)
+      - pattern: $ENGINE.evaluate($CTX, $W, $TAG, $X)
+      - pattern: $ENGINE.getTemplate($X)
+      # Rocker (Java 런타임 컴파일)
+      - pattern: Rocker.template($X)
+      # MVEL expression engine (Spring, Drools 등에 내장)
+      - pattern: MVEL.eval($X, ...)
+      - pattern: MVEL.executeExpression($X, ...)
+      # OGNL (Struts2 내장)
+      - pattern: Ognl.getValue($X, ...)
     pattern-sanitizers:
       - pattern: new SimpleEvaluationContext(...)
     metadata:

@@ -29,6 +29,17 @@ rules:
       - pattern: htmltemplate.Must(htmltemplate.New($N).Parse($X))
       # fmt.Fprintf + template 혼합 (직접 HTTP 응답에 삽입)
       - pattern: fmt.Fprintf($W, $X, ...)
+      # raymond (Handlebars for Go)
+      - pattern: raymond.Render($X, ...)
+      - pattern: raymond.MustRender($X, ...)
+      - pattern: $TMPL.Exec($CTX)
+      # Plush (Amber successor, used in Buffalo framework)
+      - pattern: plush.Render($X, ...)
+      - pattern: plush.NewContext()
+      # Amber
+      - pattern: amber.Compile($X, ...)
+      # Hero template (compile-time, but runtime input possible)
+      - pattern: hero.Render($W, $X)
 
     pattern-sanitizers:
       # 사용자 입력을 template.Execute의 data 인자로만 전달하는 것이 안전
@@ -55,6 +66,8 @@ rules:
       technology:
         - go
         - net/http
+        - raymond
+        - plush
         - gin
         - echo
         - fiber

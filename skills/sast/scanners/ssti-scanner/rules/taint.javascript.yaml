@@ -59,6 +59,27 @@ rules:
       - pattern: _.template($X)
       - pattern: lodash.template($X)
       - pattern: vm.runInNewContext($X, ...)
+      # Eta (EJS 후계자)
+      - pattern: Eta.render($X, ...)
+      - pattern: eta.render($X, ...)
+      - pattern: $ETA.renderString($X, ...)
+      # doT
+      - pattern: doT.template($X)
+      - pattern: doT.compile($X)
+      # Squirrelly
+      - pattern: Sqrl.render($X, ...)
+      - pattern: Sqrl.renderFile($X, ...)
+      # Swig (deprecated but still used)
+      - pattern: swig.render($X, ...)
+      - pattern: swig.compile($X)
+      # Hogan.js
+      - pattern: Hogan.compile($X)
+      # Mustache.js
+      - pattern: Mustache.render($X, ...)
+      # Marko
+      - pattern: marko.load($X)
+      # Twig.js
+      - pattern: "Twig.twig({data: $X})"
     pattern-sanitizers: []
     metadata:
       category: security
@@ -69,4 +90,4 @@ rules:
       impact: HIGH
       vulnerability_class: [Injection]
       owasp: ["A03:2021 Injection"]
-      technology: [nodejs, ejs, pug, nunjucks, handlebars]
+      technology: [nodejs, ejs, pug, nunjucks, handlebars, eta, dot, squirrelly, swig, hogan, mustache]

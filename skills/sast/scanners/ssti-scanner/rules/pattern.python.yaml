@@ -9,7 +9,6 @@ rules:
     pattern-either:
       - pattern-regex: 'ejs\.render\s*\('
       - pattern-regex: 'pug\.render\s*\('
-      - pattern-regex: 'nunjucks\.renderString\s*\('
       - pattern-regex: 'render_template_string\s*\('
       - pattern-regex: 'ERB\.new\s*\('
       - pattern-regex: 'Liquid::Template\.parse'
@@ -18,8 +17,6 @@ rules:
       - pattern-regex: 'render_string\s*\('
       - pattern-regex: 'template_string'
       - pattern-regex: 'parseExpression\s*\('
-      - pattern-regex: 'SpelExpressionParser'
-      - pattern-regex: 'Freemarker'
       - pattern-regex: 'Mustache\.render'
       - pattern-regex: 'Handlebars\.compile\s*\('
       - pattern-regex: '__import__'
@@ -33,6 +30,16 @@ rules:
       - pattern-regex: '@RequestBody'
       - pattern-regex: 'req\.query'
       - pattern-regex: 'req\.body'
+      # Mako template
+      - pattern-regex: 'mako\.template\.Template\s*\('
+      # Chameleon
+      - pattern-regex: 'chameleon\.PageTemplate\s*\('
+      # Tornado template
+      - pattern-regex: 'tornado\.template\.Template\s*\('
+      # Genshi MarkupTemplate
+      - pattern-regex: 'MarkupTemplate\s*\('
+      # Mako text= kwarg
+      - pattern-regex: 'Template\s*\(text='
     metadata:
       category: security
       subcategory:

@@ -24,6 +24,19 @@ rules:
       # Tilt (generic template wrapper — 사용자 입력이 template 문자열로 전달되면 위험)
       - pattern: Tilt.new($X)
       - pattern: Tilt[$EXT].new { $X }
+      # Haml
+      - pattern: Haml::Engine.new($X)
+      - pattern: Haml::Engine.new($X).render(...)
+      - pattern: Haml::Template.new($X)
+      # Slim
+      - pattern: Slim::Template.new { $X }
+      - pattern: Slim::Template.new($X)
+      # Mustache
+      - pattern: Mustache.render($X, ...)
+      - pattern: $MUSTACHE.render($X, ...)
+      # Erubi (ERB 후계자)
+      - pattern: Erubi::Engine.new($X)
+      - pattern: Erubi::Engine.new($X).src
 
     pattern-sanitizers:
       - pattern: CGI.escapeHTML($X)

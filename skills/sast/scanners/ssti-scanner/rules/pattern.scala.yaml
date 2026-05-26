@@ -9,8 +9,6 @@ rules:
     pattern-either:
       - pattern-regex: 'ejs\.render\s*\('
       - pattern-regex: 'pug\.render\s*\('
-      - pattern-regex: 'nunjucks\.renderString\s*\('
-      - pattern-regex: 'render_template_string\s*\('
       - pattern-regex: 'ERB\.new\s*\('
       - pattern-regex: 'Liquid::Template\.parse'
       - pattern-regex: 'Template\s*\('
@@ -33,6 +31,12 @@ rules:
       - pattern-regex: '@RequestBody'
       - pattern-regex: 'req\.query'
       - pattern-regex: 'req\.body'
+      # Twirl (Play Framework)
+      - pattern-regex: 'Twirl|twirl'
+      # Scalate
+      - pattern-regex: 'Scalate|scalate'
+      # Scalate engine
+      - pattern-regex: 'ScalateEngine'
     metadata:
       category: security
       subcategory:

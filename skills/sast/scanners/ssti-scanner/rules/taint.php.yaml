@@ -1,0 +1,76 @@
+rules:
+  - id: noah-php-ssti-taint
+    severity: ERROR
+    languages:
+      - php
+    mode: taint
+    message: |
+      PHP에서 사용자 입력이 Twig/Smarty/Blade 템플릿 문자열 컴파일·렌더링 함수에
+      직접 전달되면 SSTI → RCE.
+      안전: 사용자 입력은 템플릿 변수(context)로만 전달하고 템플릿 문자열은 고정 파일로 관리.
+    pattern-sources:
+      - pattern: $_GET
+      - pattern: $_POST
+      - pattern: $_REQUEST
+      - pattern: $_COOKIE
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_GET[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_POST[...];
+      - patterns:
+          - pattern: $X
+          - pattern-inside: $X = $_REQUEST[...];
+      # Laravel
+      - pattern: $REQ->input($K)
+      - pattern: $REQ->get($K)
+      - pattern: request()->input($K)
+      # Symfony
+      - pattern: $REQ->query->get($K)
+      - pattern: $REQ->request->get($K)
+      # CodeIgniter
+      - pattern: $this->input->get($K)
+      - pattern: $this->input->post($K)
+
+    pattern-sinks:
+      # Twig — createTemplate / fromString (사용자 입력 템플릿 문자열)
+      - pattern: $TWIG->createTemplate($X)
+      - pattern: $TWIG->render($X, ...)
+      - pattern: $ENV->createTemplate($X)
+      - pattern: Twig\Environment::createTemplate($X)
+      # Smarty
+      - pattern: $SMARTY->display($X)
+      - pattern: $SMARTY->fetch($X)
+      - pattern: $SMARTY->render($X)
+      # Blade (Laravel) — makeFromString / renderString
+      - pattern: Blade::render($X, ...)
+      - pattern: $BLADE->render($X, ...)
+      - pattern: $VIEW->make($X)
+      - pattern: View::make($X)
+      # Plates (PHP League)
+      - pattern: $TEMPLATES->render($X, ...)
+      # Latte
+      - pattern: $LATTE->renderToString($X, ...)
+      - pattern: $LATTE->render($X, ...)
+      # Raw eval-based template
+      - pattern: eval('?>' . $X)
+      - pattern: eval($X)
+
+    pattern-sanitizers:
+      - pattern: htmlspecialchars($X, ...)
+      - pattern: htmlentities($X, ...)
+      - pattern: strip_tags($X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe:
+        - "CWE-94: Improper Control of Generation of Code"
+        - "CWE-1336: Improper Neutralization in Template Engine"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [php, twig, smarty, blade, laravel, symfony]

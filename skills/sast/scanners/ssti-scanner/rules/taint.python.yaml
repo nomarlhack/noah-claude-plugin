@@ -33,6 +33,7 @@ rules:
       - pattern: await request.json()
       - pattern: request.raw_args[$K]
     pattern-sinks:
+      # Jinja2 / Flask
       - pattern: render_template_string($X, ...)
       - pattern: render_template_string($X)
       - pattern: Template($X)
@@ -40,6 +41,27 @@ rules:
       - pattern: $ENV.from_string($X)
       - pattern: jinja2.Template($X)
       - pattern: flask.render_template_string($X, ...)
+      # Mako
+      - pattern: "Template(text=$X)"
+      - pattern: "Template(text=$X, ...)"
+      - pattern: "$LOOKUP.get_template($X).render()"
+      - pattern: "mako.template.Template(text=$X)"
+      - pattern: "$TMPL.render_unicode($X)"
+      # Chameleon
+      - pattern: "PageTemplate($X)"
+      - pattern: "PageTemplate($X)()"
+      - pattern: "chameleon.PageTemplate($X)"
+      # Tornado template
+      - pattern: "tornado.template.Template($X)"
+      - pattern: "tornado.template.Template($X).generate(...)"
+      # Genshi
+      - pattern: "MarkupTemplate($X)"
+      - pattern: "MarkupTemplate($X).generate(...)"
+      # Cheetah
+      - pattern: "Template($SRC, searchList=$X)"
+      # String template (generic Python)
+      - pattern: "$T.substitute($X)"
+      - pattern: "$T.safe_substitute($X)"
     pattern-sanitizers: []
     metadata:
       category: security
@@ -50,4 +72,4 @@ rules:
       impact: HIGH
       vulnerability_class: [Injection]
       owasp: ["A03:2021 Injection"]
-      technology: [python, flask, jinja2]
+      technology: [python, flask, jinja2, mako, chameleon, tornado, genshi]

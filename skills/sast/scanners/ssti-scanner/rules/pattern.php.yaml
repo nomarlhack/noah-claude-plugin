@@ -9,8 +9,6 @@ rules:
     pattern-either:
       - pattern-regex: 'ejs\.render\s*\('
       - pattern-regex: 'pug\.render\s*\('
-      - pattern-regex: 'nunjucks\.renderString\s*\('
-      - pattern-regex: 'render_template_string\s*\('
       - pattern-regex: 'ERB\.new\s*\('
       - pattern-regex: 'Liquid::Template\.parse'
       - pattern-regex: 'Template\s*\('
@@ -18,8 +16,6 @@ rules:
       - pattern-regex: 'render_string\s*\('
       - pattern-regex: 'template_string'
       - pattern-regex: 'parseExpression\s*\('
-      - pattern-regex: 'SpelExpressionParser'
-      - pattern-regex: 'Freemarker'
       - pattern-regex: 'Mustache\.render'
       - pattern-regex: 'Handlebars\.compile\s*\('
       - pattern-regex: '__import__'
@@ -33,6 +29,16 @@ rules:
       - pattern-regex: '@RequestBody'
       - pattern-regex: 'req\.query'
       - pattern-regex: 'req\.body'
+      # Twig createTemplate
+      - pattern-regex: '\\$TWIG->createTemplate\s*\('
+      # Smarty display/fetch
+      - pattern-regex: '\\$SMARTY->display\s*\(|\\$SMARTY->fetch\s*\('
+      # Blade render
+      - pattern-regex: 'Blade::render\s*\('
+      # Latte engine
+      - pattern-regex: 'Latte\\\\Engine'
+      # Plates
+      - pattern-regex: 'Plates\\\\Template'
     metadata:
       category: security
       subcategory:

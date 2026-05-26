@@ -12,3 +12,15 @@ rules:
           - pattern: $P.parseExpression($X)
           - pattern: Velocity.evaluate(...)
           - pattern: $E.createTemplate($X)
+          # Thymeleaf
+          - pattern: "$ENGINE.process($X, $CTX)"
+          - pattern: "StringTemplateSpec($X, ...)"
+          # Pebble
+          - pattern: "$PEBBLE.getLiteralTemplate($X)"
+          # VelocityEngine
+          - pattern: "$ENGINE.mergeTemplate($X, ...)"
+          # MVEL / OGNL
+          - pattern: "MVEL.eval($X, ...)"
+          - pattern: "Ognl.getValue($X, ...)"
+          # Freemarker
+          - pattern: "Template($N, StringReader($X), $CFG)"

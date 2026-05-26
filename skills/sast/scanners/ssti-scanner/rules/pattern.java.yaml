@@ -9,10 +9,7 @@ rules:
     pattern-either:
       - pattern-regex: 'ejs\.render\s*\('
       - pattern-regex: 'pug\.render\s*\('
-      - pattern-regex: 'nunjucks\.renderString\s*\('
-      - pattern-regex: 'render_template_string\s*\('
       - pattern-regex: 'ERB\.new\s*\('
-      - pattern-regex: 'Liquid::Template\.parse'
       - pattern-regex: 'Template\s*\('
       - pattern-regex: 'renderString\s*\('
       - pattern-regex: 'render_string\s*\('
@@ -33,6 +30,16 @@ rules:
       - pattern-regex: '@RequestBody'
       - pattern-regex: 'req\.query'
       - pattern-regex: 'req\.body'
+      # VelocityEngine instance
+      - pattern-regex: 'VelocityEngine\s*\('
+      # VelocityEngine.mergeTemplate
+      - pattern-regex: 'mergeTemplate\s*\('
+      # MVEL expression
+      - pattern-regex: 'MVEL\.eval\s*\('
+      # OGNL/Struts
+      - pattern-regex: 'Ognl\.getValue\s*\('
+      # Pebble engine init
+      - pattern-regex: 'PebbleEngine\s*\('
     metadata:
       category: security
       subcategory:
