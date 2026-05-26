@@ -1,0 +1,96 @@
+rules:
+  # ⑤ Intent redirection taint: getParcelableExtra → startActivity
+  - id: noah-kotlin-android-intent-redirect-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      외부에서 받은 Intent/URI(getParcelableExtra/parseUri)를 검증 없이 startActivity로
+      재실행하면 Intent Redirection — 내부 비exported 컴포넌트 임의 기동/권한 상승.
+      안전: setPackage()/setComponent()로 명시적 컴포넌트 고정, 또는 액션 화이트리스트 검증.
+    pattern-sources:
+      # 외부에서 받은 Intent/extra
+      - pattern: intent.getParcelableExtra($K)
+      - pattern: intent.getParcelableExtra<Intent>($K)
+      - pattern: intent.getParcelableExtra<$T>($K)
+      - pattern: $INTENT.getParcelableExtra($K)
+      - pattern: Intent.parseUri($X, ...)
+      - pattern: intent.getStringExtra($K)
+      - pattern: intent.data?.toString()
+      - pattern: intent.dataString
+
+    pattern-sinks:
+      - pattern: startActivity($X)
+      - pattern: startActivity($X, ...)
+      - pattern: startActivityForResult($X, ...)
+      - pattern: startService($X)
+      - pattern: sendBroadcast($X)
+      - pattern: sendOrderedBroadcast($X, ...)
+      - pattern: $CTX.startActivity($X)
+      - pattern: $CTX.startService($X)
+
+    pattern-sanitizers:
+      # setPackage / setComponent 로 명시적 고정
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $X.setPackage($PKG)
+              ...
+              startActivity($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $X.setComponent($COMP)
+              ...
+              startActivity($X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-927: Exposed IPC Components"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Intent Redirection]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [android, kotlin]
+
+  # ⑤ Intent redirection taint: Java 버전
+  - id: noah-java-android-intent-redirect-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      외부에서 받은 Intent(getParcelableExtra/parseUri)를 검증 없이 startActivity로 재실행
+      → Intent Redirection. 안전: setPackage()/setComponent()로 명시적 고정.
+    pattern-sources:
+      - pattern: $INTENT.getParcelableExtra($K)
+      - pattern: Intent.parseUri($X, ...)
+      - pattern: $INTENT.getStringExtra($K)
+
+    pattern-sinks:
+      - pattern: startActivity($X)
+      - pattern: startActivity($X, ...)
+      - pattern: startActivityForResult($X, ...)
+      - pattern: startService($X)
+      - pattern: $CTX.startActivity($X)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $X.setPackage($PKG);
+              ...
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-927: Exposed IPC Components"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Intent Redirection]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [android, java]

@@ -1,0 +1,93 @@
+rules:
+  # ④ WebView JS injection taint: deeplink/외부 입력 → evaluateJavascript/loadUrl
+  - id: noah-kotlin-android-webview-js-inject-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      외부 입력(deeplink URI 파라미터/Intent extra/Activity 파라미터)이 WebView
+      evaluateJavascript/loadUrl("javascript:...")에 직접 들어가면 JS Injection → XSS/RCE.
+      안전: JSONObject.quote()/Uri.encode()로 이스케이프 후 주입, 또는 고정 JS 함수만 호출.
+    pattern-sources:
+      # Deeplink / Intent source
+      - pattern: intent.data?.getQueryParameter($K)
+      - pattern: intent.data?.getQueryParameter($K)!!
+      - pattern: uri.getQueryParameter($K)
+      - pattern: $URI.getQueryParameter($K)
+      - pattern: intent.getStringExtra($K)
+      - pattern: intent.getStringExtra($K)!!
+      - pattern: getIntent().getStringExtra($K)
+      - pattern: getIntent().data?.getQueryParameter($K)
+      # Activity/Fragment parameter
+      - pattern: arguments?.getString($K)
+      - pattern: arguments?.getString($K)!!
+      # Intent data
+      - pattern: intent.dataString
+      - pattern: intent.data?.toString()
+
+    pattern-sinks:
+      # JS 직접 실행
+      - pattern: $WV.evaluateJavascript($X, ...)
+      - pattern: $WV.loadUrl("javascript:$X")
+      - pattern: $WV.loadUrl($X)
+      - pattern: $WV.loadData($X, ...)
+      - pattern: $WV.loadDataWithBaseURL($BASE, $X, ...)
+      - pattern: $WV.postUrl($X, ...)
+
+    pattern-sanitizers:
+      - pattern: JSONObject.quote($X)
+      - pattern: Uri.encode($X)
+      - pattern: TextUtils.htmlEncode($X)
+      - pattern: HtmlCompat.escapeHtml($X, ...)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe:
+        - "CWE-79: Improper Neutralization of Input (XSS)"
+        - "CWE-749: Exposed Dangerous Method"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [XSS, Code Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [android, kotlin, webview]
+
+  # ④ WebView taint: Java 버전
+  - id: noah-java-android-webview-js-inject-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      외부 입력이 WebView evaluateJavascript/loadUrl("javascript:...")에 직접 전달 → JS Injection.
+      안전: JSONObject.quote()/Uri.encode()로 이스케이프 후 주입.
+    pattern-sources:
+      - pattern: $INTENT.getQueryParameter($K)
+      - pattern: $URI.getQueryParameter($K)
+      - pattern: $INTENT.getStringExtra($K)
+      - pattern: getIntent().getStringExtra($K)
+      - pattern: getIntent().getData().getQueryParameter($K)
+
+    pattern-sinks:
+      - pattern: $WV.evaluateJavascript($X, ...)
+      - pattern: $WV.loadUrl($X)
+      - pattern: $WV.loadData($X, ...)
+      - pattern: $WV.loadDataWithBaseURL($BASE, $X, ...)
+
+    pattern-sanitizers:
+      - pattern: JSONObject.quote($X)
+      - pattern: Uri.encode($X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe:
+        - "CWE-79: Improper Neutralization of Input (XSS)"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [android, java, webview]

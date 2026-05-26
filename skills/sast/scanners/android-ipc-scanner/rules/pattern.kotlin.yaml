@@ -14,15 +14,22 @@ rules:
       - pattern-regex: 'startActivity\s*\('
       - pattern-regex: 'startActivityForResult'
       - pattern-regex: 'startService\s*\('
-      # PendingIntent 가변성 (FLAG_MUTABLE + 빈 base intent = 하이재킹)
+      # PendingIntent 가변성 (FLAG_MUTABLE 명시 or 플래그 0 = pre-12 기본 MUTABLE)
       - pattern-regex: 'PendingIntent\.getActivity'
       - pattern-regex: 'PendingIntent\.getBroadcast'
       - pattern-regex: 'PendingIntent\.getService'
       - pattern-regex: 'FLAG_MUTABLE'
+      # pre-Android 12: 플래그 인자 0은 암묵적 MUTABLE
+      - pattern-regex: 'PendingIntent\.(getActivity|getBroadcast|getService)\s*\([^)]*,\s*0\s*\)'
       # 브로드캐스트 / 동적 리시버 노출
       - pattern-regex: 'registerReceiver\s*\('
       - pattern-regex: 'sendBroadcast\s*\('
       - pattern-regex: 'sendOrderedBroadcast\s*\('
+      # ⑧ ContentProvider 외부 URI 쿼리
+      - pattern-regex: 'contentResolver\.query\s*\('
+      - pattern-regex: 'contentResolver\.insert\s*\('
+      - pattern-regex: 'contentResolver\.update\s*\('
+      - pattern-regex: 'contentResolver\.delete\s*\('
     metadata:
       category: security
       subcategory:

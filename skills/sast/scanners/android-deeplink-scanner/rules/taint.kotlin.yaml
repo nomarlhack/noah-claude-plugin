@@ -1,0 +1,100 @@
+rules:
+  # ⑨ Deeplink → WebView JS injection taint
+  - id: noah-kotlin-deeplink-webview-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Deeplink URI 파라미터(getQueryParameter/getStringExtra)가 WebView loadUrl/evaluateJavascript에
+      검증 없이 전달 → WEBVIEW_XSS / FILE_SCHEME_LFI.
+      안전: 스킴(http/https만 허용) + 호스트 화이트리스트 검증, javascript:/data:/file:// 차단.
+    pattern-sources:
+      - pattern: intent.data?.getQueryParameter($K)
+      - pattern: intent.data?.getQueryParameter($K)!!
+      - pattern: $URI.getQueryParameter($K)
+      - pattern: intent.getStringExtra($K)
+      - pattern: intent.getStringExtra($K)!!
+      - pattern: getIntent().data?.getQueryParameter($K)
+      - pattern: getIntent().getStringExtra($K)
+      - pattern: intent.dataString
+      - pattern: intent.data?.toString()
+      - pattern: arguments?.getString($K)
+
+    pattern-sinks:
+      - pattern: $WV.loadUrl($X)
+      - pattern: $WV.loadUrl($X, ...)
+      - pattern: $WV.evaluateJavascript($X, ...)
+      - pattern: $WV.loadData($X, ...)
+      - pattern: $WV.loadDataWithBaseURL($BASE, $X, ...)
+      - pattern: startActivity($X)
+      - pattern: startActivityForResult($X, ...)
+      - pattern: Intent.parseUri($X, ...)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($X.startsWith("https://") || $X.startsWith("http://")) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              val $URI = Uri.parse($X)
+              if ($WHITELIST.contains($URI.host)) { ... }
+      - pattern: Uri.encode($X)
+      - pattern: JSONObject.quote($X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe:
+        - "CWE-79: Improper Neutralization (WebView XSS)"
+        - "CWE-927: Exposed IPC Components"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [XSS, Intent Redirection]
+      owasp: ["A03:2021 Injection", "A01:2021 Broken Access Control"]
+      technology: [android, kotlin, deeplink, webview]
+
+  # ⑨ Deeplink → WebView taint: Java 버전
+  - id: noah-java-deeplink-webview-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Deeplink URI 파라미터가 WebView loadUrl/evaluateJavascript에 검증 없이 전달 → XSS/LFI.
+      안전: 스킴 화이트리스트(http/https만), 호스트 화이트리스트 검증.
+    pattern-sources:
+      - pattern: $INTENT.getData().getQueryParameter($K)
+      - pattern: $URI.getQueryParameter($K)
+      - pattern: $INTENT.getStringExtra($K)
+      - pattern: getIntent().getStringExtra($K)
+      - pattern: getIntent().getData().getQueryParameter($K)
+      - pattern: $INTENT.getDataString()
+
+    pattern-sinks:
+      - pattern: $WV.loadUrl($X)
+      - pattern: $WV.loadUrl($X, ...)
+      - pattern: $WV.evaluateJavascript($X, ...)
+      - pattern: startActivity($X)
+      - pattern: Intent.parseUri($X, ...)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($X.startsWith("https://") || $X.startsWith("http://")) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe:
+        - "CWE-79: Improper Neutralization (WebView XSS)"
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [XSS]
+      owasp: ["A03:2021 Injection"]
+      technology: [android, java, deeplink, webview]

@@ -1,0 +1,51 @@
+rules:
+  # ① onReceivedSslError: handler.proceed() 무조건 호출만 탐지
+  # — override 선언 내부에서 proceed()가 호출되는 패턴. 단순 이름 매칭 FP 제거.
+  - id: noah-kotlin-android-webview-ssl-error-sink
+    severity: ERROR
+    languages:
+      - kotlin
+    message: |
+      WebViewClient.onReceivedSslError override 내에서 handler.proceed()를 무조건 호출.
+      SSL 인증서 오류(만료·자가서명·호스트 불일치)를 무시하고 연결 진행 → MITM.
+      안전: handler.cancel() 또는 사용자 승인 후 proceed().
+    pattern: |
+      override fun onReceivedSslError($VIEW: WebView?, $HANDLER: SslErrorHandler, $ERR: SslError) {
+        ...
+        $HANDLER.proceed()
+        ...
+      }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-295: Improper Certificate Validation"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Improper Certificate Validation]
+      owasp: ["A02:2021 Cryptographic Failures"]
+      technology: [android, kotlin, webview]
+
+  - id: noah-java-android-webview-ssl-error-sink
+    severity: ERROR
+    languages:
+      - java
+    message: |
+      WebViewClient.onReceivedSslError override 내에서 handler.proceed() 무조건 호출 → MITM.
+      안전: handler.cancel() 또는 사용자 승인 후 proceed().
+    pattern: |
+      public void onReceivedSslError(WebView $VIEW, SslErrorHandler $HANDLER, SslError $ERR) {
+        ...
+        $HANDLER.proceed();
+        ...
+      }
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-295: Improper Certificate Validation"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Improper Certificate Validation]
+      owasp: ["A02:2021 Cryptographic Failures"]
+      technology: [android, java, webview]

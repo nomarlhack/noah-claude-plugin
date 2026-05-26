@@ -18,6 +18,13 @@ rules:
       - pattern-regex: 'registerReceiver\s*\('
       - pattern-regex: 'sendBroadcast\s*\('
       - pattern-regex: 'sendOrderedBroadcast\s*\('
+      # ⑧ ContentProvider 외부 URI 쿼리 — SQL injection / 정보 노출
+      - pattern-regex: 'contentResolver\.query\s*\('
+      - pattern-regex: 'getContentResolver\s*\(\s*\)\.query'
+      - pattern-regex: 'ContentResolver\.query\s*\('
+      - pattern-regex: 'contentResolver\.insert\s*\('
+      - pattern-regex: 'contentResolver\.update\s*\('
+      - pattern-regex: 'contentResolver\.delete\s*\('
     metadata:
       category: security
       subcategory:

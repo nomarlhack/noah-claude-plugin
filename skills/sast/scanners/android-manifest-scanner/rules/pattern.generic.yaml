@@ -1,26 +1,57 @@
 rules:
-  - id: noah-android-manifest-phase1-pattern
-    severity: WARNING
+  # ③ 고위험 하드닝 위반 (단독으로도 취약 — 컨텍스트 무관)
+  - id: noah-android-manifest-high-risk-pattern
+    severity: ERROR
     languages:
       - generic
     message: |
-      android-manifest-scanner Phase 1 하드닝 위반 패턴 매치 (AndroidManifest.xml).
-      후보 수집용 — 정탐 판정은 컴포넌트 노출/권한 컨텍스트를 확인한 후 수행.
+      AndroidManifest.xml 고위험 하드닝 위반 패턴.
+      debuggable=true: 프로덕션 빌드에서 디버거 부착 허용 — 메모리·로직 탈취.
+      usesCleartextTraffic=true: 평문 HTTP 허용 — 네트워크 도청.
+      testOnly=true: 배포 금지 빌드가 Play에 올라간 경우.
+      후보 수집용 — 릴리스 빌드 매니페스트 기준으로 판정.
     paths:
       include:
         - "*AndroidManifest.xml"
     pattern-either:
       - pattern-regex: 'android:debuggable\s*=\s*"true"'
-      - pattern-regex: 'android:allowBackup\s*=\s*"true"'
       - pattern-regex: 'android:usesCleartextTraffic\s*=\s*"true"'
+      - pattern-regex: 'android:testOnly\s*=\s*"true"'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe:
+        - "CWE-489: Active Debug Code"
+        - "CWE-319: Cleartext Transmission of Sensitive Information"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+
+  # ③ 중위험 — 컨텍스트 확인 필요
+  - id: noah-android-manifest-medium-risk-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      AndroidManifest.xml 중위험 하드닝 위반 패턴.
+      allowBackup=true: ADB backup으로 앱 데이터 탈취 가능.
+      exported=true: 다른 앱이 컴포넌트 임의 호출 가능.
+        → android:permission(signatureOrSystem 등) 없으면 취약.
+        → intent-filter 없는 Activity에 exported=true는 더 위험.
+      grantUriPermissions=true: provider 전체 데이터 접근 허용.
+      protectionLevel=normal: permission이 임의 앱에 부여됨.
+      후보 수집용 — android:permission 유무·컴포넌트 유형 확인 필요.
+    paths:
+      include:
+        - "*AndroidManifest.xml"
+    pattern-either:
+      - pattern-regex: 'android:allowBackup\s*=\s*"true"'
       - pattern-regex: 'android:exported\s*=\s*"true"'
       - pattern-regex: 'android:grantUriPermissions\s*=\s*"true"'
-      - pattern-regex: 'android:testOnly\s*=\s*"true"'
       - pattern-regex: 'android:protectionLevel\s*=\s*"normal"'
     metadata:
       category: security
-      subcategory:
-        - vuln
+      subcategory: [vuln]
       cwe:
         - "CWE-926: Improper Export of Android Application Components"
         - "CWE-276: Incorrect Default Permissions"

@@ -24,6 +24,11 @@ rules:
       - pattern-regex: 'setSavePassword'
       - pattern-regex: 'onReceivedSslError'
       - pattern-regex: 'shouldOverrideUrlLoading'
+      # ⑥ Privacy 관련 설정
+      - pattern-regex: 'setDomStorageEnabled\s*\(\s*true\s*\)'
+      - pattern-regex: 'setGeolocationEnabled\s*\(\s*true\s*\)'
+      - pattern-regex: 'setDatabaseEnabled\s*\(\s*true\s*\)'
+      - pattern-regex: 'setSaveFormData\s*\(\s*true\s*\)'
     metadata:
       category: security
       subcategory:

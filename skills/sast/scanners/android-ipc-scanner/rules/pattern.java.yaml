@@ -17,9 +17,15 @@ rules:
       - pattern-regex: 'PendingIntent\.getBroadcast'
       - pattern-regex: 'PendingIntent\.getService'
       - pattern-regex: 'FLAG_MUTABLE'
+      - pattern-regex: 'PendingIntent\.(getActivity|getBroadcast|getService)\s*\([^)]*,\s*0\s*\)'
       - pattern-regex: 'registerReceiver\s*\('
       - pattern-regex: 'sendBroadcast\s*\('
       - pattern-regex: 'sendOrderedBroadcast\s*\('
+      # ⑧ ContentProvider 외부 URI 쿼리
+      - pattern-regex: 'contentResolver\.query\s*\('
+      - pattern-regex: 'contentResolver\.insert\s*\('
+      - pattern-regex: 'contentResolver\.update\s*\('
+      - pattern-regex: 'contentResolver\.delete\s*\('
     metadata:
       category: security
       subcategory:

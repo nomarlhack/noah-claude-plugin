@@ -31,9 +31,16 @@ rules:
       - pattern-regex: 'setMixedContentMode\s*\(\s*[A-Za-z0-9_.]*MIXED_CONTENT_ALWAYS_ALLOW'
       - pattern-regex: 'mixedContentMode\s*=\s*[A-Za-z0-9_.]*MIXED_CONTENT_ALWAYS_ALLOW'
       - pattern-regex: 'setSavePassword'
-      # TLS 오류 무시 / 네비게이션 제어 (override 메서드 한정 — bare 클래스명은 import 노이즈라 제외)
+      # TLS 오류 무시 / 네비게이션 제어
+      # onReceivedSslError: 고정밀 탐지는 sink.kotlin.yaml 참조
       - pattern-regex: 'onReceivedSslError'
       - pattern-regex: 'shouldOverrideUrlLoading'
+      # ⑥ Privacy 관련 설정 (DOM Storage / Geolocation / Form Data)
+      - pattern-regex: 'setDomStorageEnabled\s*\(\s*true\s*\)'
+      - pattern-regex: 'domStorageEnabled\s*=\s*true'
+      - pattern-regex: 'setGeolocationEnabled\s*\(\s*true\s*\)'
+      - pattern-regex: 'setDatabaseEnabled\s*\(\s*true\s*\)'
+      - pattern-regex: 'setSaveFormData\s*\(\s*true\s*\)'
     metadata:
       category: security
       subcategory:

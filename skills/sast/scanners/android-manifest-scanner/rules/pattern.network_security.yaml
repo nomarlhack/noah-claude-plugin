@@ -1,0 +1,39 @@
+rules:
+  # ⑦ network_security_config.xml 위험 설정
+  - id: noah-android-network-security-config-pattern
+    severity: WARNING
+    languages:
+      - generic
+    message: |
+      network_security_config.xml 위험 설정 탐지.
+      cleartextTrafficPermitted=true: 평문 HTTP 허용.
+      certificates src="user": 사용자 설치 CA 신뢰 → MITM.
+      certificates src="system" + overridePins=true: 인증서 고정 우회.
+      후보 수집용 — 운영 환경 적용 여부 확인 필요.
+    paths:
+      include:
+        - "*network_security_config.xml"
+        - "*res/xml/*.xml"
+    pattern-either:
+      # 평문 트래픽 허용
+      - pattern-regex: 'cleartextTrafficPermitted\s*=\s*"true"'
+      # 사용자 CA 신뢰 (MitM 가능)
+      - pattern-regex: '<certificates\s+src\s*=\s*"user"'
+      # 인증서 고정 우회
+      - pattern-regex: 'overridePins\s*=\s*"true"'
+      # 디버그 오버라이드 (debug-overrides 블록 탐지)
+      - pattern-regex: '<debug-overrides>'
+      # 빈 trust-anchors (모든 CA 불신 — 정탐 아닌 경우도 있음)
+      - pattern-regex: '<trust-anchors\s*/>'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe:
+        - "CWE-295: Improper Certificate Validation"
+        - "CWE-319: Cleartext Transmission of Sensitive Information"
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Insecure TLS Configuration]
+      owasp: ["A02:2021 Cryptographic Failures"]
+      technology: [android]
