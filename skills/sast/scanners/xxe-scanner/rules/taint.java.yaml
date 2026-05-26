@@ -22,6 +22,40 @@ rules:
           - pattern: $X
           - pattern-inside: |
               $T $METHOD(..., @RequestPart $X, ...) { ... }
+      # JAX-RS / Jersey / Quarkus — REST resource method parameters
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @QueryParam($K) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @PathParam($K) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @FormParam($K) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @HeaderParam($K) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @MatrixParam($K) $X, ...) { ... }
+      # Vert.x (reactive web)
+      - pattern: $CTX.queryParam($K)
+      - pattern: $CTX.queryParam($K).get(0)
+      - pattern: $CTX.pathParam($K)
+      - pattern: $CTX.body().asString()
+      - pattern: $CTX.body().asJsonObject()
+      - pattern: $REQ.getParam($K)
+      - pattern: $REQ.params().get($K)
+      # Struts2 / Struts1 — ActionContext / ActionForm
+      - pattern: ActionContext.getContext().getParameters()
+      - pattern: $FORM.get($K)
+      - pattern: $SERVLET.getParameter($K)
+      - pattern: $SERVLET.getParameterValues($K)
     pattern-sinks:
       - pattern: $DB.parse($X)
       - pattern: $DB.parse($X, ...)

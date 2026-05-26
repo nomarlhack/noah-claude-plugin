@@ -40,6 +40,23 @@ rules:
       # Werkzeug/raw
       - pattern: request.view_args[$K]
 
+      # Tornado RequestHandler
+      - pattern: self.get_argument($K)
+      - pattern: self.get_argument($K, $DEFAULT)
+      - pattern: self.get_body_argument($K)
+      - pattern: self.get_query_argument($K)
+      - pattern: self.request.arguments
+      - pattern: self.request.body
+      - pattern: self.request.body_arguments
+      # Sanic
+      - pattern: request.args.get($K)
+      - pattern: request.args[$K]
+      - pattern: request.form.get($K)
+      - pattern: request.form[$K]
+      - pattern: request.json
+      - pattern: request.json.get($K)
+      - pattern: await request.json()
+      - pattern: request.raw_args[$K]
     pattern-sinks:
       # Django ORM
       - pattern: $MODEL.objects.get($F=$X)

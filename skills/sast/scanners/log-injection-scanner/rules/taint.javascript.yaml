@@ -22,6 +22,40 @@ rules:
       - pattern: request.body
       - pattern: request.query[$K]
 
+      # NestJS — decorator-based parameter injection
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Param($K) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Param() $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Query($K) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Query() $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Body($K) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Body() $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Headers($K) $X: $T, ...) { ... }
+      # Hapi.js
+      - pattern: request.params.$K
+      - pattern: request.payload
+      - pattern: request.payload.$K
+      - pattern: request.query.$K
     pattern-sinks:
       # console
       - pattern: console.log($X)

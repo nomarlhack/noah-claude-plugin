@@ -26,6 +26,40 @@ rules:
           - pattern: $Q
           - pattern-inside: |
               const $Q = ctx.request.body.query
+      # NestJS — decorator-based parameter injection
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Param($K) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Param() $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Query($K) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Query() $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Body($K) $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Body() $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $M(..., @Headers($K) $X: $T, ...) { ... }
+      # Hapi.js
+      - pattern: request.params.$K
+      - pattern: request.payload
+      - pattern: request.payload.$K
+      - pattern: request.query.$K
     pattern-sinks:
       # parse 결과를 백엔드 forward 함수에 전달
       - pattern: $SVC.executeQuery($DEV, parseGraphQL($Q), ...)

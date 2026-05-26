@@ -23,6 +23,41 @@ rules:
       - patterns:
           - pattern: $X
           - pattern-inside: $X = $_REQUEST[...];
+      # Laravel (Illuminate\Http\Request)
+      - pattern: $REQ->input($K)
+      - pattern: $REQ->input($K, $DEFAULT)
+      - pattern: $REQ->get($K)
+      - pattern: $REQ->get($K, $DEFAULT)
+      - pattern: $REQ->query($K)
+      - pattern: $REQ->query($K, $DEFAULT)
+      - pattern: $REQ->post($K)
+      - pattern: $REQ->post($K, $DEFAULT)
+      - pattern: $REQ->all()
+      - pattern: $REQ->only($KEYS)
+      - pattern: $REQ->except($KEYS)
+      - pattern: $REQ->json($K)
+      - pattern: $REQ->json($K, $DEFAULT)
+      - pattern: $REQ->header($K)
+      - pattern: $REQ->cookie($K)
+      - pattern: request()->input($K)
+      - pattern: request()->get($K)
+      # Symfony (HttpFoundation\Request)
+      - pattern: $REQ->query->get($K)
+      - pattern: $REQ->request->get($K)
+      - pattern: $REQ->attributes->get($K)
+      - pattern: $REQ->headers->get($K)
+      - pattern: $REQ->cookies->get($K)
+      - pattern: $REQ->getContent()
+      # CodeIgniter 3/4
+      - pattern: $CI->input->get($K)
+      - pattern: $CI->input->post($K)
+      - pattern: $CI->input->get_post($K)
+      - pattern: $CI->input->server($K)
+      - pattern: $this->input->get($K)
+      - pattern: $this->input->post($K)
+      - pattern: $this->request->getVar($K)
+      - pattern: $this->request->getGet($K)
+      - pattern: $this->request->getPost($K)
     pattern-sinks:
       - pattern: echo $X;
       - pattern: print($X);
