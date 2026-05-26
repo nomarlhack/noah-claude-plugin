@@ -25,6 +25,22 @@ rules:
           - pattern-inside: |
               window.addEventListener("message", function($E) { ... })
       - pattern: new URLSearchParams(location.search).get($K)
+      # document.cookie (클라이언트 저장값)
+      - pattern: document.cookie
+      # URLSearchParams 다양한 형태
+      - pattern: URLSearchParams.get($K)
+      - pattern: new URLSearchParams($S).get($K)
+      - pattern: new URLSearchParams(location.hash.substring(1)).get($K)
+      # postMessage 다양한 이벤트 리스너 패턴
+      - pattern: $E.data
+      - pattern: event.data
+      - pattern: e.data
+      - pattern: msg.data
+      # document.documentURI
+      - pattern: document.documentURI
+      # opener (클릭재킹/탭냅핑)
+      - pattern: opener.location.href
+      - pattern: window.opener.location.href
       # NestJS — decorator-based parameter injection
       - patterns:
           - pattern: $X
@@ -71,6 +87,20 @@ rules:
       - pattern: new Function($X)
       - pattern: $($SEL).html($X)
       - pattern: $EL.setAttribute("src", $X)
+      # URL-based navigation sink (DOM-based XSS via URL)
+      - pattern: $E.srcdoc = $X
+      - pattern: location.href = $X
+      - pattern: location.assign($X)
+      - pattern: location.replace($X)
+      - pattern: window.location.href = $X
+      - pattern: window.location.assign($X)
+      # DOM fragment
+      - pattern: $RANGE.createContextualFragment($X)
+      - pattern: document.createRange().createContextualFragment($X)
+      # script/link element injection
+      - pattern: $E.src = $X
+      - pattern: $E.href = $X
+      - pattern: $E.action = $X
     pattern-sanitizers:
       - pattern: DOMPurify.sanitize($X, ...)
       - pattern: DOMPurify.sanitize($X)
