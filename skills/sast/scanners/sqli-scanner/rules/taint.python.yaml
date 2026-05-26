@@ -111,6 +111,22 @@ rules:
       - pattern: await $M.raw(f"$STR")
       - pattern: await $M.filter(RawSQL(f"$STR"))
 
+      # Tortoise ORM raw
+      - pattern: await $M.raw(f"$STR")
+      - pattern: await $M.raw("..." + $V)
+      - pattern: await Tortoise.execute_query(f"$STR")
+      - pattern: await Tortoise.execute_query("..." + $V)
+      # peewee
+      - pattern: $DB.execute_sql("..." + $V)
+      - pattern: $DB.execute_sql(f"$STR")
+      - pattern: $MODEL.select(SQL("..." + $V))
+      - pattern: SQL("..." + $V)
+      # encode/databases package
+      - pattern: await $DB.fetch_all("..." + $V)
+      - pattern: await $DB.fetch_one("..." + $V)
+      - pattern: await $DB.execute("..." + $V)
+      # Motor (MongoDB with SQL-like raw)
+      - pattern: await $COLLECTION.find_raw_batches($X)
     pattern-sanitizers:
       - pattern: int($X)
       - pattern: float($X)

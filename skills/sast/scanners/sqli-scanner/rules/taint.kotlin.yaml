@@ -134,6 +134,18 @@ rules:
           - pattern-not: $JDBC.queryForList("...", ...)
           - pattern-not: $JDBC.queryForMap("...", ...)
 
+      # Kotlin Exposed (JetBrains ORM)
+      - pattern: exec("..." + $X)
+      - pattern: addLogger($X)
+      - pattern: SchemaUtils.create($X)
+      # Spring R2DBC DatabaseClient
+      - pattern: $DC.sql("..." + $X).fetch()
+      - pattern: $DC.sql("..." + $X).then()
+      - pattern: $R2.execute("..." + $X)
+      # JOOQ Kotlin DSL
+      - pattern: $DSL.resultQuery("..." + $X)
+      - pattern: $DSL.execute("..." + $X)
+      - pattern: $DSL.condition("..." + $X)
     pattern-sanitizers:
       - pattern: $INPUT.toInt()
       - pattern: $INPUT.toLong()

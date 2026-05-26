@@ -115,6 +115,21 @@ rules:
                   return new SQL().SELECT(...).WHERE($X).toString();
               }
 
+      # Hibernate Session API
+      - pattern: $SESSION.createQuery("..." + $X)
+      - pattern: $SESSION.createQuery("..." + $X, ...)
+      - pattern: $SESSION.createNativeQuery("..." + $X)
+      - pattern: $SESSION.createNativeQuery("..." + $X, ...)
+      - pattern: $SESSION.createSQLQuery("..." + $X)
+      # NamedParameterJdbcTemplate (named params 아닌 문자열 결합)
+      - pattern: $NAMED.query("..." + $X, $PARAMS, ...)
+      - pattern: $NAMED.queryForList("..." + $X, $PARAMS)
+      - pattern: $NAMED.update("..." + $X, $PARAMS)
+      - pattern: $NAMED.execute("..." + $X, $PARAMS)
+      # Spring Data R2DBC
+      - pattern: $R2DBC.execute("..." + $X)
+      - pattern: $R2DBC.sql("..." + $X).fetch()
+      - pattern: $DB_CLIENT.sql("..." + $X).fetch()
     pattern-sanitizers:
       - pattern: Integer.parseInt($X)
       - pattern: Long.parseLong($X)

@@ -44,6 +44,29 @@ rules:
               - pattern: $TX.Exec(fmt.Sprintf(...))
           - pattern-not: $TX.Raw("...", $ARGS, ...)
 
+      # pgx (raw query)
+      - patterns:
+          - pattern-either:
+              - pattern: $CONN.Exec($CTX, fmt.Sprintf(...), ...)
+              - pattern: $CONN.Query($CTX, fmt.Sprintf(...), ...)
+              - pattern: $CONN.QueryRow($CTX, fmt.Sprintf(...), ...)
+              - pattern: $CONN.Exec($CTX, "..." + $V, ...)
+              - pattern: $CONN.Query($CTX, "..." + $V, ...)
+      # pgxpool
+      - pattern: $POOL.Exec($CTX, fmt.Sprintf(...), ...)
+      - pattern: $POOL.Query($CTX, fmt.Sprintf(...), ...)
+      # sqlx
+      - pattern: $DB.NamedExec(fmt.Sprintf(...), ...)
+      - pattern: $DB.NamedExec("..." + $V, ...)
+      - pattern: $DB.Get(&$DEST, fmt.Sprintf(...), ...)
+      - pattern: $DB.Select(&$DEST, fmt.Sprintf(...), ...)
+      - pattern: $DB.Queryx(fmt.Sprintf(...), ...)
+      # bun
+      - pattern: $DB.NewRaw("..." + $V)
+      - pattern: $DB.NewRaw(fmt.Sprintf(...))
+      # squirrel (query builder with raw injection)
+      - pattern: squirrel.Expr("..." + $V)
+      - pattern: squirrel.Expr(fmt.Sprintf(...))
     pattern-sanitizers:
       - pattern: strconv.Atoi($X)
       - pattern: strconv.ParseInt($X, ...)

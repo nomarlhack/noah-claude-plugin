@@ -107,6 +107,29 @@ rules:
           - pattern-not: 'sequelize.query("...", { replacements: ... })'
       - pattern: $REPO.createQueryBuilder(...).where(`...${$X}...`)
 
+      # TypeORM getRepository raw query
+      - pattern: $REPO.query($X)
+      - pattern: $REPO.query($X, ...)
+      - pattern: $MANAGER.query($X)
+      - pattern: $MANAGER.query($X, ...)
+      - pattern: $DS.query($X)
+      - pattern: $DS.query($X, ...)
+      # Drizzle ORM sql template literal
+      - pattern: sql`$X`
+      - pattern: sql.raw($X)
+      # slonik
+      - pattern: sql.unsafe($X)
+      - pattern: $POOL.query(sql.unsafe($X))
+      # mikro-orm
+      - pattern: $EM.execute($X)
+      - pattern: $EM.execute($X, ...)
+      # Bookshelf / Objection.js
+      - pattern: $MODEL.knex().raw($X)
+      - pattern: $QB.whereRaw($X)
+      - pattern: $QB.whereRaw($X, ...)
+      - pattern: $QB.havingRaw($X)
+      - pattern: $QB.joinRaw($X)
+      - pattern: $QB.orderByRaw($X)
     pattern-sanitizers:
       - pattern: parseInt($X, ...)
       - pattern: Number($X)

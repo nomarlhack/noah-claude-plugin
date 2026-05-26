@@ -35,6 +35,19 @@ rules:
       - pattern: $DB.run($QUERY)
       - pattern: "$DB[$T].where(Sequel.lit($QUERY))"
 
+      # ActiveRecord 동적 SQL 메서드 (문자열 인자 형태)
+      - pattern: $M.update_all($QUERY)
+      - pattern: $M.delete_all($QUERY)
+      - pattern: $M.count($QUERY)
+      - pattern: $M.pluck(Arel.sql($QUERY))
+      - pattern: $M.calculate($OP, Arel.sql($QUERY))
+      - pattern: $M.from($QUERY)
+      - pattern: $M.select(Arel.sql($QUERY))
+      # Sequel additional sinks
+      - pattern: $DB.execute($QUERY)
+      - pattern: $DB.fetch($QUERY)
+      - pattern: $DB[$T].insert_sql($QUERY)
+      - pattern: $DB[$T].update_sql($QUERY)
     pattern-sanitizers:
       - pattern: $M.sanitize_sql($X)
       - pattern: $M.sanitize_sql_array($X)

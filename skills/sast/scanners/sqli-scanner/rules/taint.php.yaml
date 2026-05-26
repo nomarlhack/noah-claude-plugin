@@ -101,6 +101,23 @@ rules:
       - pattern: $this->db->query($Q, ...)
       - pattern: $CI->db->query($Q, ...)
 
+      # Doctrine ORM / DBAL
+      - pattern: $EM->createQuery("..." . $X)
+      - pattern: $EM->createNativeQuery("..." . $X, ...)
+      - pattern: $CONN->executeQuery("..." . $X)
+      - pattern: $CONN->executeStatement("..." . $X)
+      - pattern: $CONN->query("..." . $X)
+      - pattern: $QB->where("..." . $X)
+      - pattern: $QB->having("..." . $X)
+      # PDO direct exec
+      - pattern: $PDO->exec($Q)
+      # Yii2
+      - pattern: $DB->createCommand("..." . $X)->queryAll()
+      - pattern: $DB->createCommand("..." . $X)->execute()
+      - pattern: Yii::$app->db->createCommand("..." . $X)
+      # CakePHP
+      - pattern: $CONN->execute("..." . $X)
+      - pattern: $TABLE->query("..." . $X)
     pattern-sanitizers:
       - pattern: intval($X)
       - pattern: (int)$X
