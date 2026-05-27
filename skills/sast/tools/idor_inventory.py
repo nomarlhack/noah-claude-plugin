@@ -17,8 +17,8 @@
 둘 다 제공 시 합쳐서 dedup하고 출처를 표시한다. 어느 한쪽만 제공해도 동작한다.
 
 에이전트 수기 인벤토리는 컨텍스트 한계로 대량 매치를 누락하므로(실측: 1150건 중 일부만 기록)
-기계적 전수 보장이 목적이다. 소유권게이트 컬럼은 '❓ 미확인'으로 초기화 —
-에이전트/사람이 코드 Read로 ✓/❌/⚠로 채운다. 이 인벤토리는 "외부 식별자를 받아 리소스에
+기계적 전수 보장이 목적이다. 소유권게이트 컬럼은 '[미확인]'으로 초기화 —
+에이전트/사람이 코드 Read로 [검증]/[부재]/[부분]로 채운다. 이 인벤토리는 "외부 식별자를 받아 리소스에
 접근하는 엔드포인트 중 안 본 것은 없다"의 백스톱이며 DAST 권한 diff의 입력 목록이 된다.
 
 사용:
@@ -46,7 +46,7 @@ MAPPING_NOARG_RE = re.compile(r'@(Get|Post|Put|Delete|Patch|Request)Mapping\b')
 # Spring Web 외부 입력 어노테이션 7종 — 신뢰 경계.
 # 특정 이름(accountId 등) 카탈로그 금지: 어노테이션 자체가 외부 입력의 표지.
 # 게이트웨이가 일부 헤더를 덮어쓰는 환경이면 인벤토리 검토 단계에서 안전 분기 처리한다
-# ("게이트 호출 존재만으로 ✓ 금지 — 범위 적정성까지 확인").
+# ("게이트 호출 존재만으로 [검증] 금지 — 범위 적정성까지 확인").
 EXTERNAL_INPUT_ANNOTATIONS = (
     "PathVariable",
     "RequestParam",
@@ -263,9 +263,9 @@ def collect_taint_rows(locindex_path: Path) -> tuple[list[dict], dict]:
 
 # ─── 인증 게이트 미경유 경로 탐지 (auth 컬럼) ───────────────────────────
 # 인증 인터셉터/시큐리티가 인증 대상에서 제외한 경로 패턴을 수집해, 각 진입점이
-# 인증 게이트를 거치지 않는지(=phase1.md "❓ 종결 금지" 우선 대상) 표시한다.
+# 인증 게이트를 거치지 않는지(=phase1.md "[미확인] 종결 금지" 우선 대상) 표시한다.
 # 어댑터 방식: 현재 Spring 인터셉터 `excludePathPatterns(...)`만 지원.
-# 미지원 프레임워크/미발견 시 auth 컬럼은 '—'(미상)으로 남고, 판정은 phase1.md 정책이 백스톱.
+# 미지원 프레임워크/미발견 시 auth 컬럼은 '미상'(미상)으로 남고, 판정은 phase1.md 정책이 백스톱.
 _EXCLUDE_BLOCK_RE = re.compile(r"excludePathPatterns\s*\((.*?)\)", re.S)
 _STRING_LIT_RE = re.compile(r'"([^"]*)"')
 
@@ -305,9 +305,9 @@ def _norm_path(endpoint: str) -> str:
 
 
 def auth_label(endpoint: str, exclude_regexes: list) -> str:
-    """진입점이 인증 게이트를 거치는지 표시. 제외 패턴 미수집 시 '—'(미상)."""
+    """진입점이 인증 게이트를 거치는지 표시. 제외 패턴 미수집 시 '미상'(미상)."""
     if not exclude_regexes:
-        return "—"
+        return "미상"
     return "제외" if any(rx.match(_norm_path(endpoint)) for rx in exclude_regexes) else "적용"
 
 
@@ -346,7 +346,7 @@ def main() -> int:
             by_key[key] = dict(r)
     rows = list(by_key.values())
 
-    # 인증 게이트 미경유 경로 표시 (project-root 있을 때만; 미발견 시 '—')
+    # 인증 게이트 미경유 경로 표시 (project-root 있을 때만; 미발견 시 '미상')
     exclude_regexes: list = []
     if args.project_root:
         exclude_regexes = [_ant_to_regex(p) for p in collect_auth_excluded_patterns(Path(args.project_root))]
@@ -376,20 +376,20 @@ def main() -> int:
         "",
         " | ".join(summary_parts) + ".",
         "",
-        "> **소유권게이트 컬럼은 `❓ 미확인`으로 초기화됨.** 에이전트/사람이 각 엔드포인트의 "
+        "> **소유권게이트 컬럼은 `[미확인]`으로 초기화됨.** 에이전트/사람이 각 엔드포인트의 "
         "service·AOP 계층을 Read하여 다음 형식으로 채운다:",
-        "> - `✓ <service>.<method>():<line>` (완전 검증 — 호출된 게이트 함수의 파일·라인 인용 필수)",
-        "> - `❌ 부재` (게이트 없음 — service Read 후 명시)",
-        "> - `⚠ 부분: <이유>` (부분 게이트·우회 가능 — 우회 경로 명시)",
+        "> - `[검증] <service>.<method>():<line>` (완전 검증 — 호출된 게이트 함수의 파일·라인 인용 필수)",
+        "> - `[부재]` (게이트 없음 — service Read 후 명시)",
+        "> - `[부분]: <이유>` (부분 게이트·우회 가능 — 우회 경로 명시)",
         ">",
         "> **금지**: 게이트 함수가 같은 컨트롤러/모듈에 있다고 추정해 다른 항목의 게이트를 복사 붙여넣지 말 것. "
-        "각 항목은 해당 service를 직접 Read해 채워야 한다. **게이트 호출 존재만으로 ✓ 금지 — 범위 적정성까지 확인**(phase1.md).",
+        "각 항목은 해당 service를 직접 Read해 채워야 한다. **게이트 호출 존재만으로 [검증] 금지 — 범위 적정성까지 확인**(phase1.md).",
         ">",
         "> **출처**: `taint`=dataflow 확정(고신뢰), `controller-scan`=source-only 진입점(taint flow 추적 실패 안전망, "
         "DTO/람다/체이닝 우회분 포함), `taint+scan`=양쪽 모두.",
         ">",
-        "> **인증**: `제외`=인증 인터셉터/시큐리티가 명시적으로 제외한 경로(인증 미경유 — phase1.md '인증 게이트 미경유 진입점은 ❓로 종결 금지' 우선 검토 대상), "
-        "`적용`=그 외(단정 아님), `—`=도구가 인증 설정을 못 찾음/미지원 프레임워크. `제외` 행이 표 상단에 정렬된다.",
+        "> **인증**: `제외`=인증 인터셉터/시큐리티가 명시적으로 제외한 경로(인증 미경유 — phase1.md '인증 게이트 미경유 진입점은 [미확인]로 종결 금지' 우선 검토 대상), "
+        "`적용`=그 외(단정 아님), `미상`=도구가 인증 설정을 못 찾음/미지원 프레임워크. `제외` 행이 표 상단에 정렬된다.",
         ">",
         "> 이 표는 '외부 식별자 수용 엔드포인트 중 안 본 것은 없다'의 백스톱이며 DAST 권한 diff 입력이다.",
         "",
@@ -399,7 +399,7 @@ def main() -> int:
     for i, r in enumerate(rows, 1):
         out_lines.append(
             f"| {i} | {r['endpoint']} | {', '.join(r['params']) or '?'} | {r['file']} | "
-            f"{r['source']} | {r.get('auth', '—')} | ❓ 미확인 |"
+            f"{r['source']} | {r.get('auth', '미상')} | [미확인] |"
         )
     out_lines.append("")
     md = "\n".join(out_lines)

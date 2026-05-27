@@ -144,19 +144,19 @@ python3 <NOAH_SAST_DIR>/tools/idor_inventory.py \
   --project-root <PROJECT_ROOT>
 ```
 
-이 도구는 외부 입력 어노테이션(`@PathVariable`/`@RequestParam`/`@RequestBody`/`@RequestHeader`/`@CookieValue`/`@ModelAttribute`/`@RequestPart`) 7종으로 모든 컨트롤러 진입점을 전수 추출하여 `엔드포인트 | 외부입력 | 위치 | 출처(taint/controller-scan) | 인증 | 소유권게이트(❓ 미확인)` 표를 출력한다. `인증` 컬럼은 인증 게이트 미경유 경로(`제외`)를 표시해 우선 검토 대상으로 상단 정렬한다(위 "❓ 종결 금지" 규칙의 입력). 도구 동작 상세는 `docs/idor-inventory.md` 참조.
+이 도구는 외부 입력 어노테이션(`@PathVariable`/`@RequestParam`/`@RequestBody`/`@RequestHeader`/`@CookieValue`/`@ModelAttribute`/`@RequestPart`) 7종으로 모든 컨트롤러 진입점을 전수 추출하여 `엔드포인트 | 외부입력 | 위치 | 출처(taint/controller-scan) | 인증 | 소유권게이트([미확인])` 표를 출력한다. `인증` 컬럼은 인증 게이트 미경유 경로(`제외`)를 표시해 우선 검토 대상으로 상단 정렬한다(위 "[미확인] 종결 금지" 규칙의 입력). 도구 동작 상세는 `docs/idor-inventory.md` 참조.
 
 에이전트는 이 표를 결과 파일에 포함하되, **소유권게이트 열을 다음 형식으로 채운다**(거짓 복사 방지):
 
-- `✓ <service>.<method>():<file:line>` — 완전 검증. **호출된 게이트 함수의 파일·라인을 반드시 인용**. 함수명만 적는 것 금지.
-- `❌ 부재` — service Read 후 게이트 없음 확정.
-- `⚠ 부분: <우회 경로>` — 부분 게이트(타입/분기 예외, 부분 주체, 조건부 실행, 일부 액션만 등). 우회 경로 1줄 명시.
+- `[검증] <service>.<method>():<file:line>` — 완전 검증. **호출된 게이트 함수의 파일·라인을 반드시 인용**. 함수명만 적는 것 금지.
+- `[부재]` — service Read 후 게이트 없음 확정.
+- `[부분]: <우회 경로>` — 부분 게이트(타입/분기 예외, 부분 주체, 조건부 실행, 일부 액션만 등). 우회 경로 1줄 명시.
 
 **[필수] 금지 사항**:
 - 같은 컨트롤러/모듈의 다른 항목 게이트 정보를 추정으로 복사 붙여넣기 금지. 각 항목은 해당 service를 **직접 Read**해 채운다.
-- 게이트 호출 **존재**만으로 `✓` 판정 금지 — 게이트 함수 본문을 Read해 **범위 적정성**까지 확인(위 §"게이트 호출 존재 ≠ 게이트 범위 적정").
-- "service 미확인"은 ❓로 유지(임의 ✓ 금지). 미확인이 많으면 후보 유지가 안전.
-- **인증 게이트 미경유 진입점은 ❓로 종결 금지**: 요청이 인증·인가 게이트(미들웨어/인터셉터/필터/데코레이터 등 메커니즘 불문)를 거치지 않고 도달하는 진입점이 외부 식별자로 **타인에 귀속될 수 있는(소유권 개념이 있는) 리소스**에 접근하면, 소유권게이트를 ❓로 남기지 말고 service/도메인 계층을 Read해 ✓/❌로 확정한다. 컨텍스트 한계로 확정 불가하면 보수적으로 후보(`IDOR_GATE_UNVERIFIED` + `[검토필요]`)로 승격한다. '인증 불요(공개) 설계'를 안전 근거로 쓰려면 ⓐ리소스가 비민감·공용임을 보이거나 ⓑ비식별 고엔트로피 토큰·공유 검증 등 대체 접근통제가 코드에 존재함을 인용해야 한다 — **인증 부재 자체는 안전 근거가 아니며, 오히려 애플리케이션 레벨 소유권 검증의 필요성을 높인다.** 인증 미경유 진입점 식별은 `idor_inventory.py`의 `auth` 컬럼(값이 `제외`면 인증 미경유)을 사용하고, 도구가 미지원하는 프레임워크면 라우팅/시큐리티 설정을 직접 Read해 판정한다.
+- 게이트 호출 **존재**만으로 `[검증]` 판정 금지 — 게이트 함수 본문을 Read해 **범위 적정성**까지 확인(위 §"게이트 호출 존재 ≠ 게이트 범위 적정").
+- "service 미확인"은 [미확인]로 유지(임의 [검증] 금지). 미확인이 많으면 후보 유지가 안전.
+- **인증 게이트 미경유 진입점은 [미확인]로 종결 금지**: 요청이 인증·인가 게이트(미들웨어/인터셉터/필터/데코레이터 등 메커니즘 불문)를 거치지 않고 도달하는 진입점이 외부 식별자로 **타인에 귀속될 수 있는(소유권 개념이 있는) 리소스**에 접근하면, 소유권게이트를 [미확인]로 남기지 말고 service/도메인 계층을 Read해 [검증]/[부재]로 확정한다. 컨텍스트 한계로 확정 불가하면 보수적으로 후보(`IDOR_GATE_UNVERIFIED` + `[검토필요]`)로 승격한다. '인증 불요(공개) 설계'를 안전 근거로 쓰려면 ⓐ리소스가 비민감·공용임을 보이거나 ⓑ비식별 고엔트로피 토큰·공유 검증 등 대체 접근통제가 코드에 존재함을 인용해야 한다 — **인증 부재 자체는 안전 근거가 아니며, 오히려 애플리케이션 레벨 소유권 검증의 필요성을 높인다.** 인증 미경유 진입점 식별은 `idor_inventory.py`의 `auth` 컬럼(값이 `제외`면 인증 미경유)을 사용하고, 도구가 미지원하는 프레임워크면 라우팅/시큐리티 설정을 직접 Read해 판정한다.
 
 도구가 없거나 locindex가 없는 환경이면 아래 형식으로 수기 작성하되 전수성을 보장한다.
 
@@ -166,12 +166,12 @@ python3 <NOAH_SAST_DIR>/tools/idor_inventory.py \
 ### IDOR 검토 인벤토리
 | 엔드포인트 | 외부입력(파라미터) | 리소스접근 호출 | 소유권게이트 | 단계 |
 |---|---|---|---|---|
-| GET /download-url/payments/{paymentId} | paymentId(@PathVariable Long) | getDownloadUrlByPaymentId(accountId, paymentId) | ❓ service 미확인 | ② |
-| GET /audio/download/secure-link | accessKey(@RequestParam String) | getVideoAudioDownloadSecureLink(accessKey, ...) | ❌ 없음 | ② |
-| ... | ... | ... | ✓ owner.equals | — (안전, 참고용) |
+| GET /download-url/payments/{paymentId} | paymentId(@PathVariable Long) | getDownloadUrlByPaymentId(accountId, paymentId) | [미확인] | ② |
+| GET /audio/download/secure-link | accessKey(@RequestParam String) | getVideoAudioDownloadSecureLink(accessKey, ...) | [부재] | ② |
+| ... | ... | ... | [검증] owner.equals | — (안전, 참고용) |
 ```
 
-`소유권게이트` 열: `✓`(검증 확인, 안전) / `❌`(부재 확정) / `❓`(service/AOP 미확인 — 검토 필요). 이 인벤토리는 "안 본 엔드포인트는 없다"를 보장하는 백스톱이다.
+`소유권게이트` 열: `[검증]`(검증 확인, 안전) / `[부재]`(부재 확정) / `[미확인]`(service/AOP 미확인 — 검토 필요). 이 인벤토리는 "안 본 엔드포인트는 없다"를 보장하는 백스톱이다.
 
 ## 후보 판정 제한
 
@@ -190,5 +190,5 @@ python3 <NOAH_SAST_DIR>/tools/idor_inventory.py \
 2. **이름 카탈로그(`*Id`/`accountId` 등) 금지.** 어노테이션/입력 표지가 곧 신뢰 경계다. 식별자 역할 판정은 "값이 달라지면 다른 사람 리소스 접근?"으로.
 3. **인벤토리 도구는 두 모드 병행.** semgrep taint는 람다 클로저·DTO 필드·체이닝에서 추적 한계가 있다(엔진 무관 보편 한계). 그래서 dataflow 확정분(taint) + 컨트롤러 source-only 스캔(전수 안전망)을 합쳐야 FN 0에 가까워진다. 새 언어 컨트롤러 스캔 휴리스틱은 그 언어의 매핑·시그니처 문법에 맞게 추가한다(`idor_inventory.py` 확장).
    > **도구 한계 (현재)**: `idor_inventory.py` 컨트롤러 전수 스캔(모드 2)은 **Java/Kotlin Spring** 전용 어노테이션만 지원한다. Python(Django/Flask/FastAPI)·Node.js(Express/Fastify) 프로젝트는 taint 룰(모드 1)만 사용 가능하며, taint가 추적하지 못하는 흐름(DTO 필드·람다 바인딩 등)은 **에이전트가 source-first 패턴 탐색(Step 6-B-2)으로 직접 보완**해야 한다.
-4. **인증 부재/미경유 진입점도 IDOR 의미론에 포함.** 인증 게이트를 거치지 않는 상태에서 외부 식별자 수용은 결과적으로 cross-user 접근과 동일. **룰 source 패턴이 잡지 못해도(인벤토리 ③의 ❓ 항목 포함) 인증 미경유 + 보호 대상 리소스 접근이면 ❓로 종결하지 말고 후보로 승격**한다(위 §"검토 인벤토리 출력 형식"의 "인증 게이트 미경유 진입점은 ❓로 종결 금지" 규칙). 라벨 `IDOR_GATE_UNVERIFIED`(또는 `AUTH_BYPASS`).
+4. **인증 부재/미경유 진입점도 IDOR 의미론에 포함.** 인증 게이트를 거치지 않는 상태에서 외부 식별자 수용은 결과적으로 cross-user 접근과 동일. **룰 source 패턴이 잡지 못해도(인벤토리 ③의 [미확인] 항목 포함) 인증 미경유 + 보호 대상 리소스 접근이면 [미확인]로 종결하지 말고 후보로 승격**한다(위 §"검토 인벤토리 출력 형식"의 "인증 게이트 미경유 진입점은 [미확인]로 종결 금지" 규칙). 라벨 `IDOR_GATE_UNVERIFIED`(또는 `AUTH_BYPASS`).
    - 인증 게이트 등록 지점은 프레임워크마다 다르다 (예: Spring 인터셉터 `excludePathPatterns`/Security `permitAll`, Express 미들웨어 미적용 라우트, Django `AllowAny`/`@csrf_exempt`, FastAPI `Depends` 미부착, Rails `skip_before_action`). `idor_inventory.py`는 가능한 프레임워크에 한해 `auth` 컬럼으로 미경유 진입점을 자동 표시한다.

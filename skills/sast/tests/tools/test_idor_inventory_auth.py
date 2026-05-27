@@ -3,10 +3,10 @@
 
 회귀 대상: 인증 인터셉터/시큐리티가 제외한 경로(예: Spring excludePathPatterns)의
 식별자 단독 리소스 조회 진입점이 'auth=제외'로 표시되어, phase1.md의
-"인증 게이트 미경유 진입점은 ❓로 종결 금지" 우선 검토 대상이 되는지 검증한다.
+"인증 게이트 미경유 진입점은 [미확인]로 종결 금지" 우선 검토 대상이 되는지 검증한다.
 
 배경: 인증 미경유 + 식별자 단독 조회 + 소유권 게이트 부재 진입점이 인벤토리에서
-❓로 방치되어 후보 승격이 누락된 사례의 재발 방지. 픽스처는 특정 도메인/자원명에
+[미확인]로 방치되어 후보 승격이 누락된 사례의 재발 방지. 픽스처는 특정 도메인/자원명에
 묶이지 않은 합성 경로로 작성한다(범용 스캐너 룰이므로).
 """
 import importlib.util
@@ -35,8 +35,8 @@ class TestAuthLabel(unittest.TestCase):
         self.assertEqual(idor.auth_label("GET /v1/users/{id}", rx), "적용")
 
     def test_no_patterns_is_unknown(self):
-        # 도구가 인증 설정을 못 찾거나 미지원 프레임워크면 '—' (정책이 백스톱)
-        self.assertEqual(idor.auth_label("GET /public/x", []), "—")
+        # 도구가 인증 설정을 못 찾거나 미지원 프레임워크면 '미상' (정책이 백스톱)
+        self.assertEqual(idor.auth_label("GET /public/x", []), "미상")
 
     def test_single_star_is_one_segment(self):
         rx = self._rx("/a/*/b")
