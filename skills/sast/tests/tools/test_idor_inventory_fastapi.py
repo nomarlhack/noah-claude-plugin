@@ -104,6 +104,16 @@ class TestFastAPIScan(unittest.TestCase):
         self.assertIn("GET /real/{id}", rows)
         self.assertTrue(all("commented" not in e for e in rows))
 
+    def test_apirouter_prefix_synthesized(self):
+        # APIRouter(prefix="/orders")가 라우트 경로에 합성됨 (블라인드 검증 반영)
+        rows = _scan_text(
+            "from fastapi import APIRouter\n"
+            'router = APIRouter(prefix="/orders")\n'
+            '@router.get("/{order_id}")\n'
+            "def g(order_id: int): return order_id\n"
+        )
+        self.assertIn("GET /orders/{order_id}", rows)
+
 
 if __name__ == "__main__":
     unittest.main()

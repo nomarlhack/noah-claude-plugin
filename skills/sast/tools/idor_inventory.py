@@ -249,6 +249,8 @@ FASTAPI_PARAM_RE = re.compile(
     r'(\w+)\s*:\s*([\w\[\],. ]+?)\s*=\s*(' + _FA_FUNC_ALT + r')\s*\('
 )
 _PATH_VAR_RE = re.compile(r'\{(\w+)\}')
+# APIRouter(prefix="/x") — 라우터 변수별 경로 prefix (라우트 경로에 합성)
+APIROUTER_PREFIX_RE = re.compile(r'(\w+)\s*=\s*APIRouter\([^)]*\bprefix\s*=\s*["\']([^"\']*)["\']')
 
 
 def _scan_fastapi_file(path: Path) -> list[dict]:
@@ -267,6 +269,7 @@ def _scan_fastapi_file(path: Path) -> list[dict]:
     # "fastapi" 마커로 Flask 파일과 구분한다(Flask는 _scan_flask_file이 처리).
     if "fastapi" not in text.lower() or not FASTAPI_ROUTE_RE.search(text):
         return []
+    prefix_map = dict(APIROUTER_PREFIX_RE.findall(text))  # 라우터 변수 → prefix
     rows: list[dict] = []
     for i, ln in enumerate(lines):
         m = FASTAPI_ROUTE_RE.search(ln)
@@ -274,7 +277,8 @@ def _scan_fastapi_file(path: Path) -> list[dict]:
             continue
         if _is_comment_line(ln):  # 주석 처리된 데코레이터는 가짜 진입점
             continue
-        verb, route_path = m.group(2), m.group(3)
+        router_var, verb, route_path = m.group(1), m.group(2), m.group(3)
+        route_path = prefix_map.get(router_var, "") + route_path  # APIRouter prefix 합성
         # 데코레이터 아래 def/async def 시그니처 찾기 (스택된 데코레이터·빈 줄 통과)
         sig_start = None
         for j in range(i + 1, min(len(lines), i + 8)):
@@ -465,8 +469,10 @@ _SCAN_EXCLUDE_DIRS = (
 # 라우트+경로변수(<int:id>, Django와 같은 형식)는 정확히 열거하고, 입력은 본문
 # request.* 토큰을 best-effort 힌트로 단다. 핸들러가 데코레이터 바로 아래 함수라
 # 본문을 볼 수 있어 Express의 '외부 핸들러 미상'은 없다. (@app.get 충돌은 'flask' 마커로 구분)
-FLASK_ROUTE_RE = re.compile(r"""@\w+\.(route|get|post|put|delete|patch)\(\s*['"](/[^'"]*)['"]""")
+FLASK_ROUTE_RE = re.compile(r"""@(\w+)\.(route|get|post|put|delete|patch)\(\s*['"](/[^'"]*)['"]""")
 FLASK_METHODS_RE = re.compile(r"methods\s*=\s*\[([^\]]*)\]")
+# Blueprint(url_prefix="/x") — 블루프린트 변수별 경로 prefix (라우트 경로에 합성)
+BLUEPRINT_PREFIX_RE = re.compile(r"""(\w+)\s*=\s*Blueprint\([^)]*\burl_prefix\s*=\s*['"]([^'"]*)['"]""")
 FLASK_INPUT_RE = re.compile(r"\brequest\.(args|form|json|values|data|cookies|headers)\b")
 
 
@@ -484,6 +490,7 @@ def _scan_flask_file(path: Path) -> list[dict]:
     # Flask 식별: flask import + 라우트 데코레이터 (FastAPI의 @app.get과 구분)
     if "flask" not in text.lower() or not FLASK_ROUTE_RE.search(text):
         return []
+    prefix_map = dict(BLUEPRINT_PREFIX_RE.findall(text))  # Blueprint 변수 → url_prefix
     rows: list[dict] = []
     for i, ln in enumerate(lines):
         m = FLASK_ROUTE_RE.search(ln)
@@ -491,7 +498,8 @@ def _scan_flask_file(path: Path) -> list[dict]:
             continue
         if _is_comment_line(ln):  # 주석 처리된 데코레이터는 가짜 진입점
             continue
-        deco, route_path = m.group(1), m.group(2)
+        bp_var, deco, route_path = m.group(1), m.group(2), m.group(3)
+        route_path = prefix_map.get(bp_var, "") + route_path  # Blueprint url_prefix 합성
         if deco == "route":
             mm = FLASK_METHODS_RE.search(ln)
             if mm:
@@ -508,10 +516,10 @@ def _scan_flask_file(path: Path) -> list[dict]:
             if pv not in seen:
                 params.append(f"{pv}(path-var)")
                 seen.add(pv)
-        # 입력 힌트: 핸들러 본문(다음 라우트 데코레이터 전까지, 최대 25줄) request.* 토큰
+        # 입력 힌트 윈도: 다음 라우트 데코레이터 또는 다음 함수 def 전까지 (인접 핸들러 토큰 흡수 방지)
         end = min(len(lines), i + 25)
         for k in range(i + 1, end):
-            if FLASK_ROUTE_RE.search(lines[k]):
+            if FLASK_ROUTE_RE.search(lines[k]) or (k > i + 1 and lines[k].lstrip().startswith(("def ", "async def "))):
                 end = k
                 break
         window = "\n".join(lines[i:end])

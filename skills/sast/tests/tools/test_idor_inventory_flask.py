@@ -65,6 +65,25 @@ class TestFlaskScan(unittest.TestCase):
         )
         self.assertEqual(_scan(fastapi_src), {})
 
+    def test_blueprint_prefix_synthesized(self):
+        # Blueprint(url_prefix="/api")가 라우트 경로에 합성됨 (블라인드 검증 반영)
+        rows = _scan(
+            "from flask import Blueprint\n"
+            'bp = Blueprint("o", __name__, url_prefix="/api")\n'
+            '@bp.route("/users/<int:user_id>")\n'
+            "def get_user(user_id):\n    return find(user_id)\n"
+        )
+        self.assertIn("GET /api/users/<int:user_id>", rows)
+
+    def test_input_window_stops_at_next_def(self):
+        # 인접 함수(helper)의 request 토큰이 list 핸들러에 흡수되지 않음 → 입력 0이라 제외
+        rows = _scan(
+            "from flask import Flask, request\napp = Flask(__name__)\n"
+            '@app.route("/users")\ndef list_users():\n    return all()\n\n'
+            "def helper():\n    return request.json\n"
+        )
+        self.assertNotIn("GET /users", rows)
+
 
 if __name__ == "__main__":
     unittest.main()
