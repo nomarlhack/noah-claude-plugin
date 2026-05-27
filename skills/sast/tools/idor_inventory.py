@@ -555,6 +555,72 @@ def _scan_rails_routes_file(path: Path) -> list[dict]:
     return rows
 
 
+# ─── Go 어댑터 — 본문접근형 (Gin/Echo/chi/net-http: 라우트 전수 열거 + 입력 힌트) ──
+# Go는 라우트가 함수 호출(r.GET("/x", h))이고 입력이 핸들러 본문의 c.Param/c.Query
+# 접근이라 Express와 유사하다. 라우트+경로변수(:id Gin/Echo, {id} chi/gorilla)는 정확히
+# 열거하고, 입력은 본문 c.Param/c.Query/mux.Vars 토큰을 best-effort 힌트로, 외부 핸들러는
+# '입력 미상'으로 등재한다. HandleFunc(net/http)는 메서드 미지정이라 ANY로 표기.
+GO_ROUTE_RE = re.compile(
+    r'\.(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|Get|Post|Put|Delete|Patch|Handle|HandleFunc)\(\s*"(/[^"]*)"'
+)
+GO_INPUT_RE = re.compile(
+    r'\bc\.(?:Param|Query|DefaultQuery|PostForm|GetHeader|Cookie)\b|\bmux\.Vars\b|\br\.(?:FormValue|PostFormValue)\b'
+)
+
+
+def _scan_go_file(path: Path) -> list[dict]:
+    """단일 Go(.go) 파일에서 라우트를 전수 열거 (입력은 best-effort 힌트).
+
+    Gin/Echo `.GET(...)`·chi `.Get(...)`·net-http `.HandleFunc(...)` 호출의 경로 +
+    경로변수(:id / {id})를 정확히 추출하고, 입력은 본문 c.Param/c.Query/mux.Vars 토큰을
+    힌트로 단다. 외부 핸들러는 '입력 미상'으로 등재. HandleFunc는 메서드 미지정 → ANY.
+    """
+    lines = read_lines(str(path))
+    if not lines:
+        return []
+    text = "\n".join(lines)
+    if not GO_ROUTE_RE.search(text):
+        return []
+    rows: list[dict] = []
+    for i, ln in enumerate(lines):
+        m = GO_ROUTE_RE.search(ln)
+        if not m:
+            continue
+        method, route = m.group(1), m.group(2)
+        verb = "ANY" if method in ("Handle", "HandleFunc") else method.upper()
+        params: list[str] = []
+        seen: set[str] = set()
+        # 경로변수 :id(Gin/Echo) 와 {id}(chi/gorilla) 둘 다
+        for pv in EXPRESS_PATH_VAR_RE.findall(route) + _PATH_VAR_RE.findall(route):
+            if pv not in seen:
+                params.append(f"{pv}(path-var)")
+                seen.add(pv)
+        # 입력 힌트: 본문(다음 라우트 등록 전까지, 최대 25줄) c.Param/c.Query/mux.Vars 토큰
+        end = min(len(lines), i + 25)
+        for k in range(i + 1, end):
+            if GO_ROUTE_RE.search(lines[k]):
+                end = k
+                break
+        window = "\n".join(lines[i:end])
+        for hit in sorted(set(mm.group(0) for mm in GO_INPUT_RE.finditer(window))):
+            params.append(f"{hit}(input-hint)")
+        # 인라인 핸들러 여부 (라우트 호출 뒤 func(...))
+        rest = ln[m.end():]
+        inline = "func(" in rest or "func (" in rest
+        if not params:
+            if inline:
+                continue  # 인라인인데 경로변수·입력 토큰 0 → 식별자 미수용
+            params.append("<입력 미상 - 핸들러 Read>")  # 외부 핸들러 → 완전성 우선 등재
+        rows.append({
+            "endpoint": f"{verb} {route}",
+            "params": params,
+            "file": f"{path.name}:{i + 1}",
+            "abspath": str(path),
+            "source": "controller-scan",
+        })
+    return rows
+
+
 # 스캐너 도구 자신(이 스킬)의 디렉토리. project_root 안에 스킬이 복사돼 있어도
 # 도구 코드(주석/문자열의 라우트 예시 등)가 분석 대상으로 오탐되지 않도록 제외한다.
 # 일반 환경(스킬이 project_root 밖)에서는 매칭되지 않아 무영향.
@@ -565,7 +631,7 @@ def scan_controllers(project_root: Path) -> list[dict]:
     """프로젝트 루트의 컨트롤러 파일을 source-only로 스캔 (Spring Java/Kotlin + FastAPI Python + Express Node)."""
     rows: list[dict] = []
     for p in project_root.rglob("*"):
-        if p.suffix not in (".java", ".kt", ".py", ".js", ".ts", ".mjs", ".cjs", ".rb"):
+        if p.suffix not in (".java", ".kt", ".py", ".js", ".ts", ".mjs", ".cjs", ".rb", ".go"):
             continue
         parts = set(p.parts)
         if any(x in parts for x in _SCAN_EXCLUDE_DIRS):
@@ -582,6 +648,8 @@ def scan_controllers(project_root: Path) -> list[dict]:
                 rows.extend(_scan_express_file(p))
             elif p.suffix == ".rb":
                 rows.extend(_scan_rails_routes_file(p))
+            elif p.suffix == ".go":
+                rows.extend(_scan_go_file(p))
             else:
                 rows.extend(_scan_controller_file(p))
         except Exception:
