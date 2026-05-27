@@ -251,7 +251,9 @@ def _scan_fastapi_file(path: Path) -> list[dict]:
     if not lines:
         return []
     text = "\n".join(lines)
-    if not FASTAPI_ROUTE_RE.search(text):  # FastAPI 라우트 마커 없으면 스킵
+    # FastAPI 식별: fastapi import + 라우트 데코레이터. @app.get은 Flask도 쓰므로
+    # "fastapi" 마커로 Flask 파일과 구분한다(Flask는 _scan_flask_file이 처리).
+    if "fastapi" not in text.lower() or not FASTAPI_ROUTE_RE.search(text):
         return []
     rows: list[dict] = []
     for i, ln in enumerate(lines):
@@ -439,6 +441,74 @@ _SCAN_EXCLUDE_DIRS = (
     "venv", ".venv", "site-packages", "__pycache__", "dist", "coverage",
 )
 
+# ─── Flask 어댑터 — 하이브리드 (데코레이터 라우트 + 본문접근 입력) ──────────
+# Flask는 라우트가 데코레이터(@app.route/@app.get)지만 입력은 핸들러 본문의
+# request.args/form/json 접근이라 FastAPI(시그니처)와 Express(본문)의 혼합이다.
+# 라우트+경로변수(<int:id>, Django와 같은 형식)는 정확히 열거하고, 입력은 본문
+# request.* 토큰을 best-effort 힌트로 단다. 핸들러가 데코레이터 바로 아래 함수라
+# 본문을 볼 수 있어 Express의 '외부 핸들러 미상'은 없다. (@app.get 충돌은 'flask' 마커로 구분)
+FLASK_ROUTE_RE = re.compile(r"""@\w+\.(route|get|post|put|delete|patch)\(\s*['"](/[^'"]*)['"]""")
+FLASK_METHODS_RE = re.compile(r"methods\s*=\s*\[([^\]]*)\]")
+FLASK_INPUT_RE = re.compile(r"\brequest\.(args|form|json|values|data|cookies|headers)\b")
+
+
+def _scan_flask_file(path: Path) -> list[dict]:
+    """단일 Flask(.py) 파일에서 라우트를 전수 열거 (입력은 본문 request.* 힌트).
+
+    @app.route/@app.get 데코레이터의 경로 + 경로변수(<int:id>)는 정확히 추출하고,
+    HTTP 메서드는 route는 methods=[...]에서(없으면 GET), get/post 데코레이터는
+    그 메서드로 잡는다. 입력은 핸들러 본문의 request.* 토큰을 best-effort 힌트로 단다.
+    """
+    lines = read_lines(str(path))
+    if not lines:
+        return []
+    text = "\n".join(lines)
+    # Flask 식별: flask import + 라우트 데코레이터 (FastAPI의 @app.get과 구분)
+    if "flask" not in text.lower() or not FLASK_ROUTE_RE.search(text):
+        return []
+    rows: list[dict] = []
+    for i, ln in enumerate(lines):
+        m = FLASK_ROUTE_RE.search(ln)
+        if not m:
+            continue
+        deco, route_path = m.group(1), m.group(2)
+        if deco == "route":
+            mm = FLASK_METHODS_RE.search(ln)
+            if mm:
+                methods = [x.strip().strip("'\"").upper() for x in mm.group(1).split(",") if x.strip()]
+                verb = "/".join(methods) if methods else "GET"
+            else:
+                verb = "GET"
+        else:
+            verb = deco.upper()
+        params: list[str] = []
+        seen: set[str] = set()
+        # 경로변수 <int:id> — Django와 같은 형식 (DJANGO_PATH_VAR_RE 재사용)
+        for pv in DJANGO_PATH_VAR_RE.findall(route_path):
+            if pv not in seen:
+                params.append(f"{pv}(path-var)")
+                seen.add(pv)
+        # 입력 힌트: 핸들러 본문(다음 라우트 데코레이터 전까지, 최대 25줄) request.* 토큰
+        end = min(len(lines), i + 25)
+        for k in range(i + 1, end):
+            if FLASK_ROUTE_RE.search(lines[k]):
+                end = k
+                break
+        window = "\n".join(lines[i:end])
+        for hit in sorted(set(FLASK_INPUT_RE.findall(window))):
+            params.append(f"request.{hit}(input-hint)")
+        if not params:
+            continue  # 경로변수·입력 0 → 식별자 미수용 (핸들러 본문이 바로 아래라 미상 불필요)
+        rows.append({
+            "endpoint": f"{verb} {route_path}",
+            "params": params,
+            "file": f"{path.name}:{i + 1}",
+            "abspath": str(path),
+            "source": "controller-scan",
+        })
+    return rows
+
+
 # 스캐너 도구 자신(이 스킬)의 디렉토리. project_root 안에 스킬이 복사돼 있어도
 # 도구 코드(주석/문자열의 라우트 예시 등)가 분석 대상으로 오탐되지 않도록 제외한다.
 # 일반 환경(스킬이 project_root 밖)에서는 매칭되지 않아 무영향.
@@ -458,8 +528,9 @@ def scan_controllers(project_root: Path) -> list[dict]:
             continue
         try:
             if p.suffix == ".py":
-                # .py는 FastAPI(데코레이터)·Django(urls.py) 둘 다 시도 — 각자 마커로 스킵
+                # .py는 FastAPI·Flask·Django 모두 시도 — 각자 프레임워크 마커로 스킵
                 rows.extend(_scan_fastapi_file(p))
+                rows.extend(_scan_flask_file(p))
                 rows.extend(_scan_django_urls_file(p))
             elif p.suffix in (".js", ".ts", ".mjs", ".cjs"):
                 rows.extend(_scan_express_file(p))
