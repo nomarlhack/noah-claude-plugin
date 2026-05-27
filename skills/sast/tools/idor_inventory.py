@@ -379,6 +379,58 @@ def _scan_express_file(path: Path) -> list[dict]:
     return rows
 
 
+# ─── Django 어댑터 — urls.py 라우트 열거 (핸들러는 views.py 분리라 입력 미상) ──
+# Django는 라우트(urls.py)와 핸들러(views.py)가 분리되어 urls.py만으로는 입력을
+# 알 수 없다(=항상 '외부 핸들러' 패턴). 그래서 라우트+경로변수만 전수 열거하고(완전성),
+# 입력은 '미상'으로 등재해 에이전트가 view를 Read하게 한다. HTTP 메서드는 뷰가
+# 결정하므로 ANY. DRF router(router.register)·CBV 자동 메서드는 미지원(taint+에이전트 백스톱).
+DJANGO_ROUTE_RE = re.compile(r"""(?:\bpath|\bre_path|\burl)\(\s*r?['"]([^'"]*)['"]""")
+DJANGO_PATH_VAR_RE = re.compile(r"<(?:\w+:)?(\w+)>")   # path('users/<int:id>/')
+DJANGO_RE_VAR_RE = re.compile(r"\(\?P<(\w+)>")         # re_path(r'^users/(?P<id>\d+)/$')
+
+
+def _scan_django_urls_file(path: Path) -> list[dict]:
+    """Django urls.py에서 라우트를 전수 열거 (입력은 view에 있어 미상).
+
+    path()/re_path()/url() 호출의 경로 + 경로변수(<int:id> / (?P<id>...))를 추출한다.
+    include()는 sub-urls 마운트라 제외(해당 sub urls.py가 따로 스캔됨). 핸들러가
+    views.py에 분리되어 입력은 '미상'으로 표시; HTTP 메서드는 뷰가 결정하므로 ANY.
+    """
+    lines = read_lines(str(path))
+    if not lines:
+        return []
+    text = "\n".join(lines)
+    # Django URLconf는 반드시 `urlpatterns = [...]` 할당을 가짐 — 이를 필수 마커로 사용.
+    # 단순히 "urlpatterns" 단어 포함이나 path() 호출로 판별하면 일반 .py(주석/문자열에
+    # urlpatterns를 언급하거나 소문자 path()를 호출하는 코드)를 오탐하므로 할당식으로 좁힌다.
+    if not re.search(r"\burlpatterns\s*=", text):
+        return []
+    rows: list[dict] = []
+    for i, ln in enumerate(lines):
+        m = DJANGO_ROUTE_RE.search(ln)
+        if not m:
+            continue
+        route = m.group(1).strip().lstrip("^").rstrip("$").strip("/")
+        if "include(" in ln[m.end():]:  # sub-urls 마운트 → 라우트 아님
+            continue
+        params: list[str] = []
+        seen: set[str] = set()
+        for pv in DJANGO_PATH_VAR_RE.findall(route) + DJANGO_RE_VAR_RE.findall(route):
+            if pv not in seen:
+                params.append(f"{pv}(path-var)")
+                seen.add(pv)
+        if not params:
+            params.append("<입력 미상 - view Read>")  # 핸들러가 views.py → 입력 미상
+        rows.append({
+            "endpoint": f"ANY /{route}",
+            "params": params,
+            "file": f"{path.name}:{i + 1}",
+            "abspath": str(path),
+            "source": "controller-scan",
+        })
+    return rows
+
+
 # 빌드 산출물·서드파티·테스트 디렉토리 제외 (Java/Kotlin + Python + Node 공통)
 # "test"(Java src/test 관례)·"tests"(Python 관례) 둘 다 제외 — 테스트 픽스처가
 # 실제 진입점으로 오탐되는 것을 방지. dist/coverage는 Node 빌드 산출물.
@@ -386,6 +438,11 @@ _SCAN_EXCLUDE_DIRS = (
     "build", "out", "target", ".gradle", ".idea", "node_modules", "test", "tests",
     "venv", ".venv", "site-packages", "__pycache__", "dist", "coverage",
 )
+
+# 스캐너 도구 자신(이 스킬)의 디렉토리. project_root 안에 스킬이 복사돼 있어도
+# 도구 코드(주석/문자열의 라우트 예시 등)가 분석 대상으로 오탐되지 않도록 제외한다.
+# 일반 환경(스킬이 project_root 밖)에서는 매칭되지 않아 무영향.
+_SKILL_ROOT = Path(__file__).resolve().parents[1]
 
 
 def scan_controllers(project_root: Path) -> list[dict]:
@@ -397,9 +454,13 @@ def scan_controllers(project_root: Path) -> list[dict]:
         parts = set(p.parts)
         if any(x in parts for x in _SCAN_EXCLUDE_DIRS):
             continue
+        if _SKILL_ROOT in p.resolve().parents:  # 스캐너 도구 자신(스킬) 제외 — 자기참조 오탐 방지
+            continue
         try:
             if p.suffix == ".py":
+                # .py는 FastAPI(데코레이터)·Django(urls.py) 둘 다 시도 — 각자 마커로 스킵
                 rows.extend(_scan_fastapi_file(p))
+                rows.extend(_scan_django_urls_file(p))
             elif p.suffix in (".js", ".ts", ".mjs", ".cjs"):
                 rows.extend(_scan_express_file(p))
             else:
