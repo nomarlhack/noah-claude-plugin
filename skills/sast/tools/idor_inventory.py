@@ -199,10 +199,17 @@ def _scan_controller_file(path: Path) -> list[dict]:
                 break
         sig_text = "\n".join(sig_lines)
         params = _params_in_signature(sig_text, lang)
-        if not params:
-            continue  # 외부 입력 어노테이션 없는 메서드는 IDOR 인벤토리 대상 아님
         full_path = (class_prefix + ("/" if path_seg and not path_seg.startswith("/") else "") + path_seg) if class_prefix else path_seg
         full_path = full_path or "/"
+        # 경로변수({var})는 시그니처 어노테이션과 무관하게 외부 식별자 — 라우트에서 직접 추출.
+        # (controller-scan은 입력 추출 성패가 아니라 '라우트 전수 열거'가 목적)
+        existing = {p.split("(", 1)[0] for p in params}
+        for pv in _PATH_VAR_RE.findall(full_path):
+            if pv not in existing:
+                params.append(f"{pv}(path-var)")
+                existing.add(pv)
+        if not params:
+            continue  # 경로변수도 외부 입력도 없으면 IDOR 대상 아님 (예: 식별자 미수용 라우트)
         verb_norm = verb.upper() if verb != "Request" else "REQUEST"
         rows.append({
             "endpoint": f"{verb_norm} {full_path}".strip(),
@@ -289,13 +296,13 @@ def _scan_fastapi_file(path: Path) -> list[dict]:
             pname, ptype, func = pm.group(1), pm.group(2).strip(), pm.group(3)
             params.append(f"{pname}({func} {ptype})")
             seen.add(pname)
-        # 경로 변수({var})는 명시적 Path() 없이도 외부 입력 (시그니처에 받는 경우)
+        # 경로 변수({var})는 라우트에 명시된 외부 식별자 — 시그니처/Path() 확인 없이 등재.
+        # (입력 추출 성패와 무관하게 라우트를 빠짐없이 열거하는 것이 목적)
         for pv in _PATH_VAR_RE.findall(route_path):
             if pv in seen:
                 continue
-            if re.search(rf'\b{re.escape(pv)}\s*:', sig_text):
-                params.append(f"{pv}(path-param)")
-                seen.add(pv)
+            params.append(f"{pv}(path-param)")
+            seen.add(pv)
         if not params:
             continue
         rows.append({

@@ -75,6 +75,20 @@ class TestFastAPIScan(unittest.TestCase):
         rows = _scan_text(SAMPLE)
         self.assertTrue(all("not_a_route" not in e for e in rows))
 
+    def test_path_var_registered_without_signature_param(self):
+        # 1순위(라우트 전수 열거): 경로변수는 시그니처에 명시적으로 안 받아도 등재.
+        # 입력 추출 성패와 무관하게 라우트를 빠짐없이 열거하는 것이 목적.
+        text = (
+            "from fastapi import APIRouter\n"
+            "router = APIRouter()\n\n"
+            "@router.get('/legacy/{resource_id}')\n"
+            "def legacy(request):\n"
+            "    return handle(request)\n"
+        )
+        rows = _scan_text(text)
+        self.assertIn("GET /legacy/{resource_id}", rows)
+        self.assertIn("resource_id(path-param)", rows["GET /legacy/{resource_id}"])
+
     def test_no_fastapi_marker_returns_empty(self):
         # FastAPI 라우트 마커 없는 .py는 스킵
         rows = _scan_text("def plain(x):\n    return x\n")
