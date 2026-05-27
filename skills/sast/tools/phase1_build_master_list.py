@@ -190,7 +190,8 @@ skipped_scanners = []
 EXCLUDE_STEMS = {"chain-analysis"}  # Phase 1 manifest 형식이 아닌 파일 제외
 md_files = sorted(
     f for f in phase1_dir.glob("*.md")
-    if not f.stem.endswith("-phase2") and f.stem not in EXCLUDE_STEMS
+    if not f.name.startswith("_")  # _ 접두사 = 보조/메타 산출물(예: _idor_inventory_raw) — 후보 manifest 아님
+    and not f.stem.endswith("-phase2") and f.stem not in EXCLUDE_STEMS
 )
 if not md_files:
     print(f"ERROR: No .md files found in {phase1_dir}")

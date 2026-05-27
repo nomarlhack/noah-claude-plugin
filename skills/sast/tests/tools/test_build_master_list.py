@@ -157,6 +157,25 @@ class TestBuildMasterList(unittest.TestCase):
             self.assertEqual(len(data["candidates"]), 1)
             self.assertEqual(data["candidates"][0]["scanner"], "xss-scanner")
 
+    def test_underscore_prefix_excluded(self):
+        """`_` 접두사 보조 산출물(예: _idor_inventory_raw.md)은 후보 수집에서 제외.
+
+        대용량 IDOR 인벤토리를 결과 파일과 분리해 별도 `_*.md`로 저장해도
+        manifest가 없으니 NO_MANIFEST로 오인되면 안 된다(회귀 방지).
+        """
+        with tempfile.TemporaryDirectory() as d:
+            Path(os.path.join(d, "xss-scanner.md")).write_text(VALID_MD)
+            # manifest 없는 보조 인벤토리 파일 — 제외되어야 함
+            Path(os.path.join(d, "_idor_inventory_raw.md")).write_text(
+                "### IDOR 검토 인벤토리\n| # | 엔드포인트 |\n|---|---|\n| 1 | GET /a |\n"
+            )
+            out = os.path.join(d, "master-list.json")
+            r = self._run(d, out)
+            self.assertEqual(r.returncode, 0, f"stderr: {r.stderr}")
+            data = json.loads(Path(out).read_text())
+            self.assertEqual(len(data["candidates"]), 1)
+            self.assertEqual(data["candidates"][0]["scanner"], "xss-scanner")
+
 
 if __name__ == "__main__":
     unittest.main()

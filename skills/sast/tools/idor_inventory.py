@@ -261,6 +261,56 @@ def collect_taint_rows(locindex_path: Path) -> tuple[list[dict], dict]:
     return rows, {"taint_count": len(taint_locs), "scanner_meta": sc}
 
 
+# ─── 인증 게이트 미경유 경로 탐지 (auth 컬럼) ───────────────────────────
+# 인증 인터셉터/시큐리티가 인증 대상에서 제외한 경로 패턴을 수집해, 각 진입점이
+# 인증 게이트를 거치지 않는지(=phase1.md "❓ 종결 금지" 우선 대상) 표시한다.
+# 어댑터 방식: 현재 Spring 인터셉터 `excludePathPatterns(...)`만 지원.
+# 미지원 프레임워크/미발견 시 auth 컬럼은 '—'(미상)으로 남고, 판정은 phase1.md 정책이 백스톱.
+_EXCLUDE_BLOCK_RE = re.compile(r"excludePathPatterns\s*\((.*?)\)", re.S)
+_STRING_LIT_RE = re.compile(r'"([^"]*)"')
+
+
+def collect_auth_excluded_patterns(root: Path) -> list[str]:
+    """프로젝트 전체에서 인증 인터셉터가 제외한 경로 패턴 리터럴을 수집."""
+    pats: set[str] = set()
+    for ext in ("*.java", "*.kt"):
+        for f in root.rglob(ext):
+            sp = str(f)
+            if "/build/" in sp or "/.gradle/" in sp:
+                continue
+            try:
+                txt = f.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if "excludePathPatterns" not in txt:
+                continue
+            for block in _EXCLUDE_BLOCK_RE.findall(txt):
+                pats.update(_STRING_LIT_RE.findall(block))
+    return sorted(pats)
+
+
+def _ant_to_regex(pat: str) -> "re.Pattern[str]":
+    """Spring Ant 경로 패턴 → 정규식. `**`=임의(슬래시 포함), `*`=세그먼트 내, `{var}`=단일 세그먼트."""
+    pat = re.sub(r"\{[^}]+\}", "*", pat)
+    esc = re.escape(pat)
+    esc = esc.replace(r"\*\*", "\x00").replace(r"\*", "[^/]*").replace("\x00", ".*")
+    return re.compile("^" + esc + r"/?$")
+
+
+def _norm_path(endpoint: str) -> str:
+    """'GET /a/b' → '/a/b' (verb 제거, 선행 슬래시 보정)."""
+    parts = endpoint.split(None, 1)
+    p = parts[1] if len(parts) == 2 else endpoint
+    return p if p.startswith("/") else "/" + p
+
+
+def auth_label(endpoint: str, exclude_regexes: list) -> str:
+    """진입점이 인증 게이트를 거치는지 표시. 제외 패턴 미수집 시 '—'(미상)."""
+    if not exclude_regexes:
+        return "—"
+    return "제외" if any(rx.match(_norm_path(endpoint)) for rx in exclude_regexes) else "적용"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("locindex_positional", nargs="?", help="(deprecated) locindex 경로 — --locindex 사용 권장")
@@ -296,8 +346,17 @@ def main() -> int:
             by_key[key] = dict(r)
     rows = list(by_key.values())
 
-    # 정렬: 출처(taint 먼저) → 엔드포인트
-    rows.sort(key=lambda x: (0 if "taint" in x["source"] else 1, x["endpoint"]))
+    # 인증 게이트 미경유 경로 표시 (project-root 있을 때만; 미발견 시 '—')
+    exclude_regexes: list = []
+    if args.project_root:
+        exclude_regexes = [_ant_to_regex(p) for p in collect_auth_excluded_patterns(Path(args.project_root))]
+    for r in rows:
+        r["auth"] = auth_label(r["endpoint"], exclude_regexes)
+
+    # 정렬: 인증 미경유(제외) 먼저 → 출처(taint 먼저) → 엔드포인트
+    rows.sort(key=lambda x: (0 if x.get("auth") == "제외" else 1,
+                             0 if "taint" in x["source"] else 1,
+                             x["endpoint"]))
 
     # MD 출력
     sc = taint_meta.get("scanner_meta", {})
@@ -329,15 +388,18 @@ def main() -> int:
         "> **출처**: `taint`=dataflow 확정(고신뢰), `controller-scan`=source-only 진입점(taint flow 추적 실패 안전망, "
         "DTO/람다/체이닝 우회분 포함), `taint+scan`=양쪽 모두.",
         ">",
+        "> **인증**: `제외`=인증 인터셉터/시큐리티가 명시적으로 제외한 경로(인증 미경유 — phase1.md '인증 게이트 미경유 진입점은 ❓로 종결 금지' 우선 검토 대상), "
+        "`적용`=그 외(단정 아님), `—`=도구가 인증 설정을 못 찾음/미지원 프레임워크. `제외` 행이 표 상단에 정렬된다.",
+        ">",
         "> 이 표는 '외부 식별자 수용 엔드포인트 중 안 본 것은 없다'의 백스톱이며 DAST 권한 diff 입력이다.",
         "",
-        "| # | 엔드포인트 | 외부입력(파라미터) | 위치 | 출처 | 소유권게이트 |",
-        "|---|---|---|---|---|---|",
+        "| # | 엔드포인트 | 외부입력(파라미터) | 위치 | 출처 | 인증 | 소유권게이트 |",
+        "|---|---|---|---|---|---|---|",
     ]
     for i, r in enumerate(rows, 1):
         out_lines.append(
             f"| {i} | {r['endpoint']} | {', '.join(r['params']) or '?'} | {r['file']} | "
-            f"{r['source']} | ❓ 미확인 |"
+            f"{r['source']} | {r.get('auth', '—')} | ❓ 미확인 |"
         )
     out_lines.append("")
     md = "\n".join(out_lines)
