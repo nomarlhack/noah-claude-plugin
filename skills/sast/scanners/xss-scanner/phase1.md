@@ -19,6 +19,7 @@ XSS Sink는 "공격자가 제어 가능한 문자열이 HTML 파서/JS 파서에
 - **SPA (React/Vue/Angular)**: 서버는 JSON만 반환 → sink는 프론트엔드 JS 코드에 집중. 서버사이드에 `html_safe` 헬퍼가 있어도 호출되지 않으면 공격 가능한 sink가 아니다.
 - **SSR (ERB/Slim/Jinja2/JSP/Thymeleaf)**: 서버 템플릿이 sink.
 - **하이브리드**: 양쪽 모두 검색.
+- **백엔드 전용 (렌더 sink가 분석 범위 밖 — 별도 프론트/웹뷰/앱 repo)**: 서버는 JSON만 반환하고 실제 렌더 sink(`innerHTML` 등)는 **이 repo에 없는 소비자**에 있다. **[필수] 이 경우 "repo에 렌더 sink 없음"을 "XSS 없음/이상 없음"으로 종결하지 말 것.** 대신 아래 "## Egress Sink 아키타입"을 적용하여, 사용자 제어 free-text가 escape/sanitize 없이 서비스를 떠나는 egress 경계(저장·API 응답)를 sink-of-record로 삼아 Stored XSS 후보로 등록한다. (이번 클래스 누락의 직접 원인이 이 분기 부재였다.)
 
 **프론트엔드 Sink 패턴:**
 
@@ -47,6 +48,31 @@ XSS Sink는 "공격자가 제어 가능한 문자열이 HTML 파서/JS 파서에
 | Laravel Blade | `{!! $value !!}` (`{{ $value }}`는 안전) |
 | Go templates | `template.HTML(userInput)` 강제 캐스트 (자동 escape 우회) |
 | ASP.NET Razor | `@Html.Raw(value)`, `@(new HtmlString(value))` |
+
+## Egress Sink 아키타입 (백엔드 전용 repo — 렌더 소비자 분리 시)
+
+렌더 sink가 분석 범위 밖(별도 프론트/웹뷰/앱)일 때 Stored XSS를 놓치지 않기 위한 보조 sink 정의. **아래 활성 조건을 모두 만족할 때만 적용**한다(과탐 방지).
+
+**활성 게이트 (AND):**
+1. 이 repo가 JSON API를 반환하는 백엔드이고, repo 내에 in-repo 렌더 sink(프론트 JS/SSR 템플릿)가 없다(프론트 소스 파일 0건 등).
+2. 출력이 별도 소비자(웹/웹뷰/앱)에서 렌더링됨이 코드/아키텍처상 자명하다.
+
+위 게이트가 거짓이면(=in-repo sink가 있거나 풀스택 repo) 본 아키타입을 적용하지 않고 기존 sink 규칙을 그대로 쓴다. — **기존 same-repo 탐지 동작은 변경하지 않는다.**
+
+**sink 재정의 (egress 경계):**
+- 사용자 제어 free-text가 escape/sanitize 없이 **DB 영속**(`repository.save(...)` 등)되거나 **응답 DTO로 반환**되는 지점을 sink-of-record로 본다.
+
+**source 한정 (콘텐츠성 free-text만):**
+- 대상: 자유 서술 문자열 필드 — `content`, `comment`, `title`, `description`, `nickname`, `memo`, `reason`, `answer` 등.
+- **제외**: ID/숫자/enum/날짜/Boolean/URL-스킴 검증된 필드, 길이가 구조적으로 제한된 코드값. (이들은 egress 후보로 올리지 않는다.)
+
+**sanitizer (있으면 제외):** `HtmlUtils.htmlEscape` / `Jsoup.clean` / OWASP `Encode.forHtml` / 정책 기반 sanitizer가 저장·반환 전에 적용됨이 코드로 확인되면 제외.
+
+**[필수] 출력 형식 — 단일 통합 후보:** egress 필드를 **필드마다 개별 후보로 쪼개지 말 것.** 한 서비스의 "escape 없이 나가는 free-text 필드 목록"을 **하나의 STORED 후보**로 묶어 등록한다(예: "Stored XSS — 무가공 free-text egress: content, title, …"). 라벨은 STORED, 신뢰도는 저신뢰("sink=외부 소비자 렌더, 확인 필요")로 명시한다.
+
+**[필수] 권장 조치 문구:** "출력 인코딩은 렌더링 소비자가 **출력 컨텍스트에 맞게**(textContent/프레임워크 기본 escape) 수행, 백엔드는 **정책 기반 sanitize(허용 태그 화이트리스트)**로 방어 심화"로 기재한다. **"무조건 서버사이드 HTML escape"는 이중 인코딩·저장 데이터 오염을 유발하므로 권하지 않는다.**
+
+**dom-xss-scanner와의 경계:** 본 egress 아키타입은 xss-scanner(STORED)가 소유한다. dom-xss-scanner는 클라이언트 완결 DOM XSS 전용이므로 백엔드 전용 repo에서는 본 아키타입을 중복 등록하지 않는다(이중 카운트 방지).
 
 ## Source-first 추가 패턴
 
@@ -132,6 +158,7 @@ HTML 출력 sink 능력형 토큰(`innerHTML`/`outerHTML`/`dangerouslySetInnerHT
 | Sink는 있으나 source 추적 불가 (변수가 어디서 오는지 모름) | 후보 유지 (직관 제외 금지) |
 | Sink가 SPA 빌드에서 호출되지 않는 서버사이드 헬퍼 | 제외 (실제 라우트/뷰에서 호출되지 않음을 grep으로 확인) |
 | `renderToStaticMarkup` 내부 sink, 반환값 흐름 추적 미완료 | 후보 유지 |
+| 백엔드 전용 repo + 콘텐츠성 free-text가 escape/sanitize 없이 저장·응답으로 egress (렌더 sink는 범위 밖 소비자) | 후보 유지 (STORED, 저신뢰) — "## Egress Sink 아키타입"의 단일 통합 후보로 등록. "repo에 렌더 sink 없음"을 제외 근거로 쓰지 말 것 |
 
 **Reflected vs Stored 라벨 (트리거 채널 분류):**
 - **REFLECTED**: URL/파라미터/헤더가 동일 응답에 즉시 출력
