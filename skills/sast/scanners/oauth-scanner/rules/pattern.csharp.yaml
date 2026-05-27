@@ -7,19 +7,14 @@ rules:
       oauth-scanner Phase 1 sink/source 패턴 매치 (C# 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'oauth'
-      - pattern-regex: 'OAuth'
-      - pattern-regex: 'omniauth'
-      - pattern-regex: 'authorization_code'
-      - pattern-regex: 'access_token'
-      - pattern-regex: 'redirect_uri'
-      - pattern-regex: 'client_secret'
-      - pattern-regex: 'code_verifier'
-      - pattern-regex: 'code_challenge'
-      - pattern-regex: 'passport-oauth'
-      - pattern-regex: 'openid-client'
-      - pattern-regex: 'next-auth'
-      - pattern-regex: 'authlib'
+      - pattern-regex: 'Microsoft\.Identity\.Web\b'
+      - pattern-regex: 'AddMicrosoftIdentityWebApi\b'
+      - pattern-regex: 'AddOAuth\s*\('
+      - pattern-regex: 'AddOpenIdConnect\s*\('
+      - pattern-regex: 'authorization_code\b'
+      - pattern-regex: 'redirect_uri\b'
+      - pattern-regex: 'client_secret\b'
+      - pattern-regex: 'IdentityServer4\b'
     metadata:
       category: security
       subcategory:

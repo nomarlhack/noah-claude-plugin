@@ -64,6 +64,10 @@ rules:
       - pattern: unserialize($X)
       - pattern: unserialize(trim($X))
       - pattern: maybe_unserialize($X)
+      # WDDX (XML 기반 직렬화 — PHP 7.4 deprecated)
+      - pattern: wddx_deserialize($X)
+      # igbinary (바이너리 직렬화 확장)
+      - pattern: igbinary_unserialize($X)
     pattern-sanitizers:
       - pattern: json_decode($X, ...)
       - pattern: 'unserialize($X, [''allowed_classes'' => false])'

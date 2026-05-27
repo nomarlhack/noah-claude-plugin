@@ -49,6 +49,18 @@ rules:
       - pattern: jsonpickle.decode($X)
       - pattern: shelve.open($X)
       - pattern: dill.loads($X)
+      - pattern: dill.load($X)
+      # marshal — 임의 코드 실행 가능
+      - pattern: marshal.loads($X)
+      - pattern: marshal.load($X)
+      # cloudpickle (ML 워크로드에서 자주 사용)
+      - pattern: cloudpickle.loads($X)
+      - pattern: cloudpickle.load($X)
+      # joblib (scikit-learn 모델 로드)
+      - pattern: joblib.load($X)
+      # PyTorch 모델 — pickle 기반
+      - pattern: torch.load($X)
+      - pattern: torch.load($X, ...)
     pattern-sanitizers:
       - pattern: yaml.safe_load($X)
       - pattern: json.loads($X)

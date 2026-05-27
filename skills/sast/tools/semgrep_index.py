@@ -21,7 +21,11 @@ Phase 1 패턴 인덱싱의 단일 진실 원천이다:
   python3 semgrep_index.py \\
     --scanners-dir <NOAH_SAST_DIR>/scanners \\
     --project-root <PROJECT_ROOT> \\
-    --out-dir <PATTERN_INDEX_DIR>
+    --out-dir <PATTERN_INDEX_DIR> \\
+    [--exclude-paths <PATH1> <PATH2> ...]
+
+  스킬 디렉토리가 project-root 안에 있으면 자동으로 스캔 대상에서 제외된다.
+  추가로 제외할 경로가 있으면 --exclude-paths로 지정 (절대경로 또는 project-root 기준 상대경로).
 
 Exit (stdout `run_semgrep_index_exit=N`):
   0 = 정상 (rules/ 있는 모든 스캐너 처리 성공)
@@ -98,11 +102,15 @@ def _has_code_ext(path: Path) -> bool:
     return any(suffix == ext.lstrip("*").lower() for ext in INCLUDE_EXTS)
 
 
-def build_utf8_mirror(project_root: Path) -> tuple[Path | None, dict[str, str]]:
+def build_utf8_mirror(
+    project_root: Path,
+    exclude_abs: set[str] | None = None,
+) -> tuple[Path | None, dict[str, str]]:
     """비-UTF8 텍스트 파일을 UTF-8로 변환한 임시 미러 디렉토리 생성.
 
     반환: (mirror_root, {mirror_abs_path: original_abs_path} 매핑).
     변환된 파일이 0건이면 (None, {}) 반환.
+    exclude_abs: 스캔에서 제외할 절대경로 집합.
     """
     mirror = Path(tempfile.mkdtemp(prefix="noah_sast_utf8_mirror_"))
     mapping: dict[str, str] = {}
@@ -110,6 +118,10 @@ def build_utf8_mirror(project_root: Path) -> tuple[Path | None, dict[str, str]]:
         if not path.is_file():
             continue
         if any(part in MIRROR_EXCLUDE_DIRS for part in path.parts):
+            continue
+        if exclude_abs and any(
+            str(path.resolve()).startswith(ep) for ep in exclude_abs
+        ):
             continue
         if not _has_code_ext(path):
             continue
@@ -177,14 +189,26 @@ def run_semgrep(
     rule_files: list[Path],
     project_root: str,
     extra_targets: list[str] | None = None,
+    exclude_abs: set[str] | None = None,
 ) -> tuple[dict, str | None]:
     """semgrep 실행. 결과 JSON 파싱 후 (results, error) 반환.
-    extra_targets가 있으면 함께 스캔 (UTF-8 mirror 디렉토리 지원)."""
+    extra_targets가 있으면 함께 스캔 (UTF-8 mirror 디렉토리 지원).
+    exclude_abs: semgrep --exclude-rule 대신 --exclude 경로로 제외할 절대경로 집합."""
     cmd = ["semgrep", "scan", "--json", "--quiet", "--no-git-ignore"]
     for ext in INCLUDE_EXTS:
         cmd.extend(["--include", ext])
     for rf in rule_files:
         cmd.extend(["--config", str(rf)])
+    # 스캔 대상에서 제외할 경로. project_root 기준 상대경로로 변환해서 --exclude-dir 적용.
+    if exclude_abs:
+        proj = Path(project_root).resolve()
+        for ep in exclude_abs:
+            try:
+                rel = Path(ep).relative_to(proj)
+                # 최상위 디렉토리 이름만 있으면 --exclude-dir, 중첩 경로는 glob 패턴
+                cmd.extend(["--exclude", str(rel)])
+            except ValueError:
+                pass  # project_root 밖 경로는 무시
     cmd.append(project_root)
     if extra_targets:
         cmd.extend(extra_targets)
@@ -253,6 +277,7 @@ def process_scanner(
     failures: dict,
     utf8_mirror: Path | None = None,
     mirror_path_map: dict[str, str] | None = None,
+    exclude_abs: set[str] | None = None,
 ) -> int:
     """스캐너 1개 처리. rules/ 디렉토리가 있어야 처리. 총 매치 수 반환."""
     rules_dir = scanner_dir / "rules"
@@ -271,7 +296,7 @@ def process_scanner(
         return 0
 
     extra = [str(utf8_mirror)] if utf8_mirror else None
-    data, err = run_semgrep(rule_files, project_root, extra_targets=extra)
+    data, err = run_semgrep(rule_files, project_root, extra_targets=extra, exclude_abs=exclude_abs)
     if err is not None:
         failures.setdefault(scanner_name, []).append(
             {"scanner": scanner_name, "reason": err.split(":")[0], "detail": err}
@@ -375,27 +400,66 @@ def process_scanner(
     return sum(len(v) for v in results_by_rule.values())
 
 
+def resolve_exclude_paths(
+    project_root: Path,
+    scanners_dir: Path,
+    extra_paths: list[str],
+) -> set[str]:
+    """스캔 제외 절대경로 집합을 계산.
+
+    - 스킬 자신의 상위 디렉토리(noah-sast)가 project-root 안에 있으면 자동 감지해 제외.
+    - --exclude-paths 인수로 추가 지정 가능.
+    """
+    exclude: set[str] = set()
+
+    # scanners_dir은 <NOAH_SAST_DIR>/scanners — 상위가 스킬 루트
+    skill_root = scanners_dir.parent.resolve()
+    proj = project_root.resolve()
+    try:
+        skill_root.relative_to(proj)
+        exclude.add(str(skill_root))
+        print(
+            f"  스킬 디렉토리 자동 제외: {skill_root}",
+            file=sys.stderr,
+        )
+    except ValueError:
+        pass  # 스킬이 project-root 밖에 있음 — 제외 불필요
+
+    for p in extra_paths:
+        resolved = Path(p).resolve()
+        exclude.add(str(resolved))
+
+    return exclude
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Noah SAST semgrep 인덱싱 스크립트")
     parser.add_argument("--scanners-dir", required=True)
     parser.add_argument("--project-root", required=True)
     parser.add_argument("--out-dir", required=True)
+    parser.add_argument(
+        "--exclude-paths", nargs="*", default=[],
+        help="스캔에서 제외할 추가 경로 (절대경로 또는 project-root 기준 상대경로)",
+    )
     args = parser.parse_args()
 
     check_environment()
 
     scanners_dir = Path(args.scanners_dir).resolve()
-    project_root = str(Path(args.project_root).resolve())
+    project_root = Path(args.project_root).resolve()
     out_dir = Path(args.out_dir).resolve()
 
     if not scanners_dir.is_dir():
         print(f"ERROR: scanners-dir 없음: {scanners_dir}", file=sys.stderr)
         return 1
-    if not Path(project_root).is_dir():
+    if not project_root.is_dir():
         print(f"ERROR: project-root 없음: {project_root}", file=sys.stderr)
         return 1
 
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    exclude_abs = resolve_exclude_paths(project_root, scanners_dir, args.exclude_paths)
+    project_root_str = str(project_root)
 
     scanner_dirs = sorted(
         p for p in scanners_dir.iterdir()
@@ -410,7 +474,7 @@ def main() -> int:
     # 비-UTF8 텍스트 파일(EUC-KR/CP949/ISO-8859 등)을 UTF-8로 변환한 임시 미러 빌드.
     # semgrep이 비-UTF8 파일을 파싱 못 해 매치를 누락하는 문제를 보완.
     print("UTF-8 mirror 빌드 중...", file=sys.stderr)
-    utf8_mirror, mirror_path_map = build_utf8_mirror(Path(project_root))
+    utf8_mirror, mirror_path_map = build_utf8_mirror(project_root, exclude_abs=exclude_abs)
     if utf8_mirror is not None:
         print(f"  비-UTF8 파일 {len(mirror_path_map)}개 변환 → {utf8_mirror}",
               file=sys.stderr)
@@ -421,8 +485,9 @@ def main() -> int:
         name = scanner_dir.name
         try:
             n = process_scanner(
-                name, scanner_dir, project_root, out_dir, failures,
+                name, scanner_dir, project_root_str, out_dir, failures,
                 utf8_mirror=utf8_mirror, mirror_path_map=mirror_path_map,
+                exclude_abs=exclude_abs,
             )
         except Exception as e:
             failures.setdefault(name, []).append(
@@ -469,6 +534,7 @@ def _emit_summary(rc: int) -> None:
     parser.add_argument("--scanners-dir")
     parser.add_argument("--project-root")
     parser.add_argument("--out-dir")
+    parser.add_argument("--exclude-paths", nargs="*", default=[])
     args, _ = parser.parse_known_args()
     processed_count = 0
     if args.scanners_dir and Path(args.scanners_dir).is_dir():

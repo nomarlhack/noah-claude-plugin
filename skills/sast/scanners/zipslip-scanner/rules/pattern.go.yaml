@@ -7,24 +7,14 @@ rules:
       zipslip-scanner Phase 1 sink/source 패턴 매치 (Go 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'adm-zip'
-      - pattern-regex: 'unzipper'
-      - pattern-regex: 'unzip-stream'
-      - pattern-regex: 'yauzl'
-      - pattern-regex: 'decompress'
-      - pattern-regex: 'zipfile\.extractall\s*\('
-      - pattern-regex: 'zipfile\.extract\s*\('
-      - pattern-regex: 'tarfile\.extractall\s*\('
-      - pattern-regex: 'ZipInputStream'
-      - pattern-regex: 'ZipFile'
-      - pattern-regex: 'ZipArchive::extractTo\s*\('
-      - pattern-regex: 'extractAllTo\s*\('
-      - pattern-regex: 'extractEntryTo\s*\('
-      - pattern-regex: 'Zip::'
-      - pattern-regex: 'tar\.extract'
-      - pattern-regex: 'getNextEntry'
-      - pattern-regex: 'getEntry\s*\('
-      - pattern-regex: 'entry\.getName'
+      - pattern-regex: 'archive/zip\b'
+      - pattern-regex: 'archive/tar\b'
+      - pattern-regex: 'zip\.OpenReader\b'
+      - pattern-regex: 'zip\.NewReader\b'
+      - pattern-regex: 'tar\.NewReader\b'
+      - pattern-regex: '\.Next\s*\('
+      - pattern-regex: '\.Name\b'
+      - pattern-regex: 'mholt/archiver\b'
     metadata:
       category: security
       subcategory:

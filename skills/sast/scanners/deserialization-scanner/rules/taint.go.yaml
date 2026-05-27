@@ -1,0 +1,56 @@
+rules:
+  - id: noah-go-deser-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go에서 HTTP 입력이 encoding/gob / ugorji/codec / yaml.Unmarshal(interface{}) 에
+      직접 전달되면 Insecure Deserialization → RCE/임의 타입 주입.
+      안전: 구체 타입 포인터로 Unmarshal, interface{} 대상 역직렬화 금지.
+    pattern-sources:
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.FormValue($K)
+      - pattern: r.Header.Get($K)
+      - pattern: mux.Vars(r)[$K]
+      - pattern: r.Body
+      - pattern: io.ReadAll(r.Body)
+      - pattern: ioutil.ReadAll(r.Body)
+      - pattern: c.Query($K)
+      - pattern: c.Param($K)
+      - pattern: c.QueryParam($K)
+      - pattern: chi.URLParam(r, $K)
+
+    pattern-sinks:
+      # encoding/gob — interface{} 대상은 임의 타입 복원
+      - pattern: gob.NewDecoder($X).Decode($DEST)
+      - pattern: $DEC.Decode($DEST)
+      - pattern: $DEC.DecodeValue($DEST)
+      # ugorji/codec
+      - pattern: codec.NewDecoder($X, $H).Decode($DEST)
+      - pattern: $CDEC.Decode($DEST)
+      # gopkg.in/yaml.v2 / yaml.v3 — interface{} 대상
+      - pattern: yaml.Unmarshal($X, $DEST)
+      - pattern: yaml.NewDecoder($X).Decode($DEST)
+      # encoding/xml — interface{} 대상
+      - pattern: xml.Unmarshal($X, $DEST)
+      - pattern: xml.NewDecoder($X).Decode($DEST)
+      # msgpack (vmihailenco/msgpack)
+      - pattern: msgpack.Unmarshal($X, $DEST)
+      - pattern: msgpack.NewDecoder($X).Decode($DEST)
+
+    pattern-sanitizers:
+      - pattern: strconv.Atoi($X)
+      - pattern: strconv.ParseInt($X, ...)
+      - pattern: json.Unmarshal($X, $DEST)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Deserialization]
+      owasp: ["A08:2021 Software and Data Integrity Failures"]
+      technology: [go, gob, yaml, msgpack, codec]

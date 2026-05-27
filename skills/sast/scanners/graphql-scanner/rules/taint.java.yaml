@@ -1,0 +1,64 @@
+rules:
+  - id: noah-java-graphql-introspection-forward-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      graphql-java 서버에서 클라이언트 쿼리를 validate() 없이 execute에 전달하면
+      Introspection(__schema/__type) 노출 + depth/complexity DoS 가능.
+      안전: IntrospectionWithMetrics 비활성화, MaxQueryDepthInstrumentation,
+            MaxQueryComplexityInstrumentation 적용 후 execute.
+    pattern-sources:
+      # Spring MVC / Spring Boot GraphQL controller
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestBody $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+      # Spring GraphQL — DataFetchingEnvironment argument
+      - pattern: $ENV.getArgument($K)
+      - pattern: $ENV.getArguments()
+      # Servlet
+      - pattern: $REQ.getParameter($K)
+      - pattern: $REQ.getReader()
+
+    pattern-sinks:
+      # graphql-java execute (validate 없이 직접 실행)
+      - pattern: $GQL.execute($X)
+      - pattern: $GQL.executeAsync($X)
+      - pattern: GraphQL.newGraphQL($S).build().execute($X)
+      - pattern: ExecutionInput.newExecutionInput($X).build()
+      # DataFetcher에서 쿼리 forward
+      - pattern: $CLIENT.query($X, ...)
+      - pattern: $CLIENT.execute($X, ...)
+
+    pattern-sanitizers:
+      # Instrumentation으로 depth/complexity 제한
+      - pattern: new MaxQueryDepthInstrumentation($N)
+      - pattern: new MaxQueryComplexityInstrumentation($N)
+      # 인트로스펙션 비활성화
+      - pattern-regex: 'NoSchemaIntrospectionCustomRule'
+      - pattern-regex: 'GraphQL\.disableIntrospection\b'
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-200: Information Exposure (GraphQL Introspection)"
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class:
+        - Information Disclosure
+      owasp:
+        - "A05:2021 Security Misconfiguration"
+      technology:
+        - java
+        - graphql
+        - graphql-java
+        - spring-graphql

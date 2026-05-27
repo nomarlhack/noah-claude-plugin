@@ -1,0 +1,45 @@
+rules:
+  - id: noah-ruby-upload-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby/Rails에서 업로드 파일명이 검증 없이 저장 경로에 사용되면 임의 파일 업로드 → RCE.
+      안전: File.basename() + 확장자 화이트리스트 검증 + SecureRandom 파일명 사용.
+    pattern-sources:
+      # Rack / Rails multipart
+      - pattern: params[:file].original_filename
+      - pattern: $FILE.original_filename
+      - pattern: request.env['rack.request.form_hash'][$K][:filename]
+      # Sinatra
+      - pattern: params['file'][:filename]
+
+    pattern-sinks:
+      - pattern: File.open(File.join($BASE, $X), ...)
+      - pattern: File.open($X, ...)
+      - pattern: FileUtils.cp($SRC, File.join($BASE, $X))
+      - pattern: File.write(File.join($BASE, $X), ...)
+      - pattern: File.join($BASE, $X)
+
+    pattern-sanitizers:
+      - pattern: File.basename($X)
+      - pattern: SecureRandom.uuid
+      - pattern: SecureRandom.hex($N)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $ALLOWED.include?(File.extname($X).downcase)
+                ...
+              end
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [File Upload]
+      owasp: ["A04:2021 Insecure Design"]
+      technology: [ruby, rails, sinatra, rack]

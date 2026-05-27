@@ -1,0 +1,32 @@
+rules:
+  - id: noah-python-wsock-origin-bypass-sink
+    severity: ERROR
+    languages:
+      - python
+    message: |
+      Python WebSocket 서버에서 Origins 검증이 없거나 모든 출처를 허용하면
+      CSRF/Origin bypass 가능. 안전: origins 파라미터에 허용 도메인 목록 명시.
+    pattern-either:
+      # websockets 라이브러리 — origins=None 또는 check_origin 미구현
+      - pattern: websockets.serve($HANDLER, $HOST, $PORT)
+      - pattern: await websockets.serve($HANDLER, $HOST, $PORT)
+      # Django Channels — CORS origin 미검증
+      - pattern: AllowedHostsOriginValidator($APP)
+      # aiohttp — 모든 origin 허용
+      - pattern-regex: 'origins\s*=\s*\[\s*[''"]?\*[''"]?\s*\]'
+      # tornado WebSocketHandler — check_origin 항상 True
+      - patterns:
+          - pattern: return True
+          - pattern-inside: |
+              def check_origin(self, $ORIGIN):
+                  ...
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-346: Origin Validation Error"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [CSRF, Origin Bypass]
+      owasp: ["A07:2021 Identification and Authentication Failures"]
+      technology: [python, websockets, django-channels, aiohttp, tornado]

@@ -7,28 +7,15 @@ rules:
       idor-scanner Phase 1 sink/source 패턴 매치 (JavaScript 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: '@PathVariable'
-      - pattern-regex: '@RequestParam'
-      - pattern-regex: '@RequestBody'
-      - pattern-regex: 'req\.params'
-      - pattern-regex: 'req\.query'
-      - pattern-regex: 'request\.args'
-      - pattern-regex: 'params\[:'
-      - pattern-regex: 'findById'
-      - pattern-regex: 'findOne'
-      - pattern-regex: 'getById'
-      - pattern-regex: 'getOne'
-      - pattern-regex: 'findByPk'
-      - pattern-regex: 'Model\.find\s*\('
-      - pattern-regex: 'repository\.'
-      - pattern-regex: 'permitAll'
-      - pattern-regex: 'hasAnyRole'
-      - pattern-regex: '@PreAuthorize'
-      - pattern-regex: '@Secured'
-      - pattern-regex: 'authorize'
-      - pattern-regex: 'params\.id'
-      - pattern-regex: 'event\.params'
-      - pattern-regex: 'useRouter'
+      - pattern-regex: 'req\.params\b'
+      - pattern-regex: 'req\.query\b'
+      - pattern-regex: 'req\.body\b'
+      - pattern-regex: 'findById\s*\('
+      - pattern-regex: 'findOne\s*\('
+      - pattern-regex: 'findByPk\s*\('
+      - pattern-regex: 'findUnique\s*\('
+      - pattern-regex: 'params\.id\b'
+      - pattern-regex: 'useRouter\b'
     metadata:
       category: security
       subcategory:

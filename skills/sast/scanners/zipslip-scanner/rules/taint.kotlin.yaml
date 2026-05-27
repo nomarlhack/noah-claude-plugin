@@ -1,0 +1,45 @@
+rules:
+  - id: noah-kotlin-zipslip-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Kotlin에서 ZipEntry.getName() / TarArchiveEntry.getName()이 경로 검증 없이
+      파일 write sink에 전달되면 Zip Slip.
+      안전: canonicalPath.startsWith(destDir) 검증, FilenameUtils.getName() 사용.
+    pattern-sources:
+      - pattern: $ENTRY.getName()
+      - pattern: $ENTRY.name
+      - pattern: entry.getName()
+      - pattern: zipEntry.getName()
+      - pattern: tarEntry.getName()
+
+    pattern-sinks:
+      - pattern: File($DEST, $X)
+      - pattern: File($X)
+      - pattern: Paths.get($DEST, $X)
+      - pattern: Paths.get($X)
+      - pattern: FileOutputStream(File($DEST, $X))
+      - pattern: FileOutputStream($X)
+      - pattern: Files.newOutputStream(Paths.get($DEST, $X))
+      - pattern: Files.copy($IN, Paths.get($DEST, $X))
+
+    pattern-sanitizers:
+      - pattern: FilenameUtils.getName($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              val $F = File($DEST, $X)
+              if (!$F.canonicalPath.startsWith($DEST)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-22: Improper Limitation of a Pathname to a Restricted Directory"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Path Traversal]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [kotlin, commons-compress, zip4j]

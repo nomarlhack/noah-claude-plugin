@@ -1,0 +1,40 @@
+rules:
+  - id: noah-java-val-skip-sink
+    severity: WARNING
+    languages:
+      - java
+    message: |
+      Java에서 입력 검증을 명시적으로 건너뛰거나 비활성화하는 패턴.
+      BindingResult 오류 확인 없이 진행하거나, @Valid 없이 입력 객체를 사용,
+      또는 검증 그룹을 Default에서 제외하는 경우.
+    pattern-either:
+      # BindingResult.hasErrors() 미호출 패턴 — 오류 있어도 진행
+      - patterns:
+          - pattern: $RESULT.getErrorCount()
+          - pattern-inside: |
+              $T $M(..., BindingResult $RESULT, ...) {
+                ...
+              }
+      # @Validated 없이 @RequestBody 직접 사용 (Bean Validation 미적용)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $M(..., @RequestBody $X, ...) { ... }
+          - pattern-not-inside: |
+              $T $M(..., @Valid @RequestBody $X, ...) { ... }
+          - pattern-not-inside: |
+              @Validated
+              class $C { ... }
+      # groups = {} 빈 검증 그룹 — 실질 검증 없음
+      - pattern-regex: '@Validated\s*\(\s*\)'
+      - pattern-regex: 'groups\s*=\s*\{\s*\}'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-20: Improper Input Validation"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Validation Bypass]
+      owasp: ["A03:2021 Injection"]
+      technology: [java, spring]

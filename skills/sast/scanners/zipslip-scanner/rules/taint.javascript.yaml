@@ -1,0 +1,50 @@
+rules:
+  - id: noah-javascript-zipslip-taint
+    severity: ERROR
+    languages:
+      - javascript
+    mode: taint
+    message: |
+      Node.js에서 adm-zip / yauzl / unzipper 엔트리 이름이 경로 검증 없이
+      fs.writeFile/createWriteStream에 전달되면 Zip Slip.
+      안전: path.resolve 후 startsWith(destDir) 검증.
+    pattern-sources:
+      # adm-zip
+      - pattern: $ENTRY.entryName
+      - pattern: $ENTRY.name
+      # yauzl
+      - pattern: $ENTRY.fileName
+      # unzipper / unzip-stream
+      - pattern: $FILE.path
+      # decompress
+      - pattern: $FILE.path
+      # node-tar
+      - pattern: $ENTRY.path
+      - pattern: $HDR.path
+
+    pattern-sinks:
+      - pattern: fs.writeFile($X, ...)
+      - pattern: fs.writeFileSync($X, ...)
+      - pattern: fs.createWriteStream($X)
+      - pattern: fs.mkdir($X, ...)
+      - pattern: fs.mkdirSync($X, ...)
+      - pattern: path.join($BASE, $X)
+
+    pattern-sanitizers:
+      - pattern: path.basename($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              const $DEST = path.resolve($BASE, $X);
+              if (!$DEST.startsWith($BASE)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-22: Improper Limitation of a Pathname to a Restricted Directory"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Path Traversal]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [nodejs, adm-zip, yauzl, unzipper, node-tar]

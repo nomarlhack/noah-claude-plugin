@@ -42,6 +42,15 @@ rules:
       - pattern: minidom.parseString($X)
       - pattern: minidom.parse($X)
       - pattern: sax.parseString($X, ...)
+      # pulldom — 내부적으로 expat 사용
+      - pattern: pulldom.parseString($X)
+      - pattern: pulldom.parse($X)
+      # xml.dom.expatbuilder
+      - pattern: expatbuilder.parseString($X)
+      - pattern: expatbuilder.parse($X)
+      # xmltodict — expat 기반
+      - pattern: xmltodict.parse($X)
+      - pattern: xmltodict.parse($X, ...)
     pattern-sanitizers:
       - pattern: defusedxml.ElementTree.fromstring($X)
       - pattern: defusedxml.lxml.fromstring($X)

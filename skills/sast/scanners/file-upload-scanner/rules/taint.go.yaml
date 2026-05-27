@@ -1,0 +1,44 @@
+rules:
+  - id: noah-go-upload-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go에서 업로드 파일명이 경로 검증 없이 파일 저장에 사용되면 임의 파일 업로드 → RCE.
+      안전: filepath.Base() + 확장자 화이트리스트 검증 + UUID 파일명 사용.
+    pattern-sources:
+      - pattern: $FH.Filename
+      - pattern: $FILE.Filename
+      # net/http FormFile
+      - pattern: r.FormFile($K)
+      # Gin
+      - pattern: c.FormFile($K)
+      # Echo (동일 패턴, Gin과 공유)
+
+    pattern-sinks:
+      - pattern: os.Create(filepath.Join($BASE, $X))
+      - pattern: os.Create($X)
+      - pattern: os.OpenFile($X, ...)
+      - pattern: os.WriteFile($X, ...)
+      - pattern: ioutil.WriteFile($X, ...)
+      - pattern: filepath.Join($BASE, $X)
+
+    pattern-sanitizers:
+      - pattern: filepath.Base($X)
+      - pattern: uuid.New().String()
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if _, ok := $ALLOWED[$EXT]; ok { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [File Upload]
+      owasp: ["A04:2021 Insecure Design"]
+      technology: [go, gin, echo, net/http]

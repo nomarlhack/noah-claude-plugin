@@ -1,0 +1,75 @@
+rules:
+  - id: noah-csharp-deser-taint
+    severity: ERROR
+    languages:
+      - csharp
+    mode: taint
+    message: |
+      C#에서 HTTP 입력이 BinaryFormatter / NetDataContractSerializer /
+      JavaScriptSerializer / Newtonsoft.Json(TypeNameHandling.All) 에 전달되면
+      Insecure Deserialization → RCE.
+      안전: System.Text.Json 사용, TypeNameHandling.None 유지, BinaryFormatter 사용 금지.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromBody] $T2 $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromQuery] $T2 $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromRoute] $T2 $X, ...) { ... }
+      - pattern: Request.Body
+      - pattern: Request.Query[$K]
+      - pattern: Request.Form[$K]
+      - pattern: HttpContext.Request.Body
+      - pattern: HttpContext.Request.Query[$K]
+
+    pattern-sinks:
+      # BinaryFormatter (완전 취약 — .NET 5+ deprecated)
+      - pattern: new BinaryFormatter().Deserialize($X)
+      - pattern: $BF.Deserialize($X)
+      - pattern: new BinaryFormatter().UnsafeDeserialize($X, ...)
+      # NetDataContractSerializer
+      - pattern: new NetDataContractSerializer().ReadObject($X)
+      - pattern: $NDCS.ReadObject($X)
+      # SoapFormatter
+      - pattern: new SoapFormatter().Deserialize($X)
+      - pattern: $SF.Deserialize($X)
+      # JavaScriptSerializer (타입 힌트 허용 시 취약)
+      - pattern: new JavaScriptSerializer().Deserialize($X, ...)
+      - pattern: new JavaScriptSerializer().DeserializeObject($X)
+      - pattern: $JSS.Deserialize($X, ...)
+      # Newtonsoft.Json — TypeNameHandling.All / Auto
+      - pattern: JsonConvert.DeserializeObject($X, $SETTINGS)
+      - pattern: $SERIALIZER.Deserialize($X)
+      # XmlSerializer (일부 가젯 체인)
+      - pattern: new XmlSerializer($T).Deserialize($X)
+      - pattern: $XS.Deserialize($X)
+      # LosFormatter (WebForms)
+      - pattern: new LosFormatter().Deserialize($X)
+      - pattern: $LF.Deserialize($X)
+      # ObjectStateFormatter
+      - pattern: new ObjectStateFormatter().Deserialize($X)
+
+    pattern-sanitizers:
+      - pattern: int.Parse($X)
+      - pattern: double.Parse($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($WHITELIST.Contains($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Deserialization]
+      owasp: ["A08:2021 Software and Data Integrity Failures"]
+      technology: [csharp, dotnet, binaryformatter, newtonsoft]

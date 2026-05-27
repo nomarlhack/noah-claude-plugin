@@ -1,0 +1,81 @@
+rules:
+  - id: noah-javascript-deser-taint
+    severity: ERROR
+    languages:
+      - javascript
+    mode: taint
+    message: |
+      Node.js에서 HTTP 입력이 node-serialize/cryo/js-yaml.load에 직접 전달되면
+      Insecure Deserialization → RCE. JSON.parse 또는 js-yaml.safeLoad 사용.
+    pattern-sources:
+      # Express
+      - pattern: req.body
+      - pattern: req.body[$K]
+      - pattern: req.query[$K]
+      - pattern: req.params[$K]
+      - pattern: req.headers[$K]
+      - pattern: req.cookies[$K]
+      # Koa
+      - pattern: ctx.request.body
+      - pattern: ctx.request.body[$K]
+      - pattern: ctx.query[$K]
+      - pattern: ctx.params[$K]
+      # Fastify
+      - pattern: request.body
+      - pattern: request.body[$K]
+      - pattern: request.query[$K]
+      - pattern: request.params[$K]
+      # NestJS
+      - patterns:
+          - pattern: $BODY
+          - pattern-inside: |
+              @Post(...)
+              async $METHOD(@Body() $BODY, ...) { ... }
+      - patterns:
+          - pattern: $QUERY
+          - pattern-inside: |
+              @Get(...)
+              async $METHOD(@Query($K) $QUERY, ...) { ... }
+      # Hapi
+      - pattern: request.payload
+      - pattern: request.payload[$K]
+      - pattern: request.query[$K]
+      - pattern: request.params[$K]
+
+    pattern-sinks:
+      # node-serialize — IIFE 패턴으로 RCE 가능
+      - pattern: serialize.unserialize($X)
+      # cryo
+      - pattern: Cryo.parse($X)
+      - pattern: cryo.parse($X)
+      # js-yaml — load (unsafe) / safeLoad (safe)
+      - pattern: yaml.load($X)
+      - pattern: yaml.load($X, ...)
+      - pattern: jsyaml.load($X)
+      - pattern: jsyaml.load($X, ...)
+      # serialize-javascript (eval-based restore)
+      - pattern: eval("(" + $X + ")")
+      - pattern: eval($X)
+      # flatted / devalue (복잡 객체 직렬화)
+      - pattern: flatted.parse($X)
+      - pattern: devalue.parse($X)
+      # vm2 / vm eval (샌드박스 탈출)
+      - pattern: new vm.Script($X)
+      - pattern: vm.runInNewContext($X, ...)
+      - pattern: vm.runInThisContext($X)
+
+    pattern-sanitizers:
+      - pattern: JSON.parse($X)
+      - pattern: yaml.safeLoad($X)
+      - pattern: jsyaml.safeLoad($X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-502: Deserialization of Untrusted Data"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [Deserialization]
+      owasp: ["A08:2021 Software and Data Integrity Failures"]
+      technology: [javascript, nodejs, express, koa, fastify, nestjs]

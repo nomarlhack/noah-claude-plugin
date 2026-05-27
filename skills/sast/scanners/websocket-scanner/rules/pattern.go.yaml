@@ -7,18 +7,15 @@ rules:
       websocket-scanner Phase 1 sink/source 패턴 매치 (Go 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'new WebSocket\s*\('
-      - pattern-regex: 'socket\.io'
-      - pattern-regex: 'WebSocket'
-      - pattern-regex: 'ActionCable'
-      - pattern-regex: 'io\.on\(''connection'''
-      - pattern-regex: 'io\.of\s*\('
-      - pattern-regex: 'verifyClient'
-      - pattern-regex: 'allowedOrigins'
+      - pattern-regex: 'gorilla/websocket\b'
+      - pattern-regex: 'websocket\.Upgrader\b'
+      - pattern-regex: 'CheckOrigin\b'
+      - pattern-regex: 'InsecureSkipVerify\b'
+      - pattern-regex: '\.Upgrade\s*\('
+      - pattern-regex: '\.ReadMessage\s*\('
+      - pattern-regex: '\.WriteMessage\s*\('
       - pattern-regex: 'wss://'
       - pattern-regex: 'ws://'
-      - pattern-regex: 'express-ws'
-      - pattern-regex: 'gorilla/websocket'
     metadata:
       category: security
       subcategory:

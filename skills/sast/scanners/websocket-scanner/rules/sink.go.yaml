@@ -1,0 +1,33 @@
+rules:
+  - id: noah-go-wsock-origin-bypass-sink
+    severity: ERROR
+    languages:
+      - go
+    message: |
+      gorilla/websocket Upgrader의 CheckOrigin이 항상 true를 반환하면 Origin 검증 없이
+      모든 출처의 WebSocket 연결이 허용됨 (CSRF/Origin bypass).
+      안전: CheckOrigin에서 r.Header.Get("Origin")을 허용 목록과 비교.
+    pattern-either:
+      # CheckOrigin 항상 true
+      - pattern: |
+          websocket.Upgrader{..., CheckOrigin: func($R *http.Request) bool { return true }, ...}
+      - pattern: |
+          websocket.Upgrader{CheckOrigin: func($R *http.Request) bool { return true }}
+      # upgrader 변수에 대입
+      - pattern: |
+          $UP.CheckOrigin = func($R *http.Request) bool { return true }
+      # nhooyr.io/websocket — InsecureSkipVerify
+      - pattern: |
+          &websocket.AcceptOptions{InsecureSkipVerify: true}
+      - pattern: |
+          websocket.Accept($W, $R, &websocket.AcceptOptions{InsecureSkipVerify: true})
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-346: Origin Validation Error"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [CSRF, Origin Bypass]
+      owasp: ["A07:2021 Identification and Authentication Failures"]
+      technology: [go, gorilla/websocket, nhooyr]

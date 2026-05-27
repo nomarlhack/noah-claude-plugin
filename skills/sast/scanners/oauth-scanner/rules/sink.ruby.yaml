@@ -1,0 +1,30 @@
+rules:
+  - id: noah-ruby-oauth-misconfig-sink
+    severity: ERROR
+    languages:
+      - ruby
+    message: |
+      OAuth 2.0 취약 설정 탐지 (Ruby).
+      OmniAuth state 검증 비활성, CSRF 보호 비활성, implicit flow 사용 등.
+    pattern-either:
+      # OmniAuth — CSRF 보호 비활성
+      - pattern: "OmniAuth.config.allowed_request_methods = [:get]"
+      - pattern: "OmniAuth.config.allowed_request_methods = %i[get]"
+      - pattern-regex: 'OmniAuth\.config\.on_failure\s*='
+      # Doorkeeper — PKCE 비활성
+      - pattern-regex: 'force_pkce\s+false\b'
+      - pattern-regex: 'skip_authorization\s+.*\{.*true.*\}'
+      # implicit flow
+      - pattern-regex: 'grant_flows\s*.*"implicit"'
+      # redirect_uri 검증 비활성
+      - pattern-regex: 'skip_redirect_uri_check\s+true'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-352: CSRF via missing state", "CWE-601: Open Redirect"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [OAuth Misconfiguration]
+      owasp: ["A07:2021 Identification and Authentication Failures"]
+      technology: [ruby, rails, omniauth, doorkeeper]

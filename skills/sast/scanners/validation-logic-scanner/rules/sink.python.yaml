@@ -1,0 +1,31 @@
+rules:
+  - id: noah-python-val-skip-sink
+    severity: WARNING
+    languages:
+      - python
+    message: |
+      Python에서 입력 검증을 건너뛰거나 비활성화하는 패턴.
+      Pydantic model_validate에서 strict=False, marshmallow에서 unknown=INCLUDE 등.
+    pattern-either:
+      # Pydantic v2 — strict 비활성
+      - pattern: $M.model_validate($X, strict=False)
+      - pattern: $M.model_validate($X, from_attributes=True)
+      # marshmallow — 알 수 없는 필드 허용
+      - pattern: "class Meta: unknown = INCLUDE"
+      - pattern: "class Meta: unknown = RAISE"
+      # Django forms — is_valid() 호출 없이 cleaned_data 접근
+      - patterns:
+          - pattern: $FORM.cleaned_data
+          - pattern-not-inside: |
+              if $FORM.is_valid():
+                  ...
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-20: Improper Input Validation"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Validation Bypass]
+      owasp: ["A03:2021 Injection"]
+      technology: [python, pydantic, marshmallow, django]

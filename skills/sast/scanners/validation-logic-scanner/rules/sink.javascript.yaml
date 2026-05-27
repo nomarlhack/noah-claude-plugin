@@ -1,0 +1,32 @@
+rules:
+  - id: noah-javascript-val-skip-sink
+    severity: WARNING
+    languages:
+      - javascript
+      - typescript
+    message: |
+      JavaScript/TypeScript에서 입력 검증을 건너뛰거나 비활성화하는 패턴.
+      ValidationPipe에서 whitelist/forbidNonWhitelisted 비활성화,
+      Joi/ajv에서 allowUnknown/additionalProperties 허용 등.
+    pattern-either:
+      # NestJS ValidationPipe — whitelist 비활성화
+      - pattern: "new ValidationPipe({ whitelist: false })"
+      - pattern: "new ValidationPipe({ forbidNonWhitelisted: false })"
+      # NestJS ValidationPipe — transform 없이 any 허용
+      - pattern: "new ValidationPipe({ skipMissingProperties: true })"
+      # ajv — additionalProperties 허용
+      - pattern: "new Ajv({ strict: false })"
+      - pattern: "new Ajv({ additionalProperties: true })"
+      # Joi — allowUnknown
+      - pattern: "$SCHEMA.validate($X, { allowUnknown: true })"
+      - pattern: "$SCHEMA.validate($X, { stripUnknown: false })"
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-20: Improper Input Validation"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Validation Bypass]
+      owasp: ["A03:2021 Injection"]
+      technology: [nodejs, nestjs, express, ajv, joi]

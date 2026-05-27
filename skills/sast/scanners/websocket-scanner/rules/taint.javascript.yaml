@@ -1,0 +1,73 @@
+rules:
+  - id: noah-javascript-wsock-taint
+    severity: ERROR
+    languages:
+      - javascript
+    mode: taint
+    message: |
+      Node.js WebSocket/Socket.IO 메시지 데이터가 검증 없이 eval/DB/OS 명령에 전달되면
+      인젝션 취약점 발생. WebSocket은 CSRF 토큰 없이 Origin만으로 인증하므로
+      메시지 내용 신뢰 금지.
+      안전: 메시지 파싱 후 스키마 검증(joi/zod) + 개별 인젝션 방어 적용.
+    pattern-sources:
+      # ws 라이브러리
+      - patterns:
+          - pattern: $MSG
+          - pattern-inside: |
+              $WS.on('message', ($MSG) => { ... })
+      - patterns:
+          - pattern: $MSG
+          - pattern-inside: |
+              $WS.on('message', function($MSG) { ... })
+      # Socket.IO
+      - patterns:
+          - pattern: $DATA
+          - pattern-inside: |
+              $SOCKET.on($EVENT, ($DATA) => { ... })
+      - patterns:
+          - pattern: $DATA
+          - pattern-inside: |
+              $SOCKET.on($EVENT, function($DATA) { ... })
+      # express-ws
+      - patterns:
+          - pattern: $MSG
+          - pattern-inside: |
+              $APP.ws($PATH, ($WS, $REQ) => {
+                $WS.on('message', ($MSG) => { ... })
+              })
+
+    pattern-sinks:
+      # eval / code execution
+      - pattern: eval($X)
+      - pattern: new Function($X)
+      - pattern: vm.runInNewContext($X, ...)
+      # OS command injection
+      - pattern: exec($X)
+      - pattern: execSync($X)
+      - pattern: spawn($X, ...)
+      - pattern: child_process.exec($X, ...)
+      # DB injection (raw query)
+      - pattern: $DB.query($X)
+      - pattern: $DB.query($X, ...)
+      - pattern: $CONN.execute($X)
+      # HTML/DOM 반영 (stored XSS)
+      - pattern: $WS.send($X)
+      - pattern: $IO.emit($EVENT, $X)
+      - pattern: $IO.to($ROOM).emit($EVENT, $X)
+
+    pattern-sanitizers:
+      - pattern: JSON.parse($X)
+      - pattern: $SCHEMA.parse($X)
+      - pattern: $SCHEMA.validate($X)
+      - pattern: DOMPurify.sanitize($X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-20: Improper Input Validation"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [nodejs, websocket, socket.io, ws, express-ws]

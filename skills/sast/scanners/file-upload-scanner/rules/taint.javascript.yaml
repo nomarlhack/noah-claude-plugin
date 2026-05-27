@@ -1,0 +1,50 @@
+rules:
+  - id: noah-javascript-upload-taint
+    severity: ERROR
+    languages:
+      - javascript
+    mode: taint
+    message: |
+      Node.js에서 multer/busboy 업로드 파일명이 검증 없이 파일 저장 경로에 사용되면
+      임의 파일 업로드 → RCE. 공격자가 .js/.sh 등 실행 가능한 파일을 업로드할 수 있음.
+      안전: path.basename() + 확장자 화이트리스트 검증 + UUID 파일명 사용.
+    pattern-sources:
+      # multer
+      - pattern: req.file.originalname
+      - pattern: req.files[$K].name
+      - pattern: $FILE.originalname
+      # busboy / multiparty
+      - pattern: $FILE.filename
+      - pattern: $PART.filename
+      # express-fileupload
+      - pattern: req.files[$K].name
+      - pattern: $UPLOAD.name
+
+    pattern-sinks:
+      - pattern: fs.writeFile(path.join($BASE, $X), ...)
+      - pattern: fs.writeFile($X, ...)
+      - pattern: fs.writeFileSync($X, ...)
+      - pattern: fs.createWriteStream(path.join($BASE, $X))
+      - pattern: fs.createWriteStream($X)
+      - pattern: fs.rename($TMP, path.join($BASE, $X), ...)
+      - pattern: path.join($BASE, $X)
+
+    pattern-sanitizers:
+      - pattern: path.basename($X)
+      - pattern: uuidv4()
+      - pattern: crypto.randomUUID()
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($ALLOWED.includes($EXT)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [File Upload]
+      owasp: ["A04:2021 Insecure Design"]
+      technology: [nodejs, multer, busboy, express-fileupload]

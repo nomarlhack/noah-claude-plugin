@@ -1,0 +1,51 @@
+rules:
+  - id: noah-ruby-xxe-taint
+    severity: ERROR
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      Ruby에서 HTTP 입력 XML이 Nokogiri::XML / REXML에 외부 엔티티 비활성화 없이
+      전달되면 XXE. 안전: Nokogiri::XML(x) { |c| c.nonet.noent },
+      REXML::Document는 기본적으로 안전하나 외부 엔티티 resolver를 커스텀하지 말 것.
+    pattern-sources:
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: request.params[$K]
+      - pattern: request.body.read
+      - pattern: request.raw_post
+      - pattern: cookies[$K]
+      - pattern: request.cookies[$K]
+
+    pattern-sinks:
+      # Nokogiri (기본은 nonet/noent 비활성)
+      - pattern: Nokogiri::XML($X)
+      - pattern: Nokogiri::XML.parse($X)
+      - pattern: Nokogiri::XML::Document.parse($X)
+      - pattern: Nokogiri.XML($X)
+      # REXML
+      - pattern: REXML::Document.new($X)
+      - pattern: REXML::Document.new($X, ...)
+      # ox (C 기반 고속 XML 파서)
+      - pattern: Ox.parse($X)
+      - pattern: Ox.load($X)
+
+    pattern-sanitizers:
+      # Nokogiri — nonet + noent 동시 지정
+      - patterns:
+          - pattern: Nokogiri::XML($X) { |$C| $C.nonet }
+      - patterns:
+          - pattern: Nokogiri::XML($X) { |$C| $C.noent }
+      # REXML는 기본 안전 (외부 엔티티 미로드)
+      - pattern: REXML::Document.new($X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-611: Improper Restriction of XML External Entity Reference"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [XXE]
+      owasp: ["A05:2021 Security Misconfiguration"]
+      technology: [ruby, rails, sinatra, nokogiri, rexml]

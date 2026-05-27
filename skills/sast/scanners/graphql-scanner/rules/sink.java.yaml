@@ -1,0 +1,40 @@
+rules:
+  - id: noah-java-graphql-stacktrace-sink
+    severity: WARNING
+    languages:
+      - java
+    message: |
+      graphql-java 에러 응답에 스택트레이스/내부 정보 노출 가능 (INFO_LEAK).
+      SimpleDataFetcherExceptionHandler는 기본적으로 에러 extensions에 stacktrace를 포함하며,
+      DefaultDataFetcherExceptionHandler(graphql-java 20+)도 설정에 따라 노출 가능.
+      안전: DataFetcherExceptionHandler 구현 시 message만 반환, 스택트레이스 제거.
+    pattern-either:
+      # SimpleDataFetcherExceptionHandler — 기본 핸들러, 스택트레이스 extensions 포함
+      - pattern: new SimpleDataFetcherExceptionHandler()
+      # graphql-java ExecutionInput — 에러 원문 forward
+      - pattern: ExecutionInput.newExecutionInput($Q).build()
+      # GraphQL 실행 에러 원문 반환 (formatError 없음)
+      - pattern: GraphQL.newGraphQL($S).build().execute($Q)
+      # spring-graphql ErrorType 없이 RuntimeException 전파
+      - pattern-regex: 'includeStacktraceInErrorResponses\s*=\s*true'
+      - pattern-regex: 'LogExceptionWhileDataFetching\b'
+      # prepareErrorExtensions — 내부 예외 정보 포함
+      - pattern-regex: 'prepareErrorExtensions\s*\('
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-209: Generation of Error Message Containing Sensitive Information"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Information Disclosure
+      owasp:
+        - "A05:2021 Security Misconfiguration"
+      technology:
+        - java
+        - graphql
+        - graphql-java
+        - spring-graphql

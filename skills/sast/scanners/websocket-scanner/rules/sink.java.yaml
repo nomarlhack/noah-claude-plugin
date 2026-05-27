@@ -1,0 +1,29 @@
+rules:
+  - id: noah-java-wsock-origin-bypass-sink
+    severity: WARNING
+    languages:
+      - java
+    message: |
+      Java WebSocket @ServerEndpoint 또는 Spring WebSocketHandler에서 Origin 검증이
+      없으면 CSRF/Origin bypass 가능. 안전: HandshakeInterceptor.beforeHandshake()에서
+      Origin 헤더를 허용 목록과 비교 검증.
+    pattern-either:
+      # Spring — AllowedOrigins '*' 설정
+      - pattern: $REG.addHandler($H, $PATH).setAllowedOrigins("*")
+      - pattern: $REG.addHandler($H, $PATH).setAllowedOriginPatterns("*")
+      # SockJS AllowedOrigins '*'
+      - pattern: $REG.addHandler($H, $PATH).withSockJS().setAllowedOrigins("*")
+      # Spring Security CORS '*' for WS
+      - pattern-regex: 'setAllowedOrigins\s*\(\s*"\*"\s*\)'
+      # javax/jakarta @ServerEndpoint without Configurator origin check
+      - pattern-regex: '@ServerEndpoint\s*\([^)]*\)'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-346: Origin Validation Error"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [CSRF, Origin Bypass]
+      owasp: ["A07:2021 Identification and Authentication Failures"]
+      technology: [java, spring, websocket, sockjs]

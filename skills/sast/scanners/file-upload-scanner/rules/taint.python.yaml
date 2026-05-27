@@ -1,0 +1,49 @@
+rules:
+  - id: noah-python-upload-taint
+    severity: ERROR
+    languages:
+      - python
+    mode: taint
+    message: |
+      Python에서 업로드 파일명이 검증 없이 저장 경로에 사용되면 임의 파일 업로드 → RCE.
+      공격자가 .py/.php 등 실행 가능한 확장자를 업로드할 수 있음.
+      안전: werkzeug.secure_filename() 사용 + 확장자 화이트리스트 검증.
+    pattern-sources:
+      # Flask / Werkzeug
+      - pattern: request.files[$K].filename
+      - pattern: request.files.get($K).filename
+      - pattern: $FILE.filename
+      # FastAPI
+      - pattern: $FILE.filename
+      # Django
+      - pattern: request.FILES[$K].name
+      - pattern: request.FILES.get($K).name
+      - pattern: $FILE.name
+      # Tornado
+      - pattern: self.request.files[$K][0]['filename']
+
+    pattern-sinks:
+      - pattern: open(os.path.join($BASE, $X), ...)
+      - pattern: open($X, ...)
+      - pattern: os.path.join($BASE, $X)
+      - pattern: $FILE.save(os.path.join($BASE, $X))
+      - pattern: $FILE.save($X)
+      - pattern: shutil.copy($SRC, $X)
+      - pattern: pathlib.Path($BASE) / $X
+
+    pattern-sanitizers:
+      - pattern: secure_filename($X)
+      - pattern: werkzeug.utils.secure_filename($X)
+      - pattern: os.path.basename($X)
+      - pattern: uuid.uuid4()
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [File Upload]
+      owasp: ["A04:2021 Insecure Design"]
+      technology: [python, flask, django, fastapi]

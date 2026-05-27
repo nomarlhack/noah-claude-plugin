@@ -1,0 +1,38 @@
+rules:
+  - id: noah-python-oauth-misconfig-sink
+    severity: ERROR
+    languages:
+      - python
+    message: |
+      OAuth 2.0 취약 설정 탐지 (Python).
+      state 파라미터 검증 생략, PKCE 미적용, token 저장 노출 등 OAuth 보안 결함.
+    pattern-either:
+      # authlib — state 없이 authorization URL 생성
+      - patterns:
+          - pattern: $CLIENT.create_authorization_url($URL)
+          - pattern-not: $CLIENT.create_authorization_url($URL, state=...)
+      # requests-oauthlib — state 검증 없이 token fetch
+      - patterns:
+          - pattern: $OAUTH.fetch_token($URL, ...)
+          - pattern-not-inside: |
+              if $STATE != session.get('oauth_state'):
+                  ...
+      # implicit flow
+      - pattern-regex: "response_type\\s*=\\s*['\"]token['\"]"
+      # PKCE 없이 code flow
+      - patterns:
+          - pattern: $CLIENT.create_authorization_url($URL, response_type='code')
+          - pattern-not: $CLIENT.create_authorization_url($URL, code_challenge=...)
+      # token을 평문으로 session/cookie에 저장
+      - pattern-regex: "session\\[.access_token.\\]\\s*="
+      - pattern-regex: "session\\['token'\\]\\s*="
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-352: CSRF via missing state", "CWE-522: Insufficiently Protected Credentials"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [OAuth Misconfiguration]
+      owasp: ["A07:2021 Identification and Authentication Failures"]
+      technology: [python, authlib, requests-oauthlib, django-oauth-toolkit]

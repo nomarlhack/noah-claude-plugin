@@ -1,0 +1,59 @@
+rules:
+  - id: noah-java-upload-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      Java Spring에서 MultipartFile.getOriginalFilename()이 검증 없이 파일 저장 경로에
+      사용되면 임의 파일 업로드(Unrestricted File Upload) → RCE.
+      공격자가 .jsp/.php/.exe 등 실행 가능한 확장자를 업로드할 수 있음.
+      안전: 확장자 화이트리스트 검증 + 랜덤 파일명 생성(UUID 등) 사용.
+    pattern-sources:
+      - pattern: $FILE.getOriginalFilename()
+      - pattern: $PART.getSubmittedFileName()
+      - pattern: $FILE.getName()
+      # MultipartFile 파라미터
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestPart $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestPart(...) $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $T $METHOD(..., @RequestParam $X, ...) { ... }
+
+    pattern-sinks:
+      # 파일명 직접 사용한 경로 조합
+      - pattern: new File($DEST, $X)
+      - pattern: Paths.get($DEST, $X)
+      - pattern: Paths.get($X)
+      - pattern: $FILE.transferTo(new File($DEST, $X))
+      - pattern: $FILE.transferTo(Paths.get($DEST, $X))
+      - pattern: Files.copy($IN, Paths.get($DEST, $X))
+      - pattern: new FileOutputStream(new File($DEST, $X))
+
+    pattern-sanitizers:
+      # UUID / 랜덤 파일명으로 교체
+      - pattern: UUID.randomUUID().toString()
+      - pattern: FilenameUtils.getName($X)
+      # 확장자 화이트리스트 검증 패턴
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($ALLOWED.contains($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [File Upload]
+      owasp: ["A04:2021 Insecure Design"]
+      technology: [java, spring, multipart]

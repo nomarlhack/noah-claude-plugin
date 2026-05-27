@@ -64,6 +64,15 @@ rules:
       - pattern: $XIF.createXMLEventReader($X)
       - pattern: $READER.read($X)
       - pattern: $UM.unmarshal($X)
+      # TransformerFactory — XSLT 처리 중 XXE
+      - pattern: $TF.newTransformer().transform($SRC, ...)
+      - pattern: TransformerFactory.newInstance().newTransformer().transform($SRC, ...)
+      # SchemaFactory / Validator — XSD 로드 중 XXE
+      - pattern: $SF.newSchema($X)
+      - pattern: SchemaFactory.newInstance($NS).newSchema($X)
+      - pattern: $VAL.validate($X)
+      # XPathFactory
+      - pattern: $XP.evaluate($EXPR, $X, ...)
     pattern-sanitizers:
       - pattern: $DBF.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
       - pattern: $DBF.setExpandEntityReferences(false)

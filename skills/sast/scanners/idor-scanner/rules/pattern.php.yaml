@@ -4,31 +4,18 @@ rules:
     languages:
       - php
     message: |
-      idor-scanner Phase 1 sink/source 패턴 매치 (Php 한정).
+      idor-scanner Phase 1 sink/source 패턴 매치 (PHP 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: '@PathVariable'
-      - pattern-regex: '@RequestParam'
-      - pattern-regex: '@RequestBody'
-      - pattern-regex: 'req\.params'
-      - pattern-regex: 'req\.query'
-      - pattern-regex: 'request\.args'
-      - pattern-regex: 'params\[:'
-      - pattern-regex: 'findById'
-      - pattern-regex: 'findOne'
-      - pattern-regex: 'getById'
-      - pattern-regex: 'getOne'
-      - pattern-regex: 'findByPk'
-      - pattern-regex: 'Model\.find\s*\('
-      - pattern-regex: 'repository\.'
-      - pattern-regex: 'permitAll'
-      - pattern-regex: 'hasAnyRole'
-      - pattern-regex: '@PreAuthorize'
-      - pattern-regex: '@Secured'
-      - pattern-regex: 'authorize'
-      - pattern-regex: 'params\.id'
-      - pattern-regex: 'event\.params'
-      - pattern-regex: 'useRouter'
+      - pattern-regex: '\$_GET\b'
+      - pattern-regex: '\$_POST\b'
+      - pattern-regex: '\$_REQUEST\b'
+      - pattern-regex: '->input\s*\('
+      - pattern-regex: '->route\s*\('
+      - pattern-regex: '::find\s*\('
+      - pattern-regex: '::findOrFail\s*\('
+      - pattern-regex: 'Gate::authorize\s*\('
+      - pattern-regex: '\$this->authorize\s*\('
     metadata:
       category: security
       subcategory:

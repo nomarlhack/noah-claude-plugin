@@ -1,0 +1,44 @@
+rules:
+  - id: noah-csharp-zipslip-taint
+    severity: ERROR
+    languages:
+      - csharp
+    mode: taint
+    message: |
+      C#에서 ZipArchiveEntry.FullName이 경로 검증 없이 파일 write sink에 전달되면 Zip Slip.
+      안전: Path.GetFullPath 후 허용 디렉터리 prefix 검증.
+    pattern-sources:
+      # System.IO.Compression
+      - pattern: $ENTRY.FullName
+      - pattern: entry.FullName
+      # SharpZipLib
+      - pattern: $ENTRY.Name
+      - pattern: zipEntry.Name
+
+    pattern-sinks:
+      - pattern: Path.Combine($BASE, $X)
+      - pattern: File.Create($X)
+      - pattern: new FileStream($X, ...)
+      - pattern: File.WriteAllBytes($X, ...)
+      - pattern: Directory.CreateDirectory($X)
+      - pattern: $ENTRY.ExtractToFile($X, ...)
+      - pattern: ZipFileExtensions.ExtractToFile($ENTRY, $X, ...)
+
+    pattern-sanitizers:
+      - pattern: Path.GetFileName($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              var $DEST = Path.GetFullPath(Path.Combine($BASE, $X));
+              if (!$DEST.StartsWith($BASE)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-22: Improper Limitation of a Pathname to a Restricted Directory"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Path Traversal]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [csharp, dotnet, sharpziplib]

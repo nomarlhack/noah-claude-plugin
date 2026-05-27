@@ -11,13 +11,18 @@ rules:
       경로에 파일을 쓸 수 있음.
       안전: entry.getName() → canonicalPath 비교 + destDir prefix 검증.
     pattern-sources:
-      # ZipEntry
+      # ZipEntry / ZipFile
       - pattern: $ENTRY.getName()
       - pattern: zipEntry.getName()
       - pattern: entry.getName()
+      - pattern: $ZF.getEntry($K).getName()
       # TarArchiveEntry (Apache Commons Compress)
       - pattern: $TENTRY.getName()
       - pattern: tarEntry.getName()
+      - pattern: $TIS.getNextTarEntry().getName()
+      # zip4j
+      - pattern: $FH.getFileName()
+      - pattern: fileHeader.getFileName()
 
       # JAX-RS / Jersey / Quarkus — REST resource method parameters
       - patterns:

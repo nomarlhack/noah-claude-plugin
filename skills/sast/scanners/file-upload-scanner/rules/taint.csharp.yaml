@@ -1,0 +1,46 @@
+rules:
+  - id: noah-csharp-upload-taint
+    severity: ERROR
+    languages:
+      - csharp
+    mode: taint
+    message: |
+      C# ASP.NET에서 IFormFile.FileName이 검증 없이 파일 저장 경로에 사용되면
+      임의 파일 업로드 → RCE. 안전: Path.GetFileName() + 확장자 화이트리스트 + GUID 파일명.
+    pattern-sources:
+      - pattern: $FILE.FileName
+      - pattern: $FILE.ContentType
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD(IFormFile $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromForm] IFormFile $X, ...) { ... }
+
+    pattern-sinks:
+      - pattern: Path.Combine($BASE, $X)
+      - pattern: File.Create(Path.Combine($BASE, $X))
+      - pattern: new FileStream(Path.Combine($BASE, $X), ...)
+      - pattern: File.WriteAllBytes(Path.Combine($BASE, $X), ...)
+      - pattern: await $FILE.CopyToAsync(new FileStream(Path.Combine($BASE, $X), ...))
+
+    pattern-sanitizers:
+      - pattern: Path.GetFileName($X)
+      - pattern: Guid.NewGuid().ToString()
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($ALLOWED.Contains($EXT)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [File Upload]
+      owasp: ["A04:2021 Insecure Design"]
+      technology: [csharp, dotnet, aspnet, iformfile]

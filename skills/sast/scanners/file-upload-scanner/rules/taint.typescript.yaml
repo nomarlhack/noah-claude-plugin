@@ -1,0 +1,53 @@
+rules:
+  - id: noah-typescript-upload-taint
+    severity: ERROR
+    languages:
+      - typescript
+    mode: taint
+    message: |
+      TypeScript/Node.js에서 업로드 파일명이 검증 없이 파일 저장 경로에 사용되면
+      임의 파일 업로드 → RCE.
+      안전: path.basename() + 확장자 화이트리스트 검증 + UUID 파일명 사용.
+    pattern-sources:
+      # multer (Express)
+      - pattern: req.file.originalname
+      - pattern: req.files[$K].name
+      - pattern: $FILE.originalname
+      # NestJS @UploadedFile / @UploadedFiles
+      - patterns:
+          - pattern: $F
+          - pattern-inside: |
+              $METHOD(..., @UploadedFile() $F: Express.Multer.File, ...) { ... }
+      - patterns:
+          - pattern: $F
+          - pattern-inside: |
+              $METHOD(..., @UploadedFiles() $F: Express.Multer.File[], ...) { ... }
+      - pattern: $FILE.originalname
+      - pattern: $FILE.filename
+
+    pattern-sinks:
+      - pattern: fs.writeFile(path.join($BASE, $X), ...)
+      - pattern: fs.writeFile($X, ...)
+      - pattern: fs.writeFileSync($X, ...)
+      - pattern: fs.createWriteStream($X)
+      - pattern: path.join($BASE, $X)
+
+    pattern-sanitizers:
+      - pattern: path.basename($X)
+      - pattern: uuidv4()
+      - pattern: crypto.randomUUID()
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($ALLOWED.includes($EXT)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [File Upload]
+      owasp: ["A04:2021 Insecure Design"]
+      technology: [typescript, nodejs, nestjs, multer]

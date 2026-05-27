@@ -7,24 +7,12 @@ rules:
       zipslip-scanner Phase 1 sink/source 패턴 매치 (Ruby 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'adm-zip'
-      - pattern-regex: 'unzipper'
-      - pattern-regex: 'unzip-stream'
-      - pattern-regex: 'yauzl'
-      - pattern-regex: 'decompress'
-      - pattern-regex: 'zipfile\.extractall\s*\('
-      - pattern-regex: 'zipfile\.extract\s*\('
-      - pattern-regex: 'tarfile\.extractall\s*\('
-      - pattern-regex: 'ZipInputStream'
-      - pattern-regex: 'ZipFile'
-      - pattern-regex: 'ZipArchive::extractTo\s*\('
-      - pattern-regex: 'extractAllTo\s*\('
-      - pattern-regex: 'extractEntryTo\s*\('
-      - pattern-regex: 'Zip::'
-      - pattern-regex: 'tar\.extract'
-      - pattern-regex: 'getNextEntry'
-      - pattern-regex: 'getEntry\s*\('
-      - pattern-regex: 'entry\.getName'
+      - pattern-regex: 'Zip::\b'
+      - pattern-regex: 'rubyzip\b'
+      - pattern-regex: 'Gem::Package\b'
+      - pattern-regex: '\.full_name\b'
+      - pattern-regex: 'entry\.name\b'
+      - pattern-regex: 'tar\.extract\b'
     metadata:
       category: security
       subcategory:

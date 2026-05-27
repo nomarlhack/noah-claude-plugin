@@ -1,0 +1,64 @@
+rules:
+  - id: noah-php-idor-missing-owner-gate-taint
+    severity: WARNING
+    languages:
+      - php
+    mode: taint
+    message: |
+      외부입력→리소스접근→소유권게이트부재 (IDOR 검토 후보, PHP).
+      컨트롤러가 $_GET/$_POST 또는 프레임워크 request에서 받은 식별자를
+      DB 조회/수정/삭제에 직접 전달하는데 소유권 검증이 없음.
+      [중요] "검증의 부재" — policy/middleware 계층의 소유권 검증을
+      phase1.md 절차로 확인 후 제외하라.
+    pattern-sources:
+      - pattern: $_GET[$K]
+      - pattern: $_POST[$K]
+      - pattern: $_REQUEST[$K]
+      # Laravel
+      - pattern: $REQ->input($K)
+      - pattern: $REQ->get($K)
+      - pattern: $REQ->query($K)
+      - pattern: $REQ->post($K)
+      - pattern: $REQ->route($K)
+      - pattern: request()->input($K)
+      # Symfony
+      - pattern: $REQ->query->get($K)
+      - pattern: $REQ->request->get($K)
+      - pattern: $REQ->attributes->get($K)
+
+    pattern-sinks:
+      # Eloquent (Laravel)
+      - pattern: $MODEL::find($X)
+      - pattern: $MODEL::findOrFail($X)
+      - pattern: $MODEL::where('id', $X)->first()
+      - pattern: $MODEL::destroy($X)
+      - pattern: $QUERY->find($X)
+      # Doctrine
+      - pattern: $EM->find($CLASS, $X)
+      - pattern: $REPO->find($X)
+      - pattern: $REPO->findOneBy(['id' => $X])
+      # raw PDO/mysqli
+      - pattern: $PDO->prepare($Q)
+      - pattern: $STMT->execute([$X])
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($OBJ->user_id !== Auth::id()) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              Gate::authorize($ABILITY, $OBJ)
+      - pattern: $this->authorize($ABILITY, $OBJ)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-639: Authorization Bypass Through User-Controlled Key (IDOR)"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Broken Access Control]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [php, laravel, symfony, eloquent, doctrine]

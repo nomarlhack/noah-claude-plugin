@@ -1,0 +1,37 @@
+rules:
+  - id: noah-php-val-skip-sink
+    severity: WARNING
+    languages:
+      - php
+    message: |
+      PHP에서 입력 검증을 건너뛰거나 비활성화하는 패턴.
+      filter_var 미사용, sometimes 규칙으로 검증 조건부 생략, 직접 $_GET/$_POST 사용 등.
+    pattern-either:
+      # Laravel — sometimes 규칙으로 검증 조건부 생략
+      - pattern-regex: "'sometimes'"
+      # Validator::make 없이 $_GET/$_POST 직접 사용 후 DB 접근
+      - patterns:
+          - pattern: $_GET[$K]
+          - pattern-not-inside: |
+              $V = Validator::make(...);
+              ...
+          - pattern-not-inside: |
+              $request->validate(...);
+              ...
+      # filter_var 검증 없이 사용자 입력 반환
+      - patterns:
+          - pattern: $_POST[$K]
+          - pattern-not-inside: |
+              filter_var($_POST[$K], ...)
+      # bailout 없이 nullable 규칙
+      - pattern-regex: "'nullable'\\s*=>"
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-20: Improper Input Validation"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Validation Bypass]
+      owasp: ["A03:2021 Injection"]
+      technology: [php, laravel, symfony]

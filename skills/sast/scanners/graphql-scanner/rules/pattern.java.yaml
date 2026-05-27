@@ -7,25 +7,20 @@ rules:
       graphql-scanner Phase 1 sink/source 패턴 매치 (Java 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'graphql'
-      - pattern-regex: 'GraphQL'
-      - pattern-regex: 'apollo-server'
-      - pattern-regex: 'express-graphql'
-      - pattern-regex: 'graphql-yoga'
-      - pattern-regex: 'graphene'
-      - pattern-regex: 'strawberry'
-      - pattern-regex: 'ariadne'
-      - pattern-regex: 'graphql-java'
-      - pattern-regex: 'graphql-ruby'
-      - pattern-regex: '__schema'
+      - pattern-regex: 'graphql-java\b'
+      - pattern-regex: 'GraphQL\.newGraphQL\b'
+      - pattern-regex: 'ExecutionInput\b'
+      - pattern-regex: 'DataFetchingEnvironment\b'
+      - pattern-regex: 'SimpleDataFetcherExceptionHandler\b'
+      - pattern-regex: 'MaxQueryDepthInstrumentation\b'
+      - pattern-regex: 'MaxQueryComplexityInstrumentation\b'
+      - pattern-regex: '__schema\b'
       - pattern-regex: 'introspection'
-      - pattern-regex: '/graphql'
       - pattern-regex: 'IntrospectionQuery'
-      - pattern-regex: '__type'
-      - pattern-regex: 'depthLimit'
-      - pattern-regex: 'formatError'
-      - pattern-regex: 'stacktrace'
-      - pattern-regex: 'prepareErrorExtensions'
+      - pattern-regex: '__type\b'
+      - pattern-regex: 'prepareErrorExtensions\s*\('
+      - pattern-regex: 'includeStacktraceInErrorResponses\s*=\s*true'
+      - pattern-regex: 'LogExceptionWhileDataFetching\b'
     metadata:
       category: security
       subcategory:

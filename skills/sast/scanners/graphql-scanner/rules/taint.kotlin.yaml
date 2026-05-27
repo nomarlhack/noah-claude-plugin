@@ -1,0 +1,57 @@
+rules:
+  - id: noah-kotlin-graphql-introspection-forward-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      graphql-kotlin 서버에서 클라이언트 쿼리를 validate() 없이 execute에 전달하면
+      Introspection(__schema/__type) 노출 + depth/complexity DoS 가능.
+      안전: MaxQueryDepthInstrumentation, MaxQueryComplexityInstrumentation 적용 후 execute.
+    pattern-sources:
+      # Spring MVC / Spring Boot GraphQL controller
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestBody $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam $X: $T, ...) { ... }
+      # graphql-kotlin DataFetcher / resolver argument
+      - pattern: $ENV.getArgument($K)
+      - pattern: $ENV.getArguments()
+
+    pattern-sinks:
+      # graphql-kotlin execute
+      - pattern: $GQL.execute($X)
+      - pattern: $GQL.executeAsync($X)
+      - pattern: GraphQL.newGraphQL($S).build().execute($X)
+      - pattern: ExecutionInput.newExecutionInput($X).build()
+      # KtorGraphQLServer forward
+      - pattern: $SERVER.execute($X, ...)
+      - pattern: $CLIENT.query($X, ...)
+
+    pattern-sanitizers:
+      - pattern: MaxQueryDepthInstrumentation($N)
+      - pattern: MaxQueryComplexityInstrumentation($N)
+      - pattern-regex: 'NoSchemaIntrospectionCustomRule'
+
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-200: Information Exposure (GraphQL Introspection)"
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class:
+        - Information Disclosure
+      owasp:
+        - "A05:2021 Security Misconfiguration"
+      technology:
+        - kotlin
+        - graphql
+        - graphql-kotlin
+        - spring-graphql

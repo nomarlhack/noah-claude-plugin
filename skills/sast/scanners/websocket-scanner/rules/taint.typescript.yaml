@@ -1,0 +1,61 @@
+rules:
+  - id: noah-typescript-wsock-taint
+    severity: ERROR
+    languages:
+      - typescript
+    mode: taint
+    message: |
+      TypeScript WebSocket/Socket.IO 메시지 데이터가 검증 없이 eval/DB/OS 명령에 전달되면
+      인젝션 취약점 발생. 안전: 메시지 파싱 후 스키마 검증(zod/class-validator) 적용.
+    pattern-sources:
+      # ws
+      - patterns:
+          - pattern: $MSG
+          - pattern-inside: |
+              $WS.on('message', ($MSG: $T) => { ... })
+      - patterns:
+          - pattern: $MSG
+          - pattern-inside: |
+              $WS.on('message', ($MSG) => { ... })
+      # Socket.IO
+      - patterns:
+          - pattern: $DATA
+          - pattern-inside: |
+              $SOCKET.on($EVENT, ($DATA: $T) => { ... })
+      - patterns:
+          - pattern: $DATA
+          - pattern-inside: |
+              $SOCKET.on($EVENT, ($DATA) => { ... })
+      # NestJS @SubscribeMessage
+      - patterns:
+          - pattern: $PAYLOAD
+          - pattern-inside: |
+              @SubscribeMessage($EVENT)
+              $METHOD($CLIENT: $T, @MessageBody() $PAYLOAD: $PT) { ... }
+
+    pattern-sinks:
+      - pattern: eval($X)
+      - pattern: new Function($X)
+      - pattern: exec($X)
+      - pattern: execSync($X)
+      - pattern: $DB.query($X)
+      - pattern: $DB.query($X, ...)
+      - pattern: $WS.send($X)
+      - pattern: $SERVER.emit($EVENT, $X)
+
+    pattern-sanitizers:
+      - pattern: JSON.parse($X)
+      - pattern: $SCHEMA.parse($X)
+      - pattern: plainToClass($T, $X)
+      - pattern: validate($X)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-20: Improper Input Validation"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Injection]
+      owasp: ["A03:2021 Injection"]
+      technology: [typescript, nodejs, websocket, socket.io, nestjs]

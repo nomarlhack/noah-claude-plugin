@@ -1,0 +1,49 @@
+rules:
+  - id: noah-kotlin-upload-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Kotlin + Spring에서 MultipartFile.originalFilename이 검증 없이 파일 저장 경로에
+      사용되면 임의 파일 업로드 → RCE.
+      안전: 확장자 화이트리스트 검증 + UUID 파일명 사용.
+    pattern-sources:
+      - pattern: $FILE.originalFilename
+      - pattern: $FILE.name
+      - pattern: $PART.submittedFileName
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestPart $X: MultipartFile, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam $X: MultipartFile, ...) { ... }
+
+    pattern-sinks:
+      - pattern: File($DEST, $X)
+      - pattern: Paths.get($DEST, $X)
+      - pattern: $FILE.transferTo(File($DEST, $X))
+      - pattern: $FILE.transferTo(Paths.get($DEST, $X))
+      - pattern: Files.copy($IN, Paths.get($DEST, $X))
+      - pattern: FileOutputStream(File($DEST, $X))
+
+    pattern-sanitizers:
+      - pattern: UUID.randomUUID().toString()
+      - pattern: FilenameUtils.getName($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($ALLOWED.contains($EXT)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [File Upload]
+      owasp: ["A04:2021 Insecure Design"]
+      technology: [kotlin, spring, multipart]

@@ -79,6 +79,9 @@ rules:
       # Flask-SQLAlchemy
       - pattern: $M.query.get($X)
       - pattern: $M.query.get_or_404($X)
+      # SQLAlchemy 2.x select() 스타일
+      - pattern: $SESSION.execute(select($M).where($M.id == $X))
+      - pattern: $SESSION.scalar(select($M).where($M.id == $X))
 
     pattern-sanitizers:
       # 소유권 검증: request.user == 리소스 소유자 비교

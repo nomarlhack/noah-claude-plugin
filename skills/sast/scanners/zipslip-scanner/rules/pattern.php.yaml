@@ -4,27 +4,15 @@ rules:
     languages:
       - php
     message: |
-      zipslip-scanner Phase 1 sink/source 패턴 매치 (Php 한정).
+      zipslip-scanner Phase 1 sink/source 패턴 매치 (PHP 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'adm-zip'
-      - pattern-regex: 'unzipper'
-      - pattern-regex: 'unzip-stream'
-      - pattern-regex: 'yauzl'
-      - pattern-regex: 'decompress'
-      - pattern-regex: 'zipfile\.extractall\s*\('
-      - pattern-regex: 'zipfile\.extract\s*\('
-      - pattern-regex: 'tarfile\.extractall\s*\('
-      - pattern-regex: 'ZipInputStream'
-      - pattern-regex: 'ZipFile'
-      - pattern-regex: 'ZipArchive::extractTo\s*\('
-      - pattern-regex: 'extractAllTo\s*\('
-      - pattern-regex: 'extractEntryTo\s*\('
-      - pattern-regex: 'Zip::'
-      - pattern-regex: 'tar\.extract'
-      - pattern-regex: 'getNextEntry'
-      - pattern-regex: 'getEntry\s*\('
-      - pattern-regex: 'entry\.getName'
+      - pattern-regex: 'ZipArchive\b'
+      - pattern-regex: '->extractTo\s*\('
+      - pattern-regex: '->getNameIndex\s*\('
+      - pattern-regex: '->statIndex\s*\('
+      - pattern-regex: 'PharData\b'
+      - pattern-regex: 'Phar\b'
     metadata:
       category: security
       subcategory:

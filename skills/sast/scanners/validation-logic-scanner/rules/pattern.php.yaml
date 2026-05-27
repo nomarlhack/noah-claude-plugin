@@ -4,42 +4,33 @@ rules:
     languages:
       - php
     message: |
-      validation-logic-scanner Phase 1 sink/source 패턴 매치 (Php 한정).
+      validation-logic-scanner Phase 1 sink/source 패턴 매치 (PHP 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: '==\s*null'
-      - pattern-regex: '!=\s*null'
-      - pattern-regex: '==\s*undefined'
-      - pattern-regex: '!=\s*undefined'
-      - pattern-regex: '==\s*false'
-      - pattern-regex: '==\s*true'
-      - pattern-regex: '==\s*0\b'
-      - pattern-regex: '==\s*'''''
-      - pattern-regex: '==\s*""'
-      - pattern-regex: 'Joi\.'
-      - pattern-regex: '\.validate\s*\('
-      - pattern-regex: 'ValidationPipe'
-      - pattern-regex: '@Valid\b'
-      - pattern-regex: 'express-validator'
-      - pattern-regex: 'class-validator'
-      - pattern-regex: 'checkSchema'
-      - pattern-regex: 'ajv'
-      - pattern-regex: 'checkValidity'
-      - pattern-regex: 'setCustomValidity'
-      - pattern-regex: 'additionalProperties'
-      - pattern-regex: 'stripUnknown'
-      - pattern-regex: 'allowUnknown'
-      - pattern-regex: 'forbidNonWhitelisted'
-      - pattern-regex: '@IsOptional'
-      - pattern-regex: '@IsNotEmpty'
-      - pattern-regex: 'typeof\s+\w+'
-      - pattern-regex: 'instanceof\s+'
+      # Laravel 검증
+      - pattern-regex: '\$request->validate\s*\('
+      - pattern-regex: 'Validator::make\s*\('
+      - pattern-regex: 'FormRequest\b'
+      - pattern-regex: '->validated\s*\('
+      # Symfony 검증
+      - pattern-regex: 'Assert\\\\NotBlank\b'
+      - pattern-regex: 'Assert\\\\NotNull\b'
+      - pattern-regex: 'Assert\\\\Length\b'
+      - pattern-regex: '@Assert\\'
+      # filter_var
+      - pattern-regex: 'filter_var\s*\('
+      - pattern-regex: 'filter_input\s*\('
+      - pattern-regex: 'FILTER_VALIDATE_\w+'
+      # 기본 검사
+      - pattern-regex: '===\s*null\b'
+      - pattern-regex: '===\s*""\b'
+      - pattern-regex: 'empty\s*\('
     metadata:
       category: security
       subcategory:
         - vuln
       cwe:
-        - "CWE-20: Validation Logic Flaw"
+        - "CWE-20: Improper Input Validation"
       confidence: LOW
       likelihood: LOW
       impact: HIGH

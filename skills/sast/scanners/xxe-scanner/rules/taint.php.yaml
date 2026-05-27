@@ -59,9 +59,17 @@ rules:
     pattern-sinks:
       - pattern: simplexml_load_string($X, ...)
       - pattern: simplexml_load_string($X)
+      - pattern: simplexml_load_file($X)
       - pattern: $DOC->loadXML($X)
       - pattern: $DOC->loadXML($X, ...)
       - pattern: $DOC->load($X)
+      # XMLReader
+      - pattern: XMLReader::open($X)
+      - pattern: $XR->open($X)
+      - pattern: $XR->XML($X)
+      # xml_parse / xml_parse_into_struct (expat)
+      - pattern: xml_parse($PARSER, $X, ...)
+      - pattern: xml_parse_into_struct($PARSER, $X, ...)
     pattern-sanitizers:
       - pattern: libxml_disable_entity_loader(true)
     metadata:

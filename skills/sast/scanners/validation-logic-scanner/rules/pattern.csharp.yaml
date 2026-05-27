@@ -7,39 +7,31 @@ rules:
       validation-logic-scanner Phase 1 sink/source 패턴 매치 (C# 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: '==\s*null'
-      - pattern-regex: '!=\s*null'
-      - pattern-regex: '==\s*undefined'
-      - pattern-regex: '!=\s*undefined'
-      - pattern-regex: '==\s*false'
-      - pattern-regex: '==\s*true'
-      - pattern-regex: '==\s*0\b'
-      - pattern-regex: '==\s*'''''
-      - pattern-regex: '==\s*""'
-      - pattern-regex: 'Joi\.'
-      - pattern-regex: '\.validate\s*\('
-      - pattern-regex: 'ValidationPipe'
-      - pattern-regex: '@Valid\b'
-      - pattern-regex: 'express-validator'
-      - pattern-regex: 'class-validator'
-      - pattern-regex: 'checkSchema'
-      - pattern-regex: 'ajv'
-      - pattern-regex: 'checkValidity'
-      - pattern-regex: 'setCustomValidity'
-      - pattern-regex: 'additionalProperties'
-      - pattern-regex: 'stripUnknown'
-      - pattern-regex: 'allowUnknown'
-      - pattern-regex: 'forbidNonWhitelisted'
-      - pattern-regex: '@IsOptional'
-      - pattern-regex: '@IsNotEmpty'
-      - pattern-regex: 'typeof\s+\w+'
-      - pattern-regex: 'instanceof\s+'
+      # Data Annotations
+      - pattern-regex: '\[Required\]'
+      - pattern-regex: '\[Range\b'
+      - pattern-regex: '\[StringLength\b'
+      - pattern-regex: '\[RegularExpression\b'
+      - pattern-regex: '\[EmailAddress\]'
+      - pattern-regex: '\[MaxLength\b'
+      - pattern-regex: '\[MinLength\b'
+      # ModelState
+      - pattern-regex: 'ModelState\.IsValid\b'
+      - pattern-regex: 'ModelState\.AddModelError\b'
+      # FluentValidation
+      - pattern-regex: 'AbstractValidator\b'
+      - pattern-regex: '\.RuleFor\s*\('
+      - pattern-regex: '\.NotEmpty\s*\('
+      - pattern-regex: '\.NotNull\s*\('
+      # null 검사
+      - pattern-regex: '==\s*null\b'
+      - pattern-regex: '!=\s*null\b'
     metadata:
       category: security
       subcategory:
         - vuln
       cwe:
-        - "CWE-20: Validation Logic Flaw"
+        - "CWE-20: Improper Input Validation"
       confidence: LOW
       likelihood: LOW
       impact: HIGH

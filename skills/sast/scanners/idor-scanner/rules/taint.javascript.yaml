@@ -89,6 +89,12 @@ rules:
       - pattern: "$MODEL.findOne({where: {id: $X}})"
       # Raw SQL (id 직접 보간)
       - pattern: $CONN.query(`...${$X}...`)
+      # Drizzle ORM
+      - pattern: $DB.select().from($TBL).where(eq($TBL.id, $X))
+      - pattern: $DB.delete($TBL).where(eq($TBL.id, $X))
+      # Knex
+      - pattern: $KNEX($TBL).where('id', $X).first()
+      - pattern: "$KNEX($TBL).where({ id: $X }).first()"
 
     pattern-sanitizers:
       # userId 일치 검증

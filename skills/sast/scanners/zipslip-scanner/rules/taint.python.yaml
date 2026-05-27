@@ -43,6 +43,11 @@ rules:
       - pattern: shutil.move($SRC, $X)
       - pattern: pathlib.Path($BASE) / $X
       - pattern: ($BASE / $X).open(...)
+      # rarfile
+      - pattern: $RF.extract($X, ...)
+      - pattern: $RF.extractall(path=$X)
+      # py7zr
+      - pattern: $SZ.extractall(path=$X)
 
     pattern-sanitizers:
       - pattern: os.path.basename($X)

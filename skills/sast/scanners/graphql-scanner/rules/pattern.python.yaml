@@ -7,26 +7,18 @@ rules:
       graphql-scanner Phase 1 sink/source 패턴 매치 (Python 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'graphql'
-      - pattern-regex: 'GraphQL'
-      - pattern-regex: 'apollo-server'
-      - pattern-regex: 'express-graphql'
-      - pattern-regex: 'graphql-yoga'
-      - pattern-regex: 'graphene'
-      - pattern-regex: 'strawberry'
-      - pattern-regex: 'ariadne'
-      - pattern-regex: 'graphql-java'
-      - pattern-regex: 'graphql-ruby'
-      - pattern-regex: '__schema'
+      - pattern-regex: 'graphene\b'
+      - pattern-regex: 'strawberry\b'
+      - pattern-regex: 'ariadne\b'
+      - pattern-regex: 'GraphQL\s*\('
+      - pattern-regex: 'GraphQLView\b'
+      - pattern-regex: '__schema\b'
       - pattern-regex: 'introspection'
-      - pattern-regex: '/graphql'
       - pattern-regex: 'IntrospectionQuery'
-      - pattern-regex: '__type'
-      - pattern-regex: 'depthLimit'
-      - pattern-regex: 'formatError'
-      - pattern-regex: 'maskedErrors'
+      - pattern-regex: '__type\b'
+      - pattern-regex: 'debug\s*=\s*True'
       - pattern-regex: 'stacktrace'
-      - pattern-regex: 'debug=True'
+      - pattern-regex: 'formatError'
     metadata:
       category: security
       subcategory:

@@ -1,0 +1,58 @@
+rules:
+  - id: noah-kotlin-xxe-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Kotlin + Spring 컨트롤러 입력 XML이 DocumentBuilder / SAXParser / XMLInputFactory에
+      외부 엔티티 비활성화 없이 전달되면 XXE.
+      안전: setFeature("http://apache.org/xml/features/disallow-doctype-decl", true),
+            XMLInputFactory.SUPPORT_DTD = false.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestBody $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestParam $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @RequestPart $X: $T, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              fun $METHOD(..., @PathVariable $X: $T, ...) { ... }
+
+    pattern-sinks:
+      - pattern: $DB.parse($X)
+      - pattern: $DB.parse($X, ...)
+      - pattern: $SP.parse($X, ...)
+      - pattern: $XIF.createXMLStreamReader($X)
+      - pattern: $XIF.createXMLEventReader($X)
+      - pattern: $READER.read($X)
+      - pattern: $UM.unmarshal($X)
+      # TransformerFactory
+      - pattern: $TF.newTransformer().transform($X, ...)
+      # SchemaFactory / Validator
+      - pattern: $SF.newSchema($X)
+      - pattern: $VAL.validate($X)
+
+    pattern-sanitizers:
+      - pattern: $DBF.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+      - pattern: $DBF.setExpandEntityReferences(false)
+      - pattern: $XIF.setProperty(XMLInputFactory.SUPPORT_DTD, false)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-611: Improper Restriction of XML External Entity Reference"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [XXE]
+      owasp: ["A05:2021 Security Misconfiguration"]
+      technology: [kotlin, spring, jaxb]

@@ -1,0 +1,65 @@
+rules:
+  - id: noah-csharp-xxe-taint
+    severity: ERROR
+    languages:
+      - csharp
+    mode: taint
+    message: |
+      C#에서 HTTP 입력 XML이 XmlReader / XmlDocument / XPathDocument에
+      DtdProcessing.Parse 또는 ProhibitDtd=false 설정으로 전달되면 XXE.
+      안전: XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit } 사용,
+            .NET 4.0+ 기본값 XmlResolver=null 확인.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromBody] $T2 $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $METHOD([FromQuery] $T2 $X, ...) { ... }
+      - pattern: Request.Body
+      - pattern: Request.Form[$K]
+      - pattern: HttpContext.Request.Body
+      - pattern: await $CTX.Request.ReadAsStringAsync()
+
+    pattern-sinks:
+      # XmlReader — DtdProcessing.Parse 설정 시
+      - pattern: XmlReader.Create($X, ...)
+      - pattern: XmlReader.Create($X)
+      # XmlDocument
+      - pattern: new XmlDocument().LoadXml($X)
+      - pattern: $DOC.LoadXml($X)
+      - pattern: $DOC.Load($X)
+      # XPathDocument
+      - pattern: new XPathDocument($X)
+      # XmlTextReader (구형, 기본으로 엔티티 처리)
+      - pattern: new XmlTextReader($X)
+      # XmlSerializer
+      - pattern: new XmlSerializer($T).Deserialize($X)
+      - pattern: $SER.Deserialize($X)
+
+    pattern-sanitizers:
+      # DtdProcessing.Prohibit 또는 Ignore
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              var $S = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit };
+              ...
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              var $S = new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore };
+              ...
+      - pattern: new XmlDocument { XmlResolver = null }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-611: Improper Restriction of XML External Entity Reference"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [XXE]
+      owasp: ["A05:2021 Security Misconfiguration"]
+      technology: [csharp, dotnet, xmlreader, xmldocument]

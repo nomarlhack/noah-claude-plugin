@@ -7,19 +7,15 @@ rules:
       oauth-scanner Phase 1 sink/source 패턴 매치 (TypeScript 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'oauth'
-      - pattern-regex: 'OAuth'
-      - pattern-regex: 'omniauth'
-      - pattern-regex: 'authorization_code'
-      - pattern-regex: 'access_token'
-      - pattern-regex: 'redirect_uri'
-      - pattern-regex: 'client_secret'
-      - pattern-regex: 'code_verifier'
-      - pattern-regex: 'code_challenge'
-      - pattern-regex: 'passport-oauth'
-      - pattern-regex: 'openid-client'
-      - pattern-regex: 'next-auth'
-      - pattern-regex: 'authlib'
+      - pattern-regex: 'passport-oauth\b'
+      - pattern-regex: 'openid-client\b'
+      - pattern-regex: 'next-auth\b'
+      - pattern-regex: '@nestjs/passport\b'
+      - pattern-regex: 'authorization_code\b'
+      - pattern-regex: 'access_token\b'
+      - pattern-regex: 'redirect_uri\b'
+      - pattern-regex: 'client_secret\b'
+      - pattern-regex: 'code_challenge\b'
     metadata:
       category: security
       subcategory:

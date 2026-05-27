@@ -1,0 +1,46 @@
+rules:
+  - id: noah-go-zipslip-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go에서 archive/zip 또는 archive/tar 엔트리 이름이 경로 정규화 없이
+      파일 write sink에 전달되면 Zip Slip.
+      안전: filepath.Clean 후 strings.HasPrefix(dest, baseDir) 검증.
+    pattern-sources:
+      - pattern: $F.Name
+      - pattern: $ENTRY.Name
+      - pattern: $HDR.Name
+      # archive/zip
+      - pattern: $ZF.File[$I].Name
+      # archive/tar
+      - pattern: $TR.Next()
+      - pattern: $HDR.Linkname
+
+    pattern-sinks:
+      - pattern: os.Create($X)
+      - pattern: os.OpenFile($X, ...)
+      - pattern: os.MkdirAll($X, ...)
+      - pattern: filepath.Join($BASE, $X)
+      - pattern: ioutil.WriteFile($X, ...)
+      - pattern: os.WriteFile($X, ...)
+
+    pattern-sanitizers:
+      - pattern: filepath.Clean($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $DEST := filepath.Join($BASE, $X)
+              if !strings.HasPrefix($DEST, $BASE) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-22: Improper Limitation of a Pathname to a Restricted Directory"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Path Traversal]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [go, archive/zip, archive/tar]

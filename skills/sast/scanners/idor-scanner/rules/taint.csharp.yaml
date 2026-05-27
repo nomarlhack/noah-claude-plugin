@@ -1,0 +1,62 @@
+rules:
+  - id: noah-csharp-idor-missing-owner-gate-taint
+    severity: WARNING
+    languages:
+      - csharp
+    mode: taint
+    message: |
+      외부입력→리소스접근→소유권게이트부재 (IDOR 검토 후보, C#).
+      ASP.NET Core 컨트롤러가 [FromRoute]/[FromQuery]/[FromBody]로 받은 식별자를
+      DB 조회/수정/삭제에 직접 전달하는데 소유권 검증이 없음.
+      [중요] "검증의 부재" — [Authorize] policy/service 계층의 소유권 검증을
+      phase1.md 절차로 확인 후 제외하라.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $M([FromRoute] $T2 $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $M([FromQuery] $T2 $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $M([FromBody] $T2 $X, ...) { ... }
+      - pattern: Request.Query[$K]
+      - pattern: Request.Form[$K]
+      - pattern: Request.RouteValues[$K]
+      - pattern: HttpContext.Request.Query[$K]
+
+    pattern-sinks:
+      # EF Core
+      - pattern: $CTX.$DBSET.Find($X)
+      - pattern: $CTX.$DBSET.FindAsync($X)
+      - pattern: $CTX.$DBSET.FirstOrDefault($E => $E.Id == $X)
+      - pattern: $CTX.$DBSET.Where($E => $E.Id == $X)
+      - pattern: $CTX.$DBSET.Remove($ENTITY)
+      # Dapper
+      - pattern: $CONN.QueryFirstOrDefault<$T>($Q, new { Id = $X })
+      - pattern: $CONN.Execute($Q, new { Id = $X })
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($OBJ.UserId != _currentUserId) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if ($OBJ.OwnerId != _currentUserId) { ... }
+      - pattern: _authorizationService.AuthorizeAsync($USER, $OBJ, $POLICY)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-639: Authorization Bypass Through User-Controlled Key (IDOR)"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Broken Access Control]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [csharp, dotnet, aspnet, efcore, dapper]

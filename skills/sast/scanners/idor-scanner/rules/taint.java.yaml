@@ -114,8 +114,15 @@ rules:
       - pattern: $REPO.getById($X)
       - pattern: $REPO.getReferenceById($X)
       - pattern: $REPO.findOne($X)
+      - pattern: $REPO.findBy($SPEC)
       - pattern: $REPO.delete($X)
       - pattern: $REPO.deleteById($X)
+      # JPA EntityManager 직접 사용
+      - pattern: $EM.find($CLS, $X)
+      - pattern: $EM.getReference($CLS, $X)
+      # QueryDSL
+      - pattern: $QUERY.where($E.id.eq($X)).fetchOne()
+      - pattern: $QUERY.where($E.id.eq($X)).fetch()
       - pattern: $SVC.$GET($X)
       - pattern: $SVC.$GET($ACCT, $X)
       - pattern: $SVC.$GET(..., $X, ...)

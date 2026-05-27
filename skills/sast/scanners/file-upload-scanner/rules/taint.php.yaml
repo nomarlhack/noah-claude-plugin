@@ -1,0 +1,47 @@
+rules:
+  - id: noah-php-upload-taint
+    severity: ERROR
+    languages:
+      - php
+    mode: taint
+    message: |
+      PHP에서 $_FILES['name']이 검증 없이 move_uploaded_file 대상 경로에 사용되면
+      임의 파일 업로드 → RCE. 공격자가 .php 웹쉘을 업로드할 수 있음.
+      안전: 확장자 화이트리스트 + pathinfo() extension 검증 + 랜덤 파일명 사용.
+    pattern-sources:
+      - pattern: $_FILES[$K]['name']
+      - pattern: $_FILES[$K]['tmp_name']
+      # Laravel
+      - pattern: $REQ->file($K)->getClientOriginalName()
+      - pattern: $REQ->file($K)->getClientOriginalExtension()
+      - pattern: $FILE->getClientOriginalName()
+      - pattern: $FILE->getClientOriginalExtension()
+      # Symfony
+      - pattern: $FILE->getClientOriginalName()
+
+    pattern-sinks:
+      - pattern: move_uploaded_file($TMP, $X)
+      - pattern: copy($TMP, $X)
+      - pattern: rename($TMP, $X)
+      - pattern: file_put_contents($X, ...)
+
+    pattern-sanitizers:
+      - pattern: basename($X)
+      - pattern: pathinfo($X, PATHINFO_EXTENSION)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if (in_array($EXT, $ALLOWED)) { ... }
+      - pattern: uniqid()
+      - pattern: Str::random($N)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-434: Unrestricted Upload of File with Dangerous Type"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      vulnerability_class: [File Upload]
+      owasp: ["A04:2021 Insecure Design"]
+      technology: [php, laravel, symfony]

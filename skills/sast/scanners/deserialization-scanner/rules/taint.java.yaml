@@ -56,11 +56,32 @@ rules:
       - pattern: $SERVLET.getParameter($K)
       - pattern: $SERVLET.getParameterValues($K)
     pattern-sinks:
+      # Java 표준 직렬화
       - pattern: $OIS.readObject()
       - pattern: new ObjectInputStream($X).readObject()
       - pattern: $DEC.readObject()
+      # XStream
       - pattern: $XS.fromXML($X)
+      - pattern: XStream().fromXML($X)
+      # Apache Commons / Spring
       - pattern: SerializationUtils.deserialize($X)
+      # Kryo (클래스 등록 없는 경우 취약)
+      - pattern: $KRYO.readObject($INPUT, ...)
+      - pattern: $KRYO.readClassAndObject($INPUT)
+      # Hessian
+      - pattern: new HessianInput($X).readObject()
+      - pattern: $HI.readObject()
+      # SnakeYaml
+      - pattern: new Yaml().load($X)
+      - pattern: $YAML.load($X)
+      - pattern: $YAML.loadAll($X)
+      # Fastjson — TypeNameHandling 활성 시 취약
+      - pattern: JSON.parseObject($X, Object.class)
+      - pattern: JSON.parse($X)
+      - pattern: JSONObject.parseObject($X)
+      # Jackson — enableDefaultTyping / activateDefaultTyping 활성 시 취약
+      - pattern: $MAPPER.readValue($X, Object.class)
+      - pattern: $MAPPER.readValue($X, Map.class)
     pattern-sanitizers:
       - pattern: $OIS.setObjectInputFilter($F)
     metadata:

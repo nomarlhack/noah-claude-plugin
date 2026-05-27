@@ -1,0 +1,38 @@
+rules:
+  - id: noah-kotlin-graphql-stacktrace-sink
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      graphql-kotlin 에러 응답에 스택트레이스/내부 정보 노출 가능 (INFO_LEAK).
+      GraphQLServer 기본 설정은 DataFetcherException stacktrace를 포함하며,
+      KtorGraphQLServer/SpringGraphQLServer에서 formatError 미적용 시 내부 경로가 노출.
+      안전: GraphQLRequestHandlerCustomizer에서 formatError 구현, 스택트레이스 제거.
+    pattern-either:
+      # graphql-kotlin SimpleKotlinDataFetcherExceptionHandler
+      - pattern: SimpleKotlinDataFetcherExceptionHandler()
+      # GraphQL 실행 에러 원문 반환
+      - pattern: GraphQL.newGraphQL($S).build().execute($Q)
+      # spring-graphql includeStacktrace
+      - pattern-regex: 'includeStacktraceInErrorResponses\s*=\s*true'
+      - pattern-regex: 'LogExceptionWhileDataFetching\b'
+      # graphql-kotlin GraphQLServer config without exception handler
+      - pattern-regex: 'GraphQLRequestHandler\s*\('
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-209: Generation of Error Message Containing Sensitive Information"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class:
+        - Information Disclosure
+      owasp:
+        - "A05:2021 Security Misconfiguration"
+      technology:
+        - kotlin
+        - graphql
+        - graphql-kotlin
+        - spring-graphql

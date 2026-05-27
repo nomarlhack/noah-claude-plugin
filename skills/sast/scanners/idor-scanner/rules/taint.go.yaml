@@ -1,0 +1,66 @@
+rules:
+  - id: noah-go-idor-missing-owner-gate-taint
+    severity: WARNING
+    languages:
+      - go
+    mode: taint
+    message: |
+      외부입력→리소스접근→소유권게이트부재 (IDOR 검토 후보, Go).
+      HTTP 핸들러가 URL 파라미터/쿼리스트링으로 받은 식별자를 DB 조회/수정/삭제에
+      직접 전달하는데 소유권 검증이 없음.
+      [중요] "검증의 부재" — service/middleware 계층의 소유권 검증을
+      phase1.md 절차로 확인 후 제외하라.
+    pattern-sources:
+      # net/http
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.FormValue($K)
+      - pattern: r.PathValue($K)
+      # gorilla/mux
+      - pattern: mux.Vars(r)[$K]
+      - pattern: mux.Vars(r)
+      # Gin
+      - pattern: c.Param($K)
+      - pattern: c.Query($K)
+      - pattern: c.PostForm($K)
+      # Echo
+      - pattern: c.Param($K)
+      - pattern: c.QueryParam($K)
+      # chi
+      - pattern: chi.URLParam(r, $K)
+
+    pattern-sinks:
+      # GORM
+      - pattern: $DB.First($DEST, $X)
+      - pattern: $DB.Find($DEST, $X)
+      - pattern: $DB.Where("id = ?", $X).First($DEST)
+      - pattern: $DB.Where($COND, $X).First($DEST)
+      - pattern: $DB.Delete($DEST, $X)
+      - pattern: $DB.Model($M).Where("id = ?", $X).Update(...)
+      # database/sql
+      - pattern: $DB.QueryRow($QUERY, $X)
+      - pattern: $DB.Exec($QUERY, $X)
+      - pattern: $DB.Query($QUERY, $X)
+      # sqlx
+      - pattern: $DB.Get($DEST, $QUERY, $X)
+      - pattern: $DB.Select($DEST, $QUERY, $X)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $OBJ.UserID != $CURRENT_USER { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $OBJ.OwnerID != $CURRENT_USER { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-639: Authorization Bypass Through User-Controlled Key (IDOR)"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Broken Access Control]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [go, gorm, gin, echo, chi]

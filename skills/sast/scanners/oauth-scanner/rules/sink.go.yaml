@@ -1,0 +1,36 @@
+rules:
+  - id: noah-go-oauth-misconfig-sink
+    severity: ERROR
+    languages:
+      - go
+    message: |
+      OAuth 2.0 취약 설정 탐지 (Go).
+      state 파라미터 검증 생략, InsecureSkipVerify, PKCE 미적용 등 OAuth 보안 결함.
+    pattern-either:
+      # golang.org/x/oauth2 — state 없이 AuthCodeURL 호출
+      - pattern: $CONF.AuthCodeURL("")
+      - pattern: $CONF.AuthCodeURL("", ...)
+      # state 파라미터 검증 없이 code exchange
+      - patterns:
+          - pattern: $CONF.Exchange($CTX, $CODE)
+          - pattern-not-inside: |
+              if $STATE != $SESSION { ... }
+      # PKCE 없이 공개 클라이언트 code exchange
+      - patterns:
+          - pattern: $CONF.Exchange($CTX, $CODE)
+          - pattern-not: $CONF.Exchange($CTX, $CODE, oauth2.VerifierOption(...))
+      # InsecureSkipVerify — TLS 검증 비활성
+      - pattern: |
+          oauth2.NewClient($CTX, &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}})
+      # implicit flow
+      - pattern-regex: 'ResponseType.*"token"'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-352: CSRF via missing state", "CWE-295: Improper Certificate Validation"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [OAuth Misconfiguration]
+      owasp: ["A07:2021 Identification and Authentication Failures"]
+      technology: [go, golang.org/x/oauth2, coreos/go-oidc]

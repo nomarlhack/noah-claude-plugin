@@ -7,31 +7,13 @@ rules:
       file-upload-scanner Phase 1 sink/source 패턴 매치 (Java 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'multer'
-      - pattern-regex: 'formidable'
-      - pattern-regex: 'busboy'
-      - pattern-regex: 'multiparty'
-      - pattern-regex: 'express-fileupload'
-      - pattern-regex: 'FileField'
-      - pattern-regex: 'ImageField'
-      - pattern-regex: 'request\.files'
-      - pattern-regex: 'request\.FILES'
-      - pattern-regex: 'FormFile\s*\('
-      - pattern-regex: 'UploadFile'
-      - pattern-regex: 'MultipartFile'
-      - pattern-regex: 'move_uploaded_file'
-      - pattern-regex: 'ActiveStorage'
-      - pattern-regex: 'CarrierWave'
-      - pattern-regex: 'Shrine'
-      - pattern-regex: 'multipart/form-data'
-      - pattern-regex: 'content_type'
-      - pattern-regex: '@RequestPart'
-      - pattern-regex: 'contentType'
+      - pattern-regex: 'MultipartFile\b'
+      - pattern-regex: '@RequestPart\b'
       - pattern-regex: 'getOriginalFilename\s*\('
-      - pattern-regex: 'Content-Disposition'
-      - pattern-regex: '\.endsWith\s*\(\s*[''"]\.'
-      - pattern-regex: 'magic_bytes'
-      - pattern-regex: 'mime\.lookup'
+      - pattern-regex: 'getSubmittedFileName\s*\('
+      - pattern-regex: '\.transferTo\s*\('
+      - pattern-regex: 'CommonsMultipartFile\b'
+      - pattern-regex: 'StandardMultipartFile\b'
     metadata:
       category: security
       subcategory:

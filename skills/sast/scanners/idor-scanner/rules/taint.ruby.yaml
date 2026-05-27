@@ -1,0 +1,61 @@
+rules:
+  - id: noah-ruby-idor-missing-owner-gate-taint
+    severity: WARNING
+    languages:
+      - ruby
+    mode: taint
+    message: |
+      외부입력→리소스접근→소유권게이트부재 (IDOR 검토 후보, Ruby).
+      Rails/Sinatra 컨트롤러가 params에서 받은 식별자를 ActiveRecord 조회/수정/삭제에
+      직접 전달하는데 소유권 검증이 없음.
+      [중요] "검증의 부재" — before_action/policy 계층의 소유권 검증을
+      phase1.md 절차로 확인 후 제외하라.
+    pattern-sources:
+      - pattern: params[:$K]
+      - pattern: params[$K]
+      - pattern: params.require($K)
+      - pattern: params.permit($K)
+      # Sinatra
+      - pattern: params['$K']
+      - pattern: request.params[$K]
+
+    pattern-sinks:
+      # ActiveRecord
+      - pattern: $MODEL.find($X)
+      - pattern: "$MODEL.find_by(id: $X)"
+      - pattern: $MODEL.find_by($K => $X)
+      - pattern: "$MODEL.where(id: $X)"
+      - pattern: $MODEL.where("id = ?", $X)
+      - pattern: $MODEL.update($X, ...)
+      - pattern: $MODEL.destroy($X)
+      - pattern: $SCOPE.find($X)
+      - pattern: "$SCOPE.find_by(id: $X)"
+
+    pattern-sanitizers:
+      # current_user 소유권 검증
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $OBJ.user != current_user
+                ...
+              end
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if $OBJ.user_id != current_user.id
+                ...
+              end
+      # Pundit / CanCanCan
+      - pattern: authorize $OBJ
+      - pattern: authorize! $ACTION, $OBJ
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-639: Authorization Bypass Through User-Controlled Key (IDOR)"]
+      confidence: LOW
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Broken Access Control]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [ruby, rails, sinatra, activerecord]

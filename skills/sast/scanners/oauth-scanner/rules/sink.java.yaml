@@ -1,0 +1,38 @@
+rules:
+  - id: noah-java-oauth-misconfig-sink
+    severity: ERROR
+    languages:
+      - java
+    message: |
+      OAuth 2.0 취약 설정 탐지 (Java/Spring Security).
+      state 파라미터 검증 생략, PKCE 미적용, implicit flow 허용,
+      redirect_uri 검증 비활성화 등 Spring Security OAuth2 설정 결함.
+    pattern-either:
+      # Spring Security — CSRF(state) 보호 비활성
+      - pattern: $HTTP.oauth2Login().authorizationEndpoint().authorizationRequestRepository(new NullAuthorizationRequestRepository())
+      # implicit grant type 허용
+      - pattern-regex: 'AuthorizationGrantType\.IMPLICIT\b'
+      - pattern-regex: '"implicit"'
+      # redirect_uri 와일드카드 패턴
+      - pattern-regex: 'redirectUri\s*\(\s*"[^"]*\*[^"]*"\s*\)'
+      - pattern-regex: 'setRegisteredRedirectUri.*\*'
+      # PKCE 없이 public client 설정
+      - pattern-regex: 'ClientAuthenticationMethod\.NONE\b'
+      # state 검증 없이 authorization code 교환
+      - patterns:
+          - pattern: $REPO.removeAuthorizationRequest($REQ, $RESP)
+          - pattern-not-inside: |
+              String $S = $REQ.getParameter("state");
+              ...
+      # Spring Authorization Server — token reuse 허용
+      - pattern-regex: 'reuseRefreshTokens\s*\(\s*true\s*\)'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-352: CSRF via missing state", "CWE-287: Improper Authentication"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [OAuth Misconfiguration]
+      owasp: ["A07:2021 Identification and Authentication Failures"]
+      technology: [java, spring, spring-security, spring-authorization-server]

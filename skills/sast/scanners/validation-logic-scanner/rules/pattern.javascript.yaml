@@ -7,39 +7,33 @@ rules:
       validation-logic-scanner Phase 1 sink/source 패턴 매치 (JavaScript 한정).
       후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
     pattern-either:
+      # 유효성 검증 라이브러리
+      - pattern-regex: 'Joi\.'
+      - pattern-regex: 'express-validator'
+      - pattern-regex: 'class-validator'
+      - pattern-regex: 'checkSchema\s*\('
+      - pattern-regex: 'ajv\b'
+      - pattern-regex: 'yup\b'
+      - pattern-regex: 'zod\b'
+      # 브라우저 내장
+      - pattern-regex: 'checkValidity\s*\('
+      - pattern-regex: 'setCustomValidity\s*\('
+      # 설정 옵션
+      - pattern-regex: 'additionalProperties\b'
+      - pattern-regex: 'stripUnknown\b'
+      - pattern-regex: 'allowUnknown\b'
+      # null/undefined 검사
       - pattern-regex: '==\s*null'
       - pattern-regex: '!=\s*null'
       - pattern-regex: '==\s*undefined'
       - pattern-regex: '!=\s*undefined'
-      - pattern-regex: '==\s*false'
-      - pattern-regex: '==\s*true'
-      - pattern-regex: '==\s*0\b'
-      - pattern-regex: '==\s*'''''
-      - pattern-regex: '==\s*""'
-      - pattern-regex: 'Joi\.'
-      - pattern-regex: '\.validate\s*\('
-      - pattern-regex: 'ValidationPipe'
-      - pattern-regex: '@Valid\b'
-      - pattern-regex: 'express-validator'
-      - pattern-regex: 'class-validator'
-      - pattern-regex: 'checkSchema'
-      - pattern-regex: 'ajv'
-      - pattern-regex: 'checkValidity'
-      - pattern-regex: 'setCustomValidity'
-      - pattern-regex: 'additionalProperties'
-      - pattern-regex: 'stripUnknown'
-      - pattern-regex: 'allowUnknown'
-      - pattern-regex: 'forbidNonWhitelisted'
-      - pattern-regex: '@IsOptional'
-      - pattern-regex: '@IsNotEmpty'
       - pattern-regex: 'typeof\s+\w+'
-      - pattern-regex: 'instanceof\s+'
     metadata:
       category: security
       subcategory:
         - vuln
       cwe:
-        - "CWE-20: Validation Logic Flaw"
+        - "CWE-20: Improper Input Validation"
       confidence: LOW
       likelihood: LOW
       impact: HIGH
