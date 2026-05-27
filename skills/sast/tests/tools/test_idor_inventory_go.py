@@ -63,6 +63,18 @@ class TestGoScan(unittest.TestCase):
     def test_no_route_marker_returns_empty(self):
         self.assertEqual(_scan("package main\nfunc main() { println(\"hi\") }\n"), {})
 
+    def test_go122_method_pattern(self):
+        # Go 1.22 net/http 메서드+패턴: "GET /users/{id}" → verb/route 분리 + 경로변수 (블라인드 반영)
+        rows = _scan('package main\nfunc s(){\n  mux.HandleFunc("GET /users/{id}", getUser)\n}\n')
+        self.assertIn("GET /users/{id}", rows)
+        self.assertIn("id(path-var)", rows["GET /users/{id}"])
+
+    def test_commented_route_excluded(self):
+        # 주석(//) 처리된 라우트는 제외
+        rows = _scan('package main\nfunc s(){\n  r.GET("/real/:id", h)\n  // r.GET("/commented/:id", h)\n}\n')
+        self.assertIn("GET /real/:id", rows)
+        self.assertTrue(all("commented" not in e for e in rows))
+
 
 if __name__ == "__main__":
     unittest.main()

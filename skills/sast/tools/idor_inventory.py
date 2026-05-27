@@ -88,6 +88,16 @@ def read_lines(path: str) -> list[str] | None:
     return None
 
 
+def _is_comment_line(ln: str) -> bool:
+    """라우트 매치가 주석 줄에서 나온 경우(가짜 진입점) 판별.
+
+    `#`(Python/Ruby), `//`(Java/Kotlin/JS/Go). 주석 처리된 옛 라우트가 실제
+    진입점으로 오탐되는 것을 모든 어댑터에서 공통으로 막는다.
+    """
+    s = ln.lstrip()
+    return s.startswith("#") or s.startswith("//")
+
+
 def _params_in_signature(sig_text: str, lang: str) -> list[str]:
     """메서드 시그니처 텍스트에서 외부 입력 어노테이션 파라미터 추출.
 
@@ -158,6 +168,8 @@ def _scan_controller_file(path: Path) -> list[dict]:
     for i, ln in enumerate(lines):
         m = MAPPING_RE.search(ln)
         if not m:
+            continue
+        if _is_comment_line(ln):  # 주석 처리된 매핑은 가짜 진입점
             continue
         verb = m.group(1)
         path_seg = m.group(2).strip()
@@ -260,6 +272,8 @@ def _scan_fastapi_file(path: Path) -> list[dict]:
         m = FASTAPI_ROUTE_RE.search(ln)
         if not m:
             continue
+        if _is_comment_line(ln):  # 주석 처리된 데코레이터는 가짜 진입점
+            continue
         verb, route_path = m.group(2), m.group(3)
         # 데코레이터 아래 def/async def 시그니처 찾기 (스택된 데코레이터·빈 줄 통과)
         sig_start = None
@@ -347,6 +361,8 @@ def _scan_express_file(path: Path) -> list[dict]:
         m = EXPRESS_ROUTE_RE.search(ln)
         if not m:
             continue
+        if _is_comment_line(ln):  # 주석 처리된 라우트는 가짜 진입점
+            continue
         verb, route_path = m.group(2), m.group(3)
         params: list[str] = []
         seen: set[str] = set()
@@ -412,6 +428,8 @@ def _scan_django_urls_file(path: Path) -> list[dict]:
         m = DJANGO_ROUTE_RE.search(ln)
         if not m:
             continue
+        if _is_comment_line(ln):  # 주석 처리된 라우트는 가짜 진입점
+            continue
         route = m.group(1).strip().lstrip("^").rstrip("$").strip("/")
         if "include(" in ln[m.end():]:  # sub-urls 마운트 → 라우트 아님
             continue
@@ -470,6 +488,8 @@ def _scan_flask_file(path: Path) -> list[dict]:
     for i, ln in enumerate(lines):
         m = FLASK_ROUTE_RE.search(ln)
         if not m:
+            continue
+        if _is_comment_line(ln):  # 주석 처리된 데코레이터는 가짜 진입점
             continue
         deco, route_path = m.group(1), m.group(2)
         if deco == "route":
@@ -536,6 +556,8 @@ def _scan_rails_routes_file(path: Path) -> list[dict]:
         m = RAILS_ROUTE_RE.search(ln)
         if not m:
             continue
+        if _is_comment_line(ln):  # 주석 처리된 라우트는 가짜 진입점
+            continue
         verb, route = m.group(1), m.group(2)
         params: list[str] = []
         seen: set[str] = set()
@@ -561,7 +583,7 @@ def _scan_rails_routes_file(path: Path) -> list[dict]:
 # 열거하고, 입력은 본문 c.Param/c.Query/mux.Vars 토큰을 best-effort 힌트로, 외부 핸들러는
 # '입력 미상'으로 등재한다. HandleFunc(net/http)는 메서드 미지정이라 ANY로 표기.
 GO_ROUTE_RE = re.compile(
-    r'\.(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|Get|Post|Put|Delete|Patch|Handle|HandleFunc)\(\s*"(/[^"]*)"'
+    r'\.(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|Get|Post|Put|Delete|Patch|Handle|HandleFunc)\(\s*"((?:[A-Z]+ )?/[^"]*)"'
 )
 GO_INPUT_RE = re.compile(
     r'\bc\.(?:Param|Query|DefaultQuery|PostForm|GetHeader|Cookie)\b|\bmux\.Vars\b|\br\.(?:FormValue|PostFormValue)\b'
@@ -586,8 +608,16 @@ def _scan_go_file(path: Path) -> list[dict]:
         m = GO_ROUTE_RE.search(ln)
         if not m:
             continue
-        method, route = m.group(1), m.group(2)
-        verb = "ANY" if method in ("Handle", "HandleFunc") else method.upper()
+        if _is_comment_line(ln):  # 주석 처리된 라우트는 가짜 진입점
+            continue
+        method, raw = m.group(1), m.group(2)
+        mp = re.match(r"([A-Z]+)\s+(/.*)", raw)  # Go 1.22 "GET /users/{id}" (메서드+패턴 라우팅)
+        if mp:
+            verb, route = mp.group(1), mp.group(2)
+        elif method in ("Handle", "HandleFunc"):
+            verb, route = "ANY", raw
+        else:
+            verb, route = method.upper(), raw
         params: list[str] = []
         seen: set[str] = set()
         # 경로변수 :id(Gin/Echo) 와 {id}(chi/gorilla) 둘 다

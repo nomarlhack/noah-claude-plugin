@@ -58,6 +58,17 @@ class TestRailsScan(unittest.TestCase):
         plain = "class Foo\n  def bar\n    get '/x/:id'\n  end\nend\n"
         self.assertEqual(_scan(plain), {})
 
+    def test_commented_route_excluded(self):
+        # 주석 처리된 라우트(#, //)는 가짜 진입점이라 제외 (블라인드 검증 반영)
+        rows = _scan(
+            "Rails.application.routes.draw do\n"
+            "  get '/real/:id', to: 'x#y'\n"
+            "  # get '/commented/:id', to: 'a#b'\n"
+            "end\n"
+        )
+        self.assertIn("GET /real/:id", rows)
+        self.assertTrue(all("commented" not in e for e in rows))
+
 
 if __name__ == "__main__":
     unittest.main()

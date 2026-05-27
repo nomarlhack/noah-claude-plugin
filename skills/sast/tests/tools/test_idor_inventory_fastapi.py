@@ -94,6 +94,16 @@ class TestFastAPIScan(unittest.TestCase):
         rows = _scan_text("def plain(x):\n    return x\n")
         self.assertEqual(rows, {})
 
+    def test_commented_decorator_excluded(self):
+        # 주석(#) 처리된 데코레이터는 가짜 진입점이라 제외 (블라인드 검증 반영)
+        rows = _scan_text(
+            "from fastapi import APIRouter\nrouter = APIRouter()\n"
+            "@router.get('/real/{id}')\ndef f(id: int): return id\n"
+            "# @router.get('/commented/{id}')\n"
+        )
+        self.assertIn("GET /real/{id}", rows)
+        self.assertTrue(all("commented" not in e for e in rows))
+
 
 if __name__ == "__main__":
     unittest.main()

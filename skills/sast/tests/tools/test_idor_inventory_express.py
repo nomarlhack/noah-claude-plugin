@@ -74,6 +74,16 @@ class TestExpressScan(unittest.TestCase):
     def test_no_express_marker_returns_empty(self):
         self.assertEqual(_scan("const y = 1;\nfunction f(){ return y; }\n"), {})
 
+    def test_commented_route_excluded(self):
+        # 주석(//) 처리된 라우트는 가짜 진입점이라 제외 (블라인드 검증 반영)
+        rows = _scan(
+            "const r = require('express').Router();\n"
+            "r.get('/real/:id', (req,res)=>res.json(req.params.id));\n"
+            "// r.get('/commented/:id', h);\n"
+        )
+        self.assertIn("GET /real/:id", rows)
+        self.assertTrue(all("commented" not in e for e in rows))
+
 
 if __name__ == "__main__":
     unittest.main()
