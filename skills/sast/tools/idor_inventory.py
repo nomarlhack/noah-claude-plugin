@@ -315,20 +315,84 @@ def _scan_fastapi_file(path: Path) -> list[dict]:
     return rows
 
 
-# 빌드 산출물·서드파티·테스트 디렉토리 제외 (Java/Kotlin + Python 공통)
+# ─── Express(Node.js) 어댑터 — 본문접근형 (라우트 전수 열거 + 입력 힌트) ──────
+# Express는 라우트가 함수 호출(app.get('/x', h))이고 입력이 핸들러 '본문'의
+# req.params/req.body 접근이라 시그니처 파싱이 안 통한다. 그래서 ①라우트+경로변수는
+# 정확히 열거(완전성)하고 ②본문 입력은 best-effort 힌트로, 외부 핸들러(다른 파일)는
+# '입력 미상'으로 등재해 에이전트가 핸들러를 Read하게 한다(taint 갭이 큰 영역).
+EXPRESS_ROUTE_RE = re.compile(
+    r"""(\w+)\.(get|post|put|delete|patch|all|head|options)\(\s*['"`](/[^'"`]*)['"`]"""
+)
+EXPRESS_PATH_VAR_RE = re.compile(r":(\w+)")
+EXPRESS_INPUT_RE = re.compile(r"\breq(?:uest)?\.(params|query|body|headers|cookies)\b")
+
+
+def _scan_express_file(path: Path) -> list[dict]:
+    """단일 Express(.js/.ts) 파일에서 라우트를 전수 열거 (입력은 best-effort 힌트).
+
+    경로변수(:var)는 라우트에서 정확히 추출(완전성). 인라인 핸들러 본문의 req.* 접근은
+    입력 힌트로, 외부 핸들러(app.get('/x', ctrl.show))는 '입력 미상'으로 등재해
+    에이전트가 핸들러를 Read하도록 유도한다.
+    """
+    lines = read_lines(str(path))
+    if not lines:
+        return []
+    text = "\n".join(lines)
+    if not EXPRESS_ROUTE_RE.search(text):
+        return []
+    rows: list[dict] = []
+    for i, ln in enumerate(lines):
+        m = EXPRESS_ROUTE_RE.search(ln)
+        if not m:
+            continue
+        verb, route_path = m.group(2), m.group(3)
+        params: list[str] = []
+        seen: set[str] = set()
+        # 경로변수(:var) — 확실한 외부 식별자 (라우트에서 직접 추출)
+        for pv in EXPRESS_PATH_VAR_RE.findall(route_path):
+            if pv not in seen:
+                params.append(f"{pv}(path-var)")
+                seen.add(pv)
+        # 입력 힌트: 라우트 줄부터 다음 라우트 등록 전까지(최대 25줄) 본문 req.* 토큰
+        end = min(len(lines), i + 25)
+        for k in range(i + 1, end):
+            if EXPRESS_ROUTE_RE.search(lines[k]):
+                end = k
+                break
+        window = "\n".join(lines[i:end])
+        for hit in sorted(set(EXPRESS_INPUT_RE.findall(window))):
+            params.append(f"req.{hit}(input-hint)")
+        # 인라인 핸들러 여부(라우트 호출 뒤에 화살표/function)
+        rest = ln[m.end():]
+        inline = ("=>" in rest) or ("function" in rest)
+        if not params:
+            if inline:
+                continue  # 인라인인데 경로변수·입력 토큰 0 → 식별자 미수용(예: /health)
+            params.append("<입력 미상 - 핸들러 Read>")  # 외부 핸들러 → 완전성 우선 등재
+        rows.append({
+            "endpoint": f"{verb.upper()} {route_path}",
+            "params": params,
+            "file": f"{path.name}:{i + 1}",
+            "abspath": str(path),
+            "source": "controller-scan",
+        })
+    return rows
+
+
+# 빌드 산출물·서드파티·테스트 디렉토리 제외 (Java/Kotlin + Python + Node 공통)
 # "test"(Java src/test 관례)·"tests"(Python 관례) 둘 다 제외 — 테스트 픽스처가
-# 실제 진입점으로 오탐되는 것을 방지.
+# 실제 진입점으로 오탐되는 것을 방지. dist/coverage는 Node 빌드 산출물.
 _SCAN_EXCLUDE_DIRS = (
     "build", "out", "target", ".gradle", ".idea", "node_modules", "test", "tests",
-    "venv", ".venv", "site-packages", "__pycache__",
+    "venv", ".venv", "site-packages", "__pycache__", "dist", "coverage",
 )
 
 
 def scan_controllers(project_root: Path) -> list[dict]:
-    """프로젝트 루트의 컨트롤러 파일을 source-only로 스캔 (Spring Java/Kotlin + FastAPI Python)."""
+    """프로젝트 루트의 컨트롤러 파일을 source-only로 스캔 (Spring Java/Kotlin + FastAPI Python + Express Node)."""
     rows: list[dict] = []
     for p in project_root.rglob("*"):
-        if p.suffix not in (".java", ".kt", ".py"):
+        if p.suffix not in (".java", ".kt", ".py", ".js", ".ts", ".mjs", ".cjs"):
             continue
         parts = set(p.parts)
         if any(x in parts for x in _SCAN_EXCLUDE_DIRS):
@@ -336,6 +400,8 @@ def scan_controllers(project_root: Path) -> list[dict]:
         try:
             if p.suffix == ".py":
                 rows.extend(_scan_fastapi_file(p))
+            elif p.suffix in (".js", ".ts", ".mjs", ".cjs"):
+                rows.extend(_scan_express_file(p))
             else:
                 rows.extend(_scan_controller_file(p))
         except Exception:
