@@ -509,6 +509,52 @@ def _scan_flask_file(path: Path) -> list[dict]:
     return rows
 
 
+# ─── Rails 어댑터 — config/routes.rb DSL (핸들러는 app/controllers 분리라 입력 미상) ──
+# Rails는 라우트(routes.rb DSL)와 핸들러(컨트롤러)가 분리된다(Django와 유사). get/post/
+# put/patch/delete/match DSL의 경로 + 경로변수(:id, Express 형식)를 열거하고, 핸들러
+# (to: 'ctrl#action')가 app/controllers에 분리되어 입력은 '미상'으로 등재한다.
+# resources(RESTful 자동 7액션)·블록 라우트는 미지원(taint+에이전트 백스톱).
+# routes.draw를 필수 마커로 사용(일반 .rb의 get/post 메서드 호출 오탐 방지).
+RAILS_ROUTE_RE = re.compile(r"""\b(get|post|put|patch|delete|match)\s+['"]([^'"]+)['"]""")
+
+
+def _scan_rails_routes_file(path: Path) -> list[dict]:
+    """Rails config/routes.rb에서 라우트를 전수 열거 (입력은 컨트롤러에 있어 미상).
+
+    get/post/put/patch/delete/match DSL의 경로 + 경로변수(:id)를 추출한다. 핸들러가
+    app/controllers에 분리되어 경로변수가 없으면 '입력 미상'으로 등재; routes.draw를
+    필수 마커로 사용한다. resources(RESTful 자동)·블록 라우트는 미지원.
+    """
+    lines = read_lines(str(path))
+    if not lines:
+        return []
+    text = "\n".join(lines)
+    if "routes.draw" not in text:  # Rails 라우트 DSL 마커
+        return []
+    rows: list[dict] = []
+    for i, ln in enumerate(lines):
+        m = RAILS_ROUTE_RE.search(ln)
+        if not m:
+            continue
+        verb, route = m.group(1), m.group(2)
+        params: list[str] = []
+        seen: set[str] = set()
+        for pv in EXPRESS_PATH_VAR_RE.findall(route):  # :id (Express와 같은 형식)
+            if pv not in seen:
+                params.append(f"{pv}(path-var)")
+                seen.add(pv)
+        if not params:
+            params.append("<입력 미상 - controller Read>")  # 핸들러가 app/controllers 분리
+        rows.append({
+            "endpoint": f"{verb.upper()} /{route.lstrip('/')}",
+            "params": params,
+            "file": f"{path.name}:{i + 1}",
+            "abspath": str(path),
+            "source": "controller-scan",
+        })
+    return rows
+
+
 # 스캐너 도구 자신(이 스킬)의 디렉토리. project_root 안에 스킬이 복사돼 있어도
 # 도구 코드(주석/문자열의 라우트 예시 등)가 분석 대상으로 오탐되지 않도록 제외한다.
 # 일반 환경(스킬이 project_root 밖)에서는 매칭되지 않아 무영향.
@@ -519,7 +565,7 @@ def scan_controllers(project_root: Path) -> list[dict]:
     """프로젝트 루트의 컨트롤러 파일을 source-only로 스캔 (Spring Java/Kotlin + FastAPI Python + Express Node)."""
     rows: list[dict] = []
     for p in project_root.rglob("*"):
-        if p.suffix not in (".java", ".kt", ".py", ".js", ".ts", ".mjs", ".cjs"):
+        if p.suffix not in (".java", ".kt", ".py", ".js", ".ts", ".mjs", ".cjs", ".rb"):
             continue
         parts = set(p.parts)
         if any(x in parts for x in _SCAN_EXCLUDE_DIRS):
@@ -534,6 +580,8 @@ def scan_controllers(project_root: Path) -> list[dict]:
                 rows.extend(_scan_django_urls_file(p))
             elif p.suffix in (".js", ".ts", ".mjs", ".cjs"):
                 rows.extend(_scan_express_file(p))
+            elif p.suffix == ".rb":
+                rows.extend(_scan_rails_routes_file(p))
             else:
                 rows.extend(_scan_controller_file(p))
         except Exception:
