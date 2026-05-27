@@ -26,27 +26,27 @@ class TestAuthLabel(unittest.TestCase):
         return [idor._ant_to_regex(p) for p in pats]
 
     def test_excluded_subtree_is_marked(self):
-        # 인증 미경유(`/public/**` 제외) + 식별자 단독 리소스 조회 → '제외' (회귀 핵심)
+        # 인증 미경유(`/public/**` 제외) + 식별자 단독 리소스 조회 → '[제외]' (회귀 핵심)
         rx = self._rx("/public/**")
-        self.assertEqual(idor.auth_label("GET /public/v1/items/{id}/tickets", rx), "제외")
+        self.assertEqual(idor.auth_label("GET /public/v1/items/{id}/tickets", rx), "[제외]")
 
     def test_non_excluded_is_applied(self):
         rx = self._rx("/public/**")
-        self.assertEqual(idor.auth_label("GET /v1/users/{id}", rx), "적용")
+        self.assertEqual(idor.auth_label("GET /v1/users/{id}", rx), "[적용]")
 
     def test_no_patterns_is_unknown(self):
-        # 도구가 인증 설정을 못 찾거나 미지원 프레임워크면 '미상' (정책이 백스톱)
-        self.assertEqual(idor.auth_label("GET /public/x", []), "미상")
+        # 도구가 인증 설정을 못 찾거나 미지원 프레임워크면 '[미상]' (정책이 백스톱)
+        self.assertEqual(idor.auth_label("GET /public/x", []), "[미상]")
 
     def test_single_star_is_one_segment(self):
         rx = self._rx("/a/*/b")
-        self.assertEqual(idor.auth_label("GET /a/x/b", rx), "제외")
-        self.assertEqual(idor.auth_label("GET /a/x/y/b", rx), "적용")  # `*`는 한 세그먼트만
+        self.assertEqual(idor.auth_label("GET /a/x/b", rx), "[제외]")
+        self.assertEqual(idor.auth_label("GET /a/x/y/b", rx), "[적용]")  # `*`는 한 세그먼트만
 
     def test_verb_and_leading_slash_normalized(self):
         # prefix에 선행 슬래시 없는 매핑도 정규화되어 매칭
         rx = self._rx("/inhouse/**")
-        self.assertEqual(idor.auth_label("GET inhouse/v1/bookings", rx), "제외")
+        self.assertEqual(idor.auth_label("GET inhouse/v1/bookings", rx), "[제외]")
 
 
 class TestCollectPatterns(unittest.TestCase):

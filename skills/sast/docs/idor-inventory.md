@@ -73,7 +73,7 @@ taint 매치 N건(...) | 컨트롤러 source-only 스캔 M건 | → dedup 후 K 
 
 | # | 엔드포인트 | 외부입력(파라미터) | 위치 | 출처 | 인증 | 소유권게이트 |
 |---|---|---|---|---|---|---|
-| 1 | GET /public/v1/.../e-tickets | bookingPriceUnitId(@PathVariable String) | PublicBookingController.java:26 | taint+scan | 제외 | [미확인] |
+| 1 | GET /public/v1/.../e-tickets | bookingPriceUnitId(@PathVariable String) | PublicBookingController.java:26 | taint+scan | [제외] | [미확인] |
 ```
 
 | 컬럼 | 의미 |
@@ -82,7 +82,7 @@ taint 매치 N건(...) | 컨트롤러 source-only 스캔 M건 | → dedup 후 K 
 | 외부입력(파라미터) | `이름(@어노테이션 타입)` 목록. 외부 입력 어노테이션 7종으로 식별 |
 | 위치 | `파일명:라인` |
 | 출처 | `taint`=dataflow 확정(고신뢰) / `controller-scan`=source-only 진입점(안전망) / `taint+scan`=양쪽 |
-| **인증** | `제외`=인증 게이트 미경유(우선 검토) / `적용`=그 외(단정 아님) / `미상`=미발견·미지원 |
+| **인증** | `[제외]`=인증 게이트 미경유(우선 검토) / `[적용]`=그 외(단정 아님) / `[미상]`=미발견·미지원 |
 | 소유권게이트 | **항상 `[미확인]`으로 초기화** — 에이전트가 service Read 후 채움 |
 
 > **에이전트가 소유권게이트를 채우는 규칙** (phase1.md):
@@ -107,7 +107,7 @@ locindex에서 taint 위치(`file:line`)를 받아, 해당 라인에서 **위로
 `@PathVariable` · `@RequestParam` · `@RequestBody` · `@RequestHeader` · `@CookieValue` · `@ModelAttribute` · `@RequestPart`
 
 ### dedup과 정렬
-`(endpoint, params)` 키로 중복 제거. taint가 먼저 들어오면 유지하고 scan은 출처만 합산(`taint+scan`). 정렬 우선순위: **① 인증 `제외` 먼저 → ② taint 출처 먼저 → ③ 엔드포인트 사전순**. 인증 미경유 진입점이 표 상단에 모여 우선 검토 큐가 된다.
+`(endpoint, params)` 키로 중복 제거. taint가 먼저 들어오면 유지하고 scan은 출처만 합산(`taint+scan`). 정렬 우선순위: **① 인증 `[제외]` 먼저 → ② taint 출처 먼저 → ③ 엔드포인트 사전순**. 인증 미경유 진입점이 표 상단에 모여 우선 검토 큐가 된다.
 
 ### 인코딩 fallback
 `utf-8 → euc-kr → cp949 → iso-8859-1` 순으로 시도한다. 한국어 레거시 코드베이스(EUC-KR 등)의 컨트롤러도 누락 없이 읽기 위함이다.
@@ -119,14 +119,14 @@ locindex에서 taint 위치(`file:line`)를 받아, 해당 라인에서 **위로
 **동작**:
 1. `collect_auth_excluded_patterns()` — 프로젝트 전체에서 `excludePathPatterns(...)` 블록(멀티라인 포함) 안의 경로 리터럴을 수집(`build`/`.gradle` 제외).
 2. `_ant_to_regex()` — Spring Ant 패턴을 정규식으로 변환(`**`=임의·슬래시 포함, `*`=단일 세그먼트, `{var}`=단일 세그먼트).
-3. `auth_label()` — 각 진입점 경로(verb 제거·선행 슬래시 정규화)가 제외 패턴에 매칭되면 `제외`, 아니면 `적용`, 패턴 미수집 시 `미상`.
+3. `auth_label()` — 각 진입점 경로(verb 제거·선행 슬래시 정규화)가 제외 패턴에 매칭되면 `[제외]`, 아니면 `[적용]`, 패턴 미수집 시 `[미상]`.
 
-**phase1.md 정책과의 연결**: `auth=제외` + 보호 대상 리소스 접근 진입점은 phase1.md의 *"인증 게이트 미경유 진입점은 [미확인]로 종결 금지"* 규칙에 따라 service Read로 [검증]/[부재] 확정하고, 확정 불가 시 보수적으로 후보(`IDOR_GATE_UNVERIFIED`)로 승격한다. **인증 부재 자체는 안전 근거가 아니다.**
+**phase1.md 정책과의 연결**: `auth=[제외]` + 보호 대상 리소스 접근 진입점은 phase1.md의 *"인증 게이트 미경유 진입점은 [미확인]로 종결 금지"* 규칙에 따라 service Read로 [검증]/[부재] 확정하고, 확정 불가 시 보수적으로 후보(`IDOR_GATE_UNVERIFIED`)로 승격한다. **인증 부재 자체는 안전 근거가 아니다.**
 
 ## 한계와 확장
 
-- **controller-scan·auth 컬럼은 Spring(Java/Kotlin) 전용**이다. 어노테이션·`excludePathPatterns` 정규식 기반이므로 Python(Django/Flask/FastAPI)·Node.js(Express)·Rails·Go 프로젝트는 **taint 모드만** 동작하고, `auth` 컬럼은 `미상`로 남는다. 이 경우 판정은 phase1.md 정책(인증 미경유 진입점 [미확인] 종결 금지)이 백스톱이며, 에이전트가 라우팅/시큐리티 설정을 직접 Read해 판정한다.
-- `auth` 컬럼은 **근사치**다: 프로젝트 전체의 `excludePathPatterns`를 합집합으로 보고 매칭하므로, 인터셉터별 세분(어떤 인터셉터가 어떤 경로를 제외)이나 `addPathPatterns`(특정 경로만 적용)는 반영하지 않는다. `제외`만 확신 신호이고, `적용`은 단정이 아니다.
+- **controller-scan·auth 컬럼은 Spring(Java/Kotlin) 전용**이다. 어노테이션·`excludePathPatterns` 정규식 기반이므로 Python(Django/Flask/FastAPI)·Node.js(Express)·Rails·Go 프로젝트는 **taint 모드만** 동작하고, `auth` 컬럼은 `[미상]`로 남는다. 이 경우 판정은 phase1.md 정책(인증 미경유 진입점 [미확인] 종결 금지)이 백스톱이며, 에이전트가 라우팅/시큐리티 설정을 직접 Read해 판정한다.
+- `auth` 컬럼은 **근사치**다: 프로젝트 전체의 `excludePathPatterns`를 합집합으로 보고 매칭하므로, 인터셉터별 세분(어떤 인터셉터가 어떤 경로를 제외)이나 `addPathPatterns`(특정 경로만 적용)는 반영하지 않는다. `[제외]`만 확신 신호이고, `[적용]`은 단정이 아니다.
 - 다른 프레임워크 확장 시 `scan_controllers`에 그 언어의 매핑·시그니처 휴리스틱을, `collect_auth_excluded_patterns`에 그 프레임워크의 인증 제외 표지(예: Django `AllowAny`/`@csrf_exempt`, Express 미들웨어 미적용, FastAPI `Depends` 미부착)를 어댑터로 추가한다.
 
 ## 관련 문서·테스트
