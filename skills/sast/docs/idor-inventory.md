@@ -40,7 +40,7 @@ flowchart TD
 ```
 
 - **taint 모드** (`--locindex`): idor-scanner의 locindex에서 `missing-owner-gate-taint` 매치(외부입력→리소스접근 흐름이 dataflow로 확정된 위치)를 추출한다. semgrep taint 엔진이 처리한 **고신뢰** 신호다.
-- **controller-scan 모드** (`--project-root`): 모든 `.java`/`.kt` 컨트롤러에서 외부 식별자를 받는 진입점을 source-only로 전수 추출한다. taint flow가 엔진 한계(람다 클로저·체이닝·DTO 필드)로 닿지 못하는 진입점을 메우는 **안전망(FN 방지)**이다.
+- **controller-scan 모드** (`--project-root`): `.java`/`.kt`(Spring)·`.py`(FastAPI) 컨트롤러에서 외부 식별자를 받는 진입점을 source-only로 전수 추출한다. taint flow가 엔진 한계(람다 클로저·체이닝·DTO 필드)로 닿지 못하는 진입점을 메우는 **안전망(FN 방지)**이다.
 
 둘 다 제공하면 합쳐서 dedup하고 출처를 표시한다(`taint` / `controller-scan` / `taint+scan`). 어느 한쪽만 줘도 동작한다.
 
@@ -53,7 +53,7 @@ python3 <NOAH_SAST_DIR>/tools/idor_inventory.py \
   --project-root <PROJECT_ROOT> \
   --out <PHASE1_RESULTS_DIR>/_idor_inventory_raw.txt
 
-# taint 모드만 (Java/Kotlin 외 언어 — controller-scan 미지원 시)
+# taint 모드만 (Spring·FastAPI 외 프레임워크 — controller-scan 미지원 시)
 python3 <NOAH_SAST_DIR>/tools/idor_inventory.py --locindex <locindex> --out <md>
 
 # controller-scan 모드만 (locindex 없을 때)
@@ -106,6 +106,9 @@ locindex에서 taint 위치(`file:line`)를 받아, 해당 라인에서 **위로
 **외부 입력 어노테이션 7종** (신뢰 경계 — 특정 이름 카탈로그 금지, 어노테이션 자체가 표지):
 `@PathVariable` · `@RequestParam` · `@RequestBody` · `@RequestHeader` · `@CookieValue` · `@ModelAttribute` · `@RequestPart`
 
+### FastAPI 모드 — 시그니처 파싱 (`_scan_fastapi_file`)
+Python `.py`에서 라우트 데코레이터(`@router.get("/x")` 등)를 앵커로 아래 `def`/`async def` 시그니처를 찾아, 외부 입력 의존성(`Path`/`Query`/`Body`/`Header`/`Cookie`/`Form`/`File` 기본값) + 경로 변수(`{var}`)를 추출한다. Pydantic 본문 모델(`body: ItemModel`)은 타입만으로 판별이 어려워 보수적으로 제외하며(오탐 방지), 본문 모델로 들어오는 식별자는 taint 모드가 커버한다.
+
 ### dedup과 정렬
 `(endpoint, params)` 키로 중복 제거. taint가 먼저 들어오면 유지하고 scan은 출처만 합산(`taint+scan`). 정렬 우선순위: **① 인증 `[제외]` 먼저 → ② taint 출처 먼저 → ③ 엔드포인트 사전순**. 인증 미경유 진입점이 표 상단에 모여 우선 검토 큐가 된다.
 
@@ -125,7 +128,8 @@ locindex에서 taint 위치(`file:line`)를 받아, 해당 라인에서 **위로
 
 ## 한계와 확장
 
-- **controller-scan·auth 컬럼은 Spring(Java/Kotlin) 전용**이다. 어노테이션·`excludePathPatterns` 정규식 기반이므로 Python(Django/Flask/FastAPI)·Node.js(Express)·Rails·Go 프로젝트는 **taint 모드만** 동작하고, `auth` 컬럼은 `[미상]`로 남는다. 이 경우 판정은 phase1.md 정책(인증 미경유 진입점 [미확인] 종결 금지)이 백스톱이며, 에이전트가 라우팅/시큐리티 설정을 직접 Read해 판정한다.
+- **controller-scan은 Spring(Java/Kotlin)·FastAPI(Python)를 지원**한다. 둘 다 데코레이터/어노테이션+시그니처 구조라 동일 전략(①라우트 표지 ②시그니처 입력추출)을 쓴다. 반면 호출/본문접근형(Express·Django·Flask·Rails·Go)은 입력이 핸들러 본문의 `req.params`/`request.data` 접근이라 추출 전략이 달라 **taint 모드만** 동작하며, 그 갭은 에이전트 source-first 보완이 백스톱이다.
+- **`auth` 컬럼은 Spring `excludePathPatterns`만 지원**한다(FastAPI 등 타 프레임워크는 `[미상]`). 인증 미경유 판정이 `[미상]`인 경우 phase1.md 정책(인증 미경유 진입점 [미확인] 종결 금지)이 백스톱이며, 에이전트가 라우팅/시큐리티 설정을 직접 Read해 판정한다.
 - `auth` 컬럼은 **근사치**다: 프로젝트 전체의 `excludePathPatterns`를 합집합으로 보고 매칭하므로, 인터셉터별 세분(어떤 인터셉터가 어떤 경로를 제외)이나 `addPathPatterns`(특정 경로만 적용)는 반영하지 않는다. `[제외]`만 확신 신호이고, `[적용]`은 단정이 아니다.
 - 다른 프레임워크 확장 시 `scan_controllers`에 그 언어의 매핑·시그니처 휴리스틱을, `collect_auth_excluded_patterns`에 그 프레임워크의 인증 제외 표지(예: Django `AllowAny`/`@csrf_exempt`, Express 미들웨어 미적용, FastAPI `Depends` 미부착)를 어댑터로 추가한다.
 

@@ -214,18 +214,123 @@ def _scan_controller_file(path: Path) -> list[dict]:
     return rows
 
 
+# ─── FastAPI 어댑터 (controller-scan 모드의 Python 지원) ──────────────────
+# 데코레이터+시그니처 구조라 Spring과 동일한 ①라우트 표지 ②시그니처 입력추출 전략을
+# 재사용한다. 호출/본문접근형(Express/Django/Rails/Go)은 입력이 핸들러 '본문'의
+# req.params/request.data 접근이라 추출 전략이 달라 미지원 — taint 모드(모드 1)와
+# 에이전트 source-first 보완이 백스톱(phase1.md 프레임워크 확장 메타 원칙 참조).
+FASTAPI_ROUTE_RE = re.compile(
+    r'@(\w+)\.(get|post|put|delete|patch|head|options)\(\s*["\']([^"\']*)["\']'
+)
+# FastAPI 외부 입력 의존성 함수 (시그니처 기본값으로 사용됨)
+FASTAPI_INPUT_FUNCS = ("Path", "Query", "Body", "Header", "Cookie", "Form", "File")
+_FA_FUNC_ALT = "|".join(FASTAPI_INPUT_FUNCS)
+# `name: Type = Query(...)` 형태의 명시적 외부 입력 파라미터
+FASTAPI_PARAM_RE = re.compile(
+    r'(\w+)\s*:\s*([\w\[\],. ]+?)\s*=\s*(' + _FA_FUNC_ALT + r')\s*\('
+)
+_PATH_VAR_RE = re.compile(r'\{(\w+)\}')
+
+
+def _scan_fastapi_file(path: Path) -> list[dict]:
+    """단일 FastAPI(.py) 파일에서 외부 식별자 수용 진입점 추출.
+
+    ①라우트 데코레이터로 핸들러 위치 식별 -> ②함수 시그니처에서 외부 입력
+    (Path/Query/Body/Header/Cookie/Form/File 의존성 + 경로 변수) 추출.
+    Pydantic 본문 모델은 타입만으로 판별이 어려워 보수적으로 제외(오탐 방지);
+    본문 모델로 들어오는 식별자는 taint 모드가 커버한다.
+    """
+    lines = read_lines(str(path))
+    if not lines:
+        return []
+    text = "\n".join(lines)
+    if not FASTAPI_ROUTE_RE.search(text):  # FastAPI 라우트 마커 없으면 스킵
+        return []
+    rows: list[dict] = []
+    for i, ln in enumerate(lines):
+        m = FASTAPI_ROUTE_RE.search(ln)
+        if not m:
+            continue
+        verb, route_path = m.group(2), m.group(3)
+        # 데코레이터 아래 def/async def 시그니처 찾기 (스택된 데코레이터·빈 줄 통과)
+        sig_start = None
+        for j in range(i + 1, min(len(lines), i + 8)):
+            s = lines[j].strip()
+            if s.startswith("def ") or s.startswith("async def "):
+                sig_start = j
+                break
+            if s.startswith("@") or s == "":
+                continue
+            break
+        if sig_start is None:
+            continue
+        # 시그니처 끝(괄호 깊이 0)까지만 캡처 (멀티라인 대응)
+        sig_lines: list[str] = []
+        depth = 0
+        started = False
+        done = False
+        for sl in lines[sig_start:min(len(lines), sig_start + 40)]:
+            sig_lines.append(sl)
+            for ch in sl:
+                if ch == "(":
+                    depth += 1
+                    started = True
+                elif ch == ")":
+                    depth -= 1
+                    if started and depth == 0:
+                        done = True
+                        break
+            if done:
+                break
+        sig_text = "\n".join(sig_lines)
+        params: list[str] = []
+        seen: set[str] = set()
+        for pm in FASTAPI_PARAM_RE.finditer(sig_text):
+            pname, ptype, func = pm.group(1), pm.group(2).strip(), pm.group(3)
+            params.append(f"{pname}({func} {ptype})")
+            seen.add(pname)
+        # 경로 변수({var})는 명시적 Path() 없이도 외부 입력 (시그니처에 받는 경우)
+        for pv in _PATH_VAR_RE.findall(route_path):
+            if pv in seen:
+                continue
+            if re.search(rf'\b{re.escape(pv)}\s*:', sig_text):
+                params.append(f"{pv}(path-param)")
+                seen.add(pv)
+        if not params:
+            continue
+        rows.append({
+            "endpoint": f"{verb.upper()} {route_path or '/'}",
+            "params": params,
+            "file": f"{path.name}:{i + 1}",
+            "abspath": str(path),
+            "source": "controller-scan",
+        })
+    return rows
+
+
+# 빌드 산출물·서드파티·테스트 디렉토리 제외 (Java/Kotlin + Python 공통)
+# "test"(Java src/test 관례)·"tests"(Python 관례) 둘 다 제외 — 테스트 픽스처가
+# 실제 진입점으로 오탐되는 것을 방지.
+_SCAN_EXCLUDE_DIRS = (
+    "build", "out", "target", ".gradle", ".idea", "node_modules", "test", "tests",
+    "venv", ".venv", "site-packages", "__pycache__",
+)
+
+
 def scan_controllers(project_root: Path) -> list[dict]:
-    """프로젝트 루트의 모든 컨트롤러 파일을 source-only로 스캔."""
+    """프로젝트 루트의 컨트롤러 파일을 source-only로 스캔 (Spring Java/Kotlin + FastAPI Python)."""
     rows: list[dict] = []
     for p in project_root.rglob("*"):
-        if p.suffix not in (".java", ".kt"):
+        if p.suffix not in (".java", ".kt", ".py"):
             continue
-        # node_modules / 빌드 산출물 / 테스트 제외
         parts = set(p.parts)
-        if any(x in parts for x in ("build", "out", "target", ".gradle", ".idea", "node_modules", "test")):
+        if any(x in parts for x in _SCAN_EXCLUDE_DIRS):
             continue
         try:
-            rows.extend(_scan_controller_file(p))
+            if p.suffix == ".py":
+                rows.extend(_scan_fastapi_file(p))
+            else:
+                rows.extend(_scan_controller_file(p))
         except Exception:
             continue
     return rows
