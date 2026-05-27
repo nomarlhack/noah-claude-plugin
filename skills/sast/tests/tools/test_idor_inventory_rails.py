@@ -49,9 +49,26 @@ class TestRailsScan(unittest.TestCase):
         # 경로변수 없는 라우트(POST /orders)는 입력 미상 (핸들러가 app/controllers)
         self.assertTrue(any("미상" in p for p in self.rows["POST /orders"]))
 
-    def test_resources_not_enumerated(self):
-        # resources(RESTful 자동)는 미지원 → 명시적 DSL만 열거됨
-        self.assertTrue(all("products" not in e for e in self.rows))
+    def test_resources_expanded(self):
+        # resources :products → RESTful 표준 액션 전개. :id 받는 show/update/destroy가 IDOR 핵심
+        self.assertIn("GET /products/:id", self.rows)
+        self.assertIn("PATCH /products/:id", self.rows)
+        self.assertIn("DELETE /products/:id", self.rows)
+        self.assertIn("GET /products", self.rows)  # index
+
+    def test_resources_only_except(self):
+        # only:/except: 옵션 존중
+        only_rows = _scan(
+            "Rails.application.routes.draw do\n  resources :c, only: [:show, :update]\nend\n"
+        )
+        self.assertIn("GET /c/:id", only_rows)
+        self.assertIn("PATCH /c/:id", only_rows)
+        self.assertNotIn("DELETE /c/:id", only_rows)
+        exc_rows = _scan(
+            "Rails.application.routes.draw do\n  resources :d, except: [:destroy]\nend\n"
+        )
+        self.assertIn("GET /d/:id", exc_rows)
+        self.assertNotIn("DELETE /d/:id", exc_rows)
 
     def test_requires_routes_draw_marker(self):
         # routes.draw 마커 없으면(일반 .rb의 get 메서드 호출 등) 스킵

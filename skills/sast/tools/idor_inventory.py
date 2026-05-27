@@ -541,9 +541,21 @@ def _scan_flask_file(path: Path) -> list[dict]:
 # Rails는 라우트(routes.rb DSL)와 핸들러(컨트롤러)가 분리된다(Django와 유사). get/post/
 # put/patch/delete/match DSL의 경로 + 경로변수(:id, Express 형식)를 열거하고, 핸들러
 # (to: 'ctrl#action')가 app/controllers에 분리되어 입력은 '미상'으로 등재한다.
-# resources(RESTful 자동 7액션)·블록 라우트는 미지원(taint+에이전트 백스톱).
+# resources(RESTful 자동)는 표준 7액션으로 전개(only:/except: 존중). 블록 라우트·
+# single resource·nested resources는 미지원(taint+에이전트 백스톱).
 # routes.draw를 필수 마커로 사용(일반 .rb의 get/post 메서드 호출 오탐 방지).
 RAILS_ROUTE_RE = re.compile(r"""\b(get|post|put|patch|delete|match)\s+['"]([^'"]+)['"]""")
+RAILS_RESOURCES_RE = re.compile(r"\bresources\s+:(\w+)(.*)")
+# RESTful 표준 액션 → (HTTP verb, 경로 suffix). :id 받는 액션(show/edit/update/destroy)이 IDOR 핵심.
+_RESTFUL_ACTIONS = {
+    "index": ("GET", ""),
+    "create": ("POST", ""),
+    "new": ("GET", "/new"),
+    "show": ("GET", "/:id"),
+    "edit": ("GET", "/:id/edit"),
+    "update": ("PATCH", "/:id"),
+    "destroy": ("DELETE", "/:id"),
+}
 
 
 def _scan_rails_routes_file(path: Path) -> list[dict]:
@@ -551,7 +563,8 @@ def _scan_rails_routes_file(path: Path) -> list[dict]:
 
     get/post/put/patch/delete/match DSL의 경로 + 경로변수(:id)를 추출한다. 핸들러가
     app/controllers에 분리되어 경로변수가 없으면 '입력 미상'으로 등재; routes.draw를
-    필수 마커로 사용한다. resources(RESTful 자동)·블록 라우트는 미지원.
+    필수 마커로 사용한다. resources는 RESTful 표준 액션으로 전개(only:/except: 존중);
+    블록 라우트·single resource·nested resources는 미지원.
     """
     lines = read_lines(str(path))
     if not lines:
@@ -561,10 +574,34 @@ def _scan_rails_routes_file(path: Path) -> list[dict]:
         return []
     rows: list[dict] = []
     for i, ln in enumerate(lines):
+        if _is_comment_line(ln):  # 주석 처리된 라우트는 가짜 진입점
+            continue
+        # resources :name → RESTful 표준 액션 전개 (only:/except: 존중)
+        rm = RAILS_RESOURCES_RE.search(ln)
+        if rm:
+            name, opts = rm.group(1), rm.group(2)
+            actions = set(_RESTFUL_ACTIONS)
+            only = re.search(r"only:\s*\[([^\]]*)\]", opts)
+            exc = re.search(r"except:\s*\[([^\]]*)\]", opts)
+            if only:
+                actions = {a.strip().lstrip(":") for a in only.group(1).split(",") if a.strip()}
+            elif exc:
+                actions -= {a.strip().lstrip(":") for a in exc.group(1).split(",") if a.strip()}
+            for action in sorted(actions):
+                if action not in _RESTFUL_ACTIONS:
+                    continue
+                verb, suffix = _RESTFUL_ACTIONS[action]
+                params = ["id(path-var)"] if ":id" in suffix else ["<입력 미상 - controller Read>"]
+                rows.append({
+                    "endpoint": f"{verb} /{name}{suffix}",
+                    "params": params,
+                    "file": f"{path.name}:{i + 1}",
+                    "abspath": str(path),
+                    "source": "controller-scan",
+                })
+            continue
         m = RAILS_ROUTE_RE.search(ln)
         if not m:
-            continue
-        if _is_comment_line(ln):  # 주석 처리된 라우트는 가짜 진입점
             continue
         verb, route = m.group(1), m.group(2)
         params: list[str] = []
