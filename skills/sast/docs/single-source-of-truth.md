@@ -46,9 +46,10 @@ Phase 1 스캐너와 AI 자율 탐색이 발견한 모든 후보의 집합.
 ### 4. Phase 2 증거 — `<scanner>-phase2.md`의 manifest v2
 
 - **Writer**: Phase 2 에이전트 (`prompts/phase2-agent.md`). status 필드 기록 금지 — 오직 evidence만.
-- **Readers**: `phase2-review` (해석 → status 할당)
+- **Readers**: `phase2-review` (해석 → status 할당), **보고서 작성 서브에이전트 + `report-review`** (POC 리터럴 원천 — 아래)
 - **스키마**: `_contracts.md` §4
 - **evidence 필드**: `commands` (실행 명령), `responses` (HTTP 상태 + body 발췌), `observations` (관찰 사실), 옵션으로 `blocking_layer_hint`, `defense_code_hints`
+- **POC 리터럴의 단일 원천**: 동적 실행된 항목(`evidence.commands` 존재)의 보고서 "재현 방법 및 POC"는 `commands`/`responses`를 **verbatim 복사**한다 — 재작성·플레이스홀더 치환 금지. 작성 서브에이전트에 `<scanner>-phase2.md` 경로가 전달되고, `report-review`가 잔존 플레이스홀더를 실값으로 교정한다.
 - **재평가 트리거**: `source_phase2_hash` 변경 시 `phase2-review` 재평가 필요
 
 ### 5. 보고서 본문 — `noah-sast-report.md` / `.html`
@@ -80,10 +81,10 @@ Phase 1 스캐너와 AI 자율 탐색이 발견한 모든 후보의 집합.
 
 | 스크립트 | 검출 대상 |
 |---------|---------|
-| `phase1_review_assert.py` | `phase1_validated` 누락, eval MD 고아/누락, Phase 1 원본 직접 참조 |
+| `phase1_review_assert.py` | `phase1_validated` 누락, eval MD 고아/누락, Phase 1 원본 직접 참조, **session-override 룰 매치 미등록**(고신뢰 IDOR 누락, exit 7) |
 | `phase2_review_assert.py` | status 미완결, tag·safe_category enum 위반, Phase 2 manifest에 금지 필드(`status`) 포함, 마스터 목록 mtime 역전 |
 | `lint_reader_layer.py` | 보고서 본문의 내부 규약 용어(`§N`, mode명, `DISCARD`) 헤딩 노출 |
-| `validate_report.py` | 보고서 건수와 마스터 목록 건수 불일치 |
+| `validate_report.py` | 보고서 건수와 마스터 목록 건수 불일치, **동적 실행 항목 POC의 잔존 플레이스홀더**(exit 6 경고). **FAIL 시 보고서를 영구 삭제하지 않고 `.invalid-<ts>.bak`로 rename**(fail-closed 유지 + 소실 방지) |
 
 각 스크립트의 exit code 의미는 `_contracts.md` §2 Exit Code 통일 테이블 참조.
 

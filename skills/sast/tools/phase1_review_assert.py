@@ -79,6 +79,12 @@ SINK_RULE_ID_RE = re.compile(r'-sink$', re.IGNORECASE)
 # 가장 위험한 FN(정탐을 안전으로 떨굼)이다. 정당한 사유 카테고리 + 증거 없이는 차단한다.
 TAINT_SAFE_JUSTIFIED = {"false_positive", "defense_verified", "platform_default_defense"}
 
+# session-override 등록 감사: 고신뢰 신원-폴백 룰(클라이언트↔세션 elvis/ternary) 매치는
+# 반드시 후보로 등록(또는 명시 폐기)돼야 한다. 매치가 어떤 후보와도 대응되지 않으면
+# 예산 압박 등으로 조용히 누락된 FN이다(IDOR-4 실측 재발 방지). 룰 id는 언어 불문 공통 접미사.
+SESSION_OVERRIDE_RULE_RE = re.compile(r'idor-session-identity-override')
+SESSION_OVERRIDE_WINDOW = 20  # 매치 라인과 후보 라인 간 허용 오프셋(메서드 본문 크기)
+
 
 def _candidate_tier(index_dir: Path, scanner: str, file: str, line) -> str | None:
     """후보 file:line의 locindex tier를 조회한다."""
@@ -121,6 +127,48 @@ def _taint_safe_tripwire(index_dir: Path, candidates: list) -> list[str]:
                 f"{c.get('id')} ({scanner}): taint-tier 확정 흐름인데 safe 분류 — "
                 f"safe_category={cat!r}, 사유/verified_defense={'있음' if has_reason else '없음'}. "
                 f"taint→safe는 false_positive/defense_verified/platform_default_defense + 증거만 정당 (FN 의심)"
+            )
+    return violations
+
+
+def _session_override_audit(index_dir: Path, candidates: list) -> list[str]:
+    """고신뢰 session-identity-override 룰 매치가 후보로 등록됐는지 검증(조용한 누락 차단).
+
+    이 룰(①)은 '클라이언트 입력 ↔ 세션 입력' 신원 폴백이라는 고정밀 IDOR 시그널이다.
+    매치가 master-list 후보 중 어디에도 대응되지 않으면(같은 파일 + 라인 근접) 등록 누락 →
+    예산 압박 등으로 조용히 사라진 FN이다(IDOR-4 실측). 등록 여부만 검증한다(safe 정당성은
+    _taint_safe_tripwire가 별도 검증). 후보 file/line 표현은 _candidate_tier와 동일 계약.
+    """
+    locindex = index_dir / "idor-scanner.locindex.json"
+    if not locindex.is_file():
+        return []
+    try:
+        d = json.loads(locindex.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    cand_lines: dict[str, list[int]] = {}
+    for c in candidates:
+        f = c.get("file")
+        ln = c.get("line")
+        if f and isinstance(ln, int):
+            cand_lines.setdefault(f, []).append(ln)
+    violations: list[str] = []
+    for loc, meta in d.get("locations", {}).items():
+        if not isinstance(meta, dict):
+            continue
+        if not any(SESSION_OVERRIDE_RULE_RE.search(r) for r in meta.get("rule_ids", [])):
+            continue
+        try:
+            fpart, lpart = loc.rsplit(":", 1)
+            oline = int(lpart)
+        except ValueError:
+            continue
+        near = any(abs(cl - oline) <= SESSION_OVERRIDE_WINDOW for cl in cand_lines.get(fpart, []))
+        if not near:
+            violations.append(
+                f"{loc}: session-identity-override 고신뢰 매치인데 대응 후보 없음 — "
+                f"클라이언트↔세션 신원 폴백 IDOR가 후보 등록 없이 누락됨(FN). "
+                f"후보로 등록하거나 명시 폐기(사유 기재)하라"
             )
     return violations
 
@@ -412,6 +460,16 @@ def main() -> int:
                 "taint-tier 확정 흐름을 safe로 분류하려면 정당한 사유(false_positive/defense_verified/"
                 "platform_default_defense) + 증거(phase1_discarded_reason 또는 verified_defense)가 필요하다. "
                 "그 외는 정탐 누락(FN) 의심 — phase1-review 재검토."
+            )
+            return 7
+        so_violations = _session_override_audit(index_dir, candidates)
+        if so_violations:
+            print(f"FAIL: session-override 등록 감사 위반 {len(so_violations)}건 (고신뢰 IDOR 누락):")
+            for v in so_violations[:20]:
+                print(f"  {v}")
+            print(
+                "session-identity-override 룰은 클라이언트↔세션 신원 폴백이라는 고정밀 IDOR 시그널이다. "
+                "모든 매치를 후보로 등록하거나, 후보 폐기 시 사유를 기재하라(조용한 누락 금지)."
             )
             return 7
 

@@ -25,3 +25,37 @@ rules:
       confidence: LOW
       likelihood: LOW
       impact: HIGH
+
+  - id: noah-kotlin-idor-session-identity-override
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      신원 식별자가 클라이언트 입력과 세션 입력의 elvis(?:) 폴백으로 해석됨 — 클라이언트가
+      대상 신원을 지정/덮어쓸 수 있어 IDOR/BOLA 위험. 소유권 검증(세션 신원과의 대조) 확인 필요.
+      고정밀: 클라이언트(@RequestParam/커맨드객체 필드)와 세션(@RequestHeader) 원천이 섞인 elvis만 매치.
+    patterns:
+      - pattern-either:
+          # (a) @RequestParam(클라) ↔ @RequestHeader(세션) 양방향 elvis
+          - patterns:
+              - pattern-either:
+                  - pattern: "$C ?: $S"
+                  - pattern: "$S ?: $C"
+              - pattern-inside: |
+                  fun $F(..., @RequestParam(...) $C: $TC, ...) { ... }
+              - pattern-inside: |
+                  fun $F(..., @RequestHeader(...) $S: $TS, ...) { ... }
+          # (b) @RequestHeader(세션) ?: 커맨드객체.필드 (클라, GET 케이스)
+          - patterns:
+              - pattern: "$S ?: $OBJ.$FLD"
+              - pattern-inside: |
+                  fun $F(..., @RequestHeader(...) $S: $TS, ...) { ... }
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-639: Insecure Direct Object Reference"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH

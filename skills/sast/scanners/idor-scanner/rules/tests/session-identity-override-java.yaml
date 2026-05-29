@@ -1,0 +1,29 @@
+rules:
+  - id: noah-java-idor-session-identity-override
+    severity: WARNING
+    languages: [java]
+    message: |
+      신원 식별자가 클라이언트 입력과 세션 입력의 null-폴백(삼항/Optional.orElse)으로 해석됨 —
+      클라이언트가 대상 신원을 지정/덮어쓸 수 있어 IDOR/BOLA 위험. 소유권 검증 확인 필요.
+    patterns:
+      - pattern-either:
+          # (a) 삼항: 클라(@RequestParam) <-> 세션(@RequestHeader)
+          - patterns:
+              - pattern-either:
+                  - pattern: "$C != null ? $C : $S"
+                  - pattern: "$S != null ? $S : $C"
+              - pattern-inside: "$RT $M(..., @RequestParam(...) $TC $C, ...) { ... }"
+              - pattern-inside: "$RT $M(..., @RequestHeader(...) $TS $S, ...) { ... }"
+          # (a2) Optional.ofNullable(클라).orElse(세션) 및 역방향
+          - patterns:
+              - pattern-either:
+                  - pattern: "Optional.ofNullable($C).orElse($S)"
+                  - pattern: "Optional.ofNullable($S).orElse($C)"
+              - pattern-inside: "$RT $M(..., @RequestParam(...) $TC $C, ...) { ... }"
+              - pattern-inside: "$RT $M(..., @RequestHeader(...) $TS $S, ...) { ... }"
+          # (b) 세션 헤더 폴백 -> 커맨드객체 getter (GET 케이스)
+          - patterns:
+              - pattern-either:
+                  - pattern: "$S != null ? $S : $OBJ.$G()"
+                  - pattern: "Optional.ofNullable($S).orElse($OBJ.$G())"
+              - pattern-inside: "$RT $M(..., @RequestHeader(...) $TS $S, ...) { ... }"

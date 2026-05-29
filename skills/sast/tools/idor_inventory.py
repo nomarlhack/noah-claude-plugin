@@ -43,6 +43,25 @@ MAPPING_RE = re.compile(
 # 매핑 어노테이션이 path 없이 클래스/메서드 레벨로 붙는 경우(컨트롤러 prefix 처리용).
 MAPPING_NOARG_RE = re.compile(r'@(Get|Post|Put|Delete|Patch|Request)Mapping\b')
 
+# 다중 마운트: @RequestMapping("/a","/b") 또는 value={"/a","/b"}에서 경로 리터럴 전수 추출용.
+# produces/consumes/method/headers/params/name 등 비경로 명명인자 값은 제외.
+_STR_LIT_RE = re.compile(r'"([^"]*)"')
+_NON_PATH_ARG_RE = re.compile(r'\b(produces|consumes|method|headers|params|name)\s*=')
+
+
+def _mapping_path_literals(annotation_line: str) -> list[str]:
+    """@*Mapping 어노테이션 라인에서 경로 리터럴 전수 추출(다중 마운트 지원).
+
+    `@RequestMapping("/a", "/b")`, `value = {"/a","/b"}` → ["/a", "/b"].
+    value=/path= 외 명명인자(produces 등)의 문자열 값은 경로가 아니므로 잘라낸다.
+    """
+    paren = annotation_line.find("(")
+    arg = annotation_line[paren + 1:] if paren != -1 else annotation_line
+    cut = _NON_PATH_ARG_RE.search(arg)
+    if cut:
+        arg = arg[:cut.start()]
+    return [s.strip().rstrip("/") for s in _STR_LIT_RE.findall(arg)]
+
 # Spring Web 외부 입력 어노테이션 7종 — 신뢰 경계.
 # 특정 이름(accountId 등) 카탈로그 금지: 어노테이션 자체가 외부 입력의 표지.
 # 게이트웨이가 일부 헤더를 덮어쓰는 환경이면 인벤토리 검토 단계에서 안전 분기 처리한다
@@ -98,10 +117,72 @@ def _is_comment_line(ln: str) -> bool:
     return s.startswith("#") or s.startswith("//")
 
 
-def _params_in_signature(sig_text: str, lang: str) -> list[str]:
-    """메서드 시그니처 텍스트에서 외부 입력 어노테이션 파라미터 추출.
+# 미어노테이션 암묵 바인딩 파라미터 가시화 시 제외할 프레임워크/원시/표준 타입.
+# 이 타입들은 입력 바인딩 대상이 아니거나(Model 등) 식별자 단일값은 1차에서 잡힌다.
+_FRAMEWORK_PARAM_TYPES = frozenset({
+    "Model", "ModelMap", "BindingResult", "Errors", "Pageable", "Sort", "Principal",
+    "Authentication", "HttpServletRequest", "HttpServletResponse", "HttpSession",
+    "ServerWebExchange", "ServerHttpRequest", "ServerHttpResponse", "WebRequest",
+    "NativeWebRequest", "Locale", "TimeZone", "UriComponentsBuilder", "RedirectAttributes",
+    "SessionStatus", "InputStream", "OutputStream", "Writer", "Reader", "MultipartFile",
+    "RequestEntity", "HttpEntity", "HttpHeaders", "Device", "Continuation",
+    # 원시/래퍼/표준 — 식별자 단일값은 어노테이션으로 이미 잡힘
+    "String", "Long", "Integer", "Int", "Boolean", "Double", "Float", "Short", "Byte",
+    "Char", "BigDecimal", "BigInteger", "UUID", "LocalDate", "LocalDateTime", "LocalTime",
+    "Instant", "List", "Set", "Map", "Collection", "Optional", "Object", "Any", "Unit", "Void",
+})
 
-    반환: ["name(@Anno Type)", ...]
+
+def _param_list_inner(sig_text: str) -> str:
+    """시그니처 텍스트에서 첫 최상위 괄호쌍 안쪽(파라미터 목록)만 추출."""
+    start = sig_text.find("(")
+    if start == -1:
+        return ""
+    depth = 0
+    for i in range(start, len(sig_text)):
+        c = sig_text[i]
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                return sig_text[start + 1:i]
+    return sig_text[start + 1:]
+
+
+def _split_params(inner: str) -> list[str]:
+    """파라미터 목록을 최상위 콤마로 분할(제네릭<>·중첩()·배열[]·{} 내부 콤마는 무시)."""
+    parts: list[str] = []
+    depth = 0
+    buf: list[str] = []
+    for ch in inner:
+        if ch in "<([{":
+            depth += 1
+        elif ch in ">)]}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    if buf:
+        parts.append("".join(buf))
+    return [p.strip() for p in parts if p.strip()]
+
+
+_KOTLIN_CMDOBJ_RE = re.compile(r'\b(\w+)\s*:\s*([A-Z]\w*)')
+_JAVA_CMDOBJ_RE = re.compile(r'(?:@\w+(?:\([^)]*\))?\s+)*\b([A-Z]\w*)(?:<[^>]*>)?\s+(\w+)\b')
+
+
+def _params_in_signature(sig_text: str, lang: str) -> list[str]:
+    """메서드 시그니처 텍스트에서 외부 입력 파라미터 추출.
+
+    1차: 외부 입력 어노테이션(@RequestParam 등) 보유 파라미터 → "name(@Anno Type)".
+    2차: 어노테이션 없이 요청에서 암묵 바인딩되는 복합 타입 → "name(implicit-bind Type)".
+         Spring은 미어노테이션 파라미터를 요청에서 바인딩한다(복합타입→커맨드객체,
+         enum 등→타입 컨버터). 클라이언트가 채우는 이 값이 신원 식별자로 쓰일 수 있으므로(IDOR),
+         에이전트가 타입을 열어 필드를 검토하도록 표지만 남긴다(라우트·라벨 불변, 가산적).
+         원시/래퍼/프레임워크 타입은 stoplist로 제외(노이즈 억제).
     """
     out: list[str] = []
     if lang == "kotlin":
@@ -112,6 +193,24 @@ def _params_in_signature(sig_text: str, lang: str) -> list[str]:
         for m in PARAM_RE_JAVA.finditer(sig_text):
             anno, typ, name = m.group(1), m.group(2).strip(), m.group(3)
             out.append(f"{name}(@{anno} {typ})")
+
+    # 2차: 어노테이션 없는 커맨드객체(복합 타입) 가시화.
+    anno_alt_re = re.compile(rf'@({_ANNO_ALT})\b')
+    seen = {p.split("(", 1)[0] for p in out}
+    for chunk in _split_params(_param_list_inner(sig_text)):
+        if anno_alt_re.search(chunk):
+            continue  # 외부입력 어노테이션 보유 → 1차에서 캡처됨
+        cm = _KOTLIN_CMDOBJ_RE.search(chunk) if lang == "kotlin" else _JAVA_CMDOBJ_RE.search(chunk)
+        if not cm:
+            continue
+        if lang == "kotlin":
+            name, typ = cm.group(1), cm.group(2)
+        else:
+            typ, name = cm.group(1), cm.group(2)
+        if typ in _FRAMEWORK_PARAM_TYPES or name in seen:
+            continue
+        out.append(f"{name}(implicit-bind {typ})")
+        seen.add(name)
     return out
 
 
@@ -149,17 +248,21 @@ def _scan_controller_file(path: Path) -> list[dict]:
     if not CONTROLLER_RE.search(text):
         return []
     lang = "kotlin" if str(path).endswith(".kt") else "java"
-    # 클래스 레벨 매핑(prefix). 첫 번째 매칭만 사용(다중 prefix는 첫 prefix로 표시).
-    class_prefix = ""
+    # 클래스 레벨 매핑(prefix). 다중 마운트(@RequestMapping("/a","/b"))는 모든 prefix를 열거한다.
+    class_prefixes: list[str] = [""]
     for i, ln in enumerate(lines[:60]):
         if CONTROLLER_RE.search(ln):
             # 클래스 선언 위쪽 5줄 + 아래 5줄 윈도우에서 클래스레벨 @RequestMapping 검색
             ws = max(0, i - 5)
             we = min(len(lines), i + 5)
             for cl in lines[ws:we]:
-                cm = MAPPING_RE.search(cl)
+                # 인자 형식 불문(@RequestMapping("/a","/b") / value={...} / {...} / noarg)
+                # 클래스 레벨 @RequestMapping을 인식하고 경로 리터럴을 헬퍼로 추출.
+                cm = MAPPING_NOARG_RE.search(cl)
                 if cm and cm.group(1) == "Request":
-                    class_prefix = cm.group(2).strip().rstrip("/")
+                    lits = _mapping_path_literals(cl)
+                    if lits:
+                        class_prefixes = lits
                     break
             break
 
@@ -210,26 +313,30 @@ def _scan_controller_file(path: Path) -> list[dict]:
             if started and depth == 0:
                 break
         sig_text = "\n".join(sig_lines)
-        params = _params_in_signature(sig_text, lang)
-        full_path = (class_prefix + ("/" if path_seg and not path_seg.startswith("/") else "") + path_seg) if class_prefix else path_seg
-        full_path = full_path or "/"
-        # 경로변수({var})는 시그니처 어노테이션과 무관하게 외부 식별자 — 라우트에서 직접 추출.
-        # (controller-scan은 입력 추출 성패가 아니라 '라우트 전수 열거'가 목적)
-        existing = {p.split("(", 1)[0] for p in params}
-        for pv in _PATH_VAR_RE.findall(full_path):
-            if pv not in existing:
-                params.append(f"{pv}(path-var)")
-                existing.add(pv)
-        if not params:
-            continue  # 경로변수도 외부 입력도 없으면 IDOR 대상 아님 (예: 식별자 미수용 라우트)
+        sig_params = _params_in_signature(sig_text, lang)
         verb_norm = verb.upper() if verb != "Request" else "REQUEST"
-        rows.append({
-            "endpoint": f"{verb_norm} {full_path}".strip(),
-            "params": params,
-            "file": f"{path.name}:{i + 1}",
-            "abspath": str(path),
-            "source": "controller-scan",
-        })
+        # 다중 마운트: 클래스 레벨 @RequestMapping이 여러 경로를 가지면 마운트별로 행을 생성한다.
+        # (인증 제외 라우트가 다른 마운트에 가려져 누락되던 문제 — auth_label이 마운트별로 평가됨)
+        for prefix in class_prefixes:
+            full_path = (prefix + ("/" if path_seg and not path_seg.startswith("/") else "") + path_seg) if prefix else path_seg
+            full_path = full_path or "/"
+            params = list(sig_params)
+            # 경로변수({var})는 시그니처 어노테이션과 무관하게 외부 식별자 — 라우트에서 직접 추출.
+            # (controller-scan은 입력 추출 성패가 아니라 '라우트 전수 열거'가 목적)
+            existing = {p.split("(", 1)[0] for p in params}
+            for pv in _PATH_VAR_RE.findall(full_path):
+                if pv not in existing:
+                    params.append(f"{pv}(path-var)")
+                    existing.add(pv)
+            if not params:
+                continue  # 경로변수도 외부 입력도 없으면 IDOR 대상 아님 (예: 식별자 미수용 라우트)
+            rows.append({
+                "endpoint": f"{verb_norm} {full_path}".strip(),
+                "params": params,
+                "file": f"{path.name}:{i + 1}",
+                "abspath": str(path),
+                "source": "controller-scan",
+            })
     return rows
 
 

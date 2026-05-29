@@ -352,6 +352,9 @@ def build_table_from_details(report_text, master_list_ids=None):
             scanner_name = m_scanner.group(1).strip()
             parts = [p.strip() for p in scanner_name.split('/')]
             parts = [re.sub(r'\s+', '-', p.lower()) for p in parts]
+            # '### <name> Scanner'와 '### <name>-scanner Scanner' 모두 '<name>-scanner'로 정규화
+            # ('Scanner' 단어가 공백→대시 변환으로 '-scanner' 접미사가 되므로, 중복 접미사를 1개로 축약)
+            parts = [re.sub(r'(?:-scanner){2,}$', '-scanner', p) for p in parts]
             current_scanner = ' / '.join(parts)
             continue
 
@@ -416,8 +419,13 @@ def build_table_from_details(report_text, master_list_ids=None):
         table_lines.append(f'| {idx} | {vid_cell} | {title} | {vtype} | {scanner} | {status} |')
     new_table = '\n'.join(table_lines)
 
+    # 헤딩 직후 placeholder 테이블을 자동 생성 테이블로 치환한다.
+    # 헤딩과 테이블 사이에 안내용 HTML 주석(<!-- ... -->)이 끼어 있어도 매칭되도록 허용한다.
     tbl_section = re.search(
-        r'(## 취약점 요약 테이블\s*\n\s*\n)'
+        r'(## 취약점 요약 테이블[ \t]*\n'
+        r'(?:[ \t]*\n)*'                              # 빈 줄
+        r'(?:<!--[\s\S]*?-->[ \t]*\n(?:[ \t]*\n)*)?'  # 선택적 HTML 주석 + 빈 줄
+        r')'
         r'(\|[^\n]+\n'
         r'\|[^\n]+\n'
         r'(?:\|[^\n]+\n)*)',
@@ -425,6 +433,14 @@ def build_table_from_details(report_text, master_list_ids=None):
     )
     if tbl_section:
         result = result[:tbl_section.start(2)] + new_table + '\n' + result[tbl_section.end(2):]
+    else:
+        # 취약점은 파싱됐으나 치환 대상 테이블을 못 찾은 경우 — 조용한 실패 방지(헤딩 철자/위치 오류 신호)
+        sys.stderr.write(
+            "[assemble_report] WARNING: 취약점 요약 테이블 자동 생성 실패 — "
+            "'## 취약점 요약 테이블' 헤딩 직후의 placeholder 테이블(| ... |)을 찾지 못했습니다 "
+            f"(파싱된 취약점 {len(vulns)}건). 스켈레톤의 헤딩 철자('테이블' 포함)와 "
+            "헤딩-테이블 사이 형식을 확인하세요.\n"
+        )
 
     return result
 

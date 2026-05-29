@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """validate_report.py — 보고서 정량·구조 검증.
 
-Fail 검증 (exit 1, 보고서 파일 삭제):
+Fail 검증 (exit 1, 보고서 파일을 .invalid 백업으로 rename — 영구 삭제 아님):
   - MD/HTML POC 건수 일치, 심각도 표시 금지, 연계 분석 섹션 존재, safe 섹션 존재
 
 Warning 검증 (exit 6, 보고서 파일 유지):
@@ -260,6 +260,54 @@ if master_list_path and os.path.exists(master_list_path) and md_content:
                     f"POC 호스트 '{host}' (발견 {count}회) — 개요 '테스트 환경' 필드에 "
                     f"호스트 선언 없음. 플레이스홀더 <TARGET_HOST>로 통일 권장"
                 )
+
+        # (d) 동적 실행 항목 POC 플레이스홀더 검출 (재현성 보증)
+        # phase2.md manifest의 evidence.commands가 있는 id = 실제 curl 실행됨 → POC는 실값이어야 한다.
+        # 판정 기준은 상태(확인됨/후보)가 아니라 evidence 존재 — 무인증 동적후보(IDOR-3류)도 포함.
+        # 정적 후보(commands 부재)는 플레이스홀더 정당하므로 대상 아님(오탐 0).
+        # 토큰셋은 고정 화이트리스트(템플릿 유래 + 흔한 신원/페이로드 표지)만 — `<script>`·`<!ENTITY>`·
+        # `[ERROR]` 같은 정당 페이로드/로그 토큰 오탐 방지. case-sensitive.
+        _poc_ph_re = re.compile(
+            r'<(?:TARGET_HOST|API_PATH|SESSION_COOKIE|SESSION|COOKIE|TOKEN|PARAM|PAYLOAD|METHOD'
+            r'|HOST|USER_ID|VICTIM|EMAIL|PASSWORD|ID|URL)>'
+            r'|\[실제[^\]]*\]'
+            r'|\[(?:METHOD|PARAM|PAYLOAD|URL|쿠키|토큰|페이로드|파라미터)\]'
+        )
+        _id_to_p2 = {c['id']: c.get('source_phase2_file') for c in _ml_candidates if c.get('id')}
+        _dynamic_ids = set()
+        _p2_cache = {}
+        for _vid, _p2 in _id_to_p2.items():
+            if not _p2 or not os.path.exists(_p2):
+                continue
+            if _p2 not in _p2_cache:
+                _p2_cache[_p2] = {}
+                try:
+                    _p2txt = open(_p2, encoding='utf-8').read()
+                    _jm = re.search(r'```json\s*(\{.*\})\s*```', _p2txt, re.DOTALL)
+                    if _jm:
+                        for _r in _json.loads(_jm.group(1)).get('results', []):
+                            _ev = _r.get('evidence') or {}
+                            if _r.get('id') and _ev.get('commands'):
+                                _p2_cache[_p2][_r['id']] = True
+                except (OSError, ValueError):
+                    pass
+            if _p2_cache[_p2].get(_vid):
+                _dynamic_ids.add(_vid)
+
+        for _sm in _section_pat.finditer(_combined_body):
+            _sbody = _sm.group(3)
+            _sids = re.findall(r'^\*\*ID\*\*:\s*(.+?)\s*$', _sbody, re.MULTILINE)
+            if not _sids or _sids[0] not in _dynamic_ids:
+                continue
+            _poc = re.search(r'####\s*재현 방법 및 POC(.*?)(?=\n####|\Z)', _sbody, re.DOTALL)
+            if not _poc:
+                continue
+            _hits = sorted(set(_poc_ph_re.findall(_poc.group(1))))
+            if _hits:
+                warnings.append(
+                    f"POC 플레이스홀더 잔존: {_sids[0]} (동적 실행 항목 — phase2 evidence.commands 존재)에 "
+                    f"{', '.join(_hits)} — 실제 실행값으로 교정 필요 (검토자 재현 불가)"
+                )
     except (OSError, ValueError, _json.JSONDecodeError):
         pass  # master-list.json 읽기 실패 시 이 검증 스킵
 
@@ -283,10 +331,19 @@ if errors:
     print("FAIL:")
     for e in errors:
         print(f"  - {e}")
+    # fail-closed: 구조가 깨진 보고서를 canonical 경로에서 치운다(재조립 강제).
+    # 단 os.remove로 영구 삭제하지 않고 .invalid 백업으로 rename — 수작업 큐레이션본이
+    # 잘못된 카운트로 단독 실행된 경우에도 소실되지 않게 한다.
+    import time as _time
+    _bak_suffix = f".invalid-{int(_time.time())}.bak"
     for path in [md_path, html_path]:
         if os.path.exists(path):
-            os.remove(path)
-            print(f"  삭제됨: {path}")
+            _bak = path + _bak_suffix
+            try:
+                os.rename(path, _bak)
+                print(f"  무효 처리(백업 보존): {path} → {_bak}")
+            except OSError as _e:
+                print(f"  무효 처리 실패({path}): {_e}", file=sys.stderr)
     sys.exit(1)
 else:
     parts = [f"MD {md_poc}/{expected}, HTML {html_poc}/{expected}"]
