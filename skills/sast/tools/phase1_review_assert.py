@@ -89,8 +89,8 @@ SESSION_OVERRIDE_WINDOW = 20  # 매치 라인과 후보 라인 간 허용 오프
 
 # 무인증 중첩 자원 등록 감사 (session-override와 공통 계약: IDOR FN 미등록 차단):
 # idor_inventory.py 인벤토리에서 인증 미경유(`[제외]`) + path-variable 2개 이상
-# (중첩 자원 `/{parent}/.../{child}`) 진입점이 소유권게이트 [미확인]로 방치되고
-# master-list에도 미등록이면, 상위↔하위 식별자 매핑 미검증 BOLA의 조용한 누락이다.
+# (중첩 자원 `/{parent}/.../{child}`) 진입점이 [검증](안전)으로 닫히지도 master-list에 등록되지도
+# 않으면(즉 [미확인]/[부재]/[부분] + 미등록), 상위↔하위 식별자 매핑 미검증 BOLA의 조용한 누락이다.
 # phase1.md §159("인증 미경유 [미확인] 종결 금지")의 기계적 최소 강제선(floor) —
 # 트리거를 중첩(≥2)으로 좁혀 [제외] 전체(저신호 대량)가 아닌 고신호 슬라이스만 강제한다.
 INVENTORY_HEADER_RE = re.compile(r'###\s*IDOR\s*검토\s*인벤토리')
@@ -286,7 +286,7 @@ def _parse_inventory_rows(text: str):
 
 
 def _unauth_nested_resource_audit(phase1_dir: Path, candidates: list) -> list[str]:
-    """무인증 중첩 자원(path-var≥2)이 [미확인]+미등록으로 방치됐는지 검증(BOLA 조용한 누락 차단).
+    """무인증 중첩 자원(path-var≥2)이 안전 확정·등록 없이([검증] 아님 + 미등록) 방치됐는지 검증(BOLA 조용한 누락 차단).
 
     session-override(①)와 공통 계약이나 입력 소스가 다르다: auth=[제외] 신호는
     excludePathPatterns(교차 파일 설정) 기반이라 locindex(semgrep)에 없고 인벤토리 도구만
