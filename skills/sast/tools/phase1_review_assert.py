@@ -87,7 +87,7 @@ TAINT_SAFE_JUSTIFIED = {"false_positive", "defense_verified", "platform_default_
 SESSION_OVERRIDE_RULE_RE = re.compile(r'idor-session-identity-override')
 SESSION_OVERRIDE_WINDOW = 20  # 매치 라인과 후보 라인 간 허용 오프셋(메서드 본문 크기)
 
-# 무인증 중첩 자원 등록 감사 (session-override와 동일 가족: IDOR FN 미등록 차단):
+# 무인증 중첩 자원 등록 감사 (session-override와 공통 계약: IDOR FN 미등록 차단):
 # idor_inventory.py 인벤토리에서 인증 미경유(`[제외]`) + path-variable 2개 이상
 # (중첩 자원 `/{parent}/.../{child}`) 진입점이 소유권게이트 [미확인]로 방치되고
 # master-list에도 미등록이면, 상위↔하위 식별자 매핑 미검증 BOLA의 조용한 누락이다.
@@ -97,6 +97,7 @@ INVENTORY_HEADER_RE = re.compile(r'###\s*IDOR\s*검토\s*인벤토리')
 NESTED_MIN_PATHVARS = 2
 AUTH_EXCLUDED_TOKEN = "[제외]"
 GATE_UNVERIFIED_TOKEN = "[미확인]"
+GATE_SAFE_TOKEN = "[검증]"  # 안전 판정만 인벤토리 텍스트로 해소 인정 ([부재]/[부분]은 등록 요구)
 
 
 def _candidate_tier(index_dir: Path, scanner: str, file: str, line) -> str | None:
@@ -287,10 +288,11 @@ def _parse_inventory_rows(text: str):
 def _unauth_nested_resource_audit(phase1_dir: Path, candidates: list) -> list[str]:
     """무인증 중첩 자원(path-var≥2)이 [미확인]+미등록으로 방치됐는지 검증(BOLA 조용한 누락 차단).
 
-    session-override(①)와 동일 가족이나 입력 소스가 다르다: auth=[제외] 신호는
+    session-override(①)와 공통 계약이나 입력 소스가 다르다: auth=[제외] 신호는
     excludePathPatterns(교차 파일 설정) 기반이라 locindex(semgrep)에 없고 인벤토리 도구만
-    계산하므로 인벤토리 MD를 읽는다. 해소 경로는 둘 다 인정한다(OR): 인벤토리 소유권게이트가
-    [미확인]이 아니거나(에이전트가 표에서 [검증]/[부재]/[부분]으로 확정), master-list에 등록.
+    계산하므로 인벤토리 MD를 읽는다. 해소 인정(OR): 인벤토리 소유권게이트가 [검증](안전 판정)이거나
+    master-list에 등록. [부재]/[부분](취약/부분 판정)·[미확인]은 등록 없이는 미해소로 본다
+    (phase1.md "[부재]→후보 승격" 및 _session_override_audit과 일관 — 미등록 발견은 보고서 누락).
     """
     text = _find_inventory_text(phase1_dir)
     if not text:
@@ -314,8 +316,11 @@ def _unauth_nested_resource_audit(phase1_dir: Path, candidates: list) -> list[st
         pv = _count_path_vars(endpoint)
         if pv < NESTED_MIN_PATHVARS:
             continue
-        if GATE_UNVERIFIED_TOKEN not in gate:
-            continue  # 인벤토리에서 이미 해소됨([검증]/[부재]/[부분])
+        # 안전 판정([검증])만 인벤토리 텍스트로 해소 인정한다. [미확인](미판정)·[부재]·[부분]
+        # (취약/부분 판정)은 phase1.md "[부재]→후보 승격" 정책 및 sibling _session_override_audit과
+        # 일관되게 master-list 등록을 요구한다 — 등록 없이 [부재]만 적으면 보고서에서 누락(FN)된다.
+        if GATE_SAFE_TOKEN in gate:
+            continue  # 안전 판정 → 후보 등록 불요
         base, line = _parse_location(loc)
         if line is not None and _near_candidate(
             candidates,
@@ -323,10 +328,11 @@ def _unauth_nested_resource_audit(phase1_dir: Path, candidates: list) -> list[st
             line,
         ):
             continue  # master-list 등록으로 해소됨
+        state = "미판정([미확인])" if GATE_UNVERIFIED_TOKEN in gate else f"취약 판정({gate})"
         violations.append(
             f"{endpoint} ({loc}): 무인증(`[제외]`) 중첩 자원(path-var {pv}≥2)인데 "
-            f"소유권게이트 [미확인] + master-list 미등록 — 상위↔하위 식별자 매핑 미검증 BOLA 누락(FN). "
-            f"service Read로 [검증]/[부재] 확정 후 후보 등록 또는 status=safe+사유 기재하라"
+            f"소유권게이트 {state} + master-list 미등록 — 상위↔하위 식별자 매핑 미검증 BOLA 누락(FN). "
+            f"안전이면 [검증] 확정, 취약/미판정이면 후보 등록하라"
         )
     return violations
 

@@ -56,10 +56,28 @@ class TestUnauthNestedResourceAudit(unittest.TestCase):
                   "file": "/abs/path/ParentItemController.java", "line": 42}]
         self.assertEqual(pra._unauth_nested_resource_audit(d, cands), [])
 
-    def test_resolved_in_inventory_ok(self):
-        # 인벤토리 소유권게이트가 [검증]으로 확정됨 → master-list 미등록이어도 해소 인정
+    def test_verified_safe_in_inventory_ok(self):
+        # [검증](안전 판정)만 인벤토리 텍스트로 해소 인정 → master-list 미등록이어도 통과
         d = self._phase1_dir(_inv(_row(_NESTED_EP, _NESTED_LOC, "[제외]", "[검증] svc.foo():X.java:9")))
         self.assertEqual(pra._unauth_nested_resource_audit(d, candidates=[]), [])
+
+    def test_absent_gate_unregistered_flags_violation(self):
+        # [부재](취약 확정)인데 master-list 미등록 → 보고서 누락(FN) → 발화해야 함
+        # (phase1.md "[부재]→후보 승격" 및 session-override 게이트와 일관)
+        d = self._phase1_dir(_inv(_row(_NESTED_EP, _NESTED_LOC, "[제외]", "[부재]")))
+        self.assertEqual(len(pra._unauth_nested_resource_audit(d, candidates=[])), 1)
+
+    def test_partial_gate_unregistered_flags_violation(self):
+        # [부분](우회 가능) 미등록 → 발화
+        d = self._phase1_dir(_inv(_row(_NESTED_EP, _NESTED_LOC, "[제외]", "[부분]: bypass")))
+        self.assertEqual(len(pra._unauth_nested_resource_audit(d, candidates=[])), 1)
+
+    def test_absent_gate_registered_ok(self):
+        # [부재]지만 master-list에 후보 등록됨 → 통과
+        d = self._phase1_dir(_inv(_row(_NESTED_EP, _NESTED_LOC, "[제외]", "[부재]")))
+        cands = [{"id": "X-1", "scanner": "idor-scanner",
+                  "file": "/abs/path/ParentItemController.java", "line": 42}]
+        self.assertEqual(pra._unauth_nested_resource_audit(d, cands), [])
 
     def test_single_identifier_not_gated(self):
         # path-var 1개 → 중첩 아님 → 게이트 대상 아님
