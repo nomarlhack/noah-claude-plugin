@@ -3,7 +3,7 @@
 
 회귀 대상: 동적 실행된 항목(phase2.md evidence.commands 존재)의 "재현 방법 및 POC"에
 플레이스홀더(<SESSION_COOKIE> 등)가 남으면 검토자가 재현 불가 → 경고(exit 6)로 잡는다.
-판정은 상태가 아니라 evidence 존재 기준이므로 무인증 동적후보(IDOR-3류)도 대상이고,
+판정은 상태가 아니라 evidence 존재 기준이므로 무인증 동적후보도 대상이고,
 정적 후보(commands 부재)는 플레이스홀더가 정당하므로 오탐이 없어야 한다.
 """
 import json
@@ -80,7 +80,7 @@ class TestPocPlaceholderGate(unittest.TestCase):
         self.assertTrue(any("DYN-1" in x and "플레이스홀더" in x for x in w), w)
 
     def test_dynamic_candidate_with_placeholder_flagged(self):
-        # 무인증 동적후보(IDOR-3류): 상태=후보지만 evidence.commands 존재 → 대상
+        # 무인증 동적후보: 상태=후보지만 evidence.commands 존재 → 대상
         cands = [{"id": "DYNC-2", "status": "candidate", "source_phase2_file": "p2a.md"}]
         secs = [_section(1, "DYNC-2", "curl \"https://h/b?accountId=<USER_ID>\"")]
         w = self._run(cands, secs, {"p2a.md": _PHASE2_WITH_CMD})

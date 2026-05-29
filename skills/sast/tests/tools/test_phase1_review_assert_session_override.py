@@ -2,7 +2,7 @@
 """phase1_review_assert.py session-override 등록 감사(③) 회귀 테스트.
 
 회귀 대상: 고신뢰 session-identity-override 룰(클라이언트↔세션 신원 폴백) 매치가
-후보로 등록되지 않고 예산 압박 등으로 조용히 누락되던 FN(IDOR-4 실측).
+후보로 등록되지 않고 예산 압박 등으로 조용히 누락되던 FN.
 locindex에 매치가 있는데 대응 후보가 없으면 감사가 위반을 반환해야 한다(등록 강제).
 """
 import importlib.util

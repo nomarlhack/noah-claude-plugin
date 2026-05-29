@@ -263,7 +263,7 @@ if master_list_path and os.path.exists(master_list_path) and md_content:
 
         # (d) 동적 실행 항목 POC 플레이스홀더 검출 (재현성 보증)
         # phase2.md manifest의 evidence.commands가 있는 id = 실제 curl 실행됨 → POC는 실값이어야 한다.
-        # 판정 기준은 상태(확인됨/후보)가 아니라 evidence 존재 — 무인증 동적후보(IDOR-3류)도 포함.
+        # 판정 기준은 상태(확인됨/후보)가 아니라 evidence 존재 — 무인증 동적후보도 포함.
         # 정적 후보(commands 부재)는 플레이스홀더 정당하므로 대상 아님(오탐 0).
         # 토큰셋은 고정 화이트리스트(템플릿 유래 + 흔한 신원/페이로드 표지)만 — `<script>`·`<!ENTITY>`·
         # `[ERROR]` 같은 정당 페이로드/로그 토큰 오탐 방지. case-sensitive.

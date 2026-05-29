@@ -16,7 +16,7 @@
 
 둘 다 제공 시 합쳐서 dedup하고 출처를 표시한다. 어느 한쪽만 제공해도 동작한다.
 
-에이전트 수기 인벤토리는 컨텍스트 한계로 대량 매치를 누락하므로(실측: 1150건 중 일부만 기록)
+에이전트 수기 인벤토리는 컨텍스트 한계로 대량 매치를 누락하므로(대량 진입점 중 일부만 기록)
 기계적 전수 보장이 목적이다. 소유권게이트 컬럼은 '[미확인]'으로 초기화 —
 에이전트/사람이 코드 Read로 [검증]/[부재]/[부분]로 채운다. 이 인벤토리는 "외부 식별자를 받아 리소스에
 접근하는 엔드포인트 중 안 본 것은 없다"의 백스톱이며 DAST 권한 diff의 입력 목록이 된다.
@@ -979,37 +979,61 @@ def main() -> int:
         summary_parts.append(f"컨트롤러 source-only 스캔 {len(scan_rows)}건")
     summary_parts.append(f"→ dedup 후 {len(rows)} 엔드포인트")
 
+    # 검토 단위 = 파일 (일반 phase1의 파일 단위 디스패치와 정렬). 인벤토리는 "파일 내 체크리스트".
+    # rows는 이미 [제외] 먼저·taint 먼저·엔드포인트 순으로 정렬됨. 파일별로 묶되 그 순서를 보존한다.
+    def _file_of(loc):
+        return loc.rsplit(":", 1)[0] if ":" in loc else loc
+    groups: dict = {}  # 삽입 순서 보존(py3.7+)
+    for r in rows:
+        groups.setdefault(_file_of(r["file"]), []).append(r)
+    # 파일 정렬: 인증 미경유([제외]) 포함 파일 먼저 → 파일명
+    sorted_files = sorted(
+        groups,
+        key=lambda f: (0 if any(x.get("auth") == "[제외]" for x in groups[f]) else 1, f),
+    )
+    summary_parts.append(f"{len(groups)} 파일")
+
     out_lines = [
         header,
         "",
         " | ".join(summary_parts) + ".",
         "",
-        "> **소유권게이트 컬럼은 `[미확인]`으로 초기화됨.** 에이전트/사람이 각 엔드포인트의 "
-        "service·AOP 계층을 Read하여 다음 형식으로 채운다:",
+        "> **검토 단위는 파일이다(일반 phase1의 파일 단위 디스패치와 동일).** 각 `#### <파일>` 블록을 "
+        "통째로 Read하고, 필요하면 그 파일이 호출하는 service/도메인 계층까지 따라가 그 파일의 "
+        "**모든 엔드포인트**가 소유권 게이트를 갖는지 확인한다. 체크리스트(`확인` 칸)는 한 파일 안의 "
+        "어떤 진입점도 빠뜨리지 않게 하는 완전성 장치다.",
+        ">",
+        "> **소유권게이트 컬럼은 `[미확인]`으로 초기화됨.** 각 엔드포인트를 다음 형식으로 채운다:",
         "> - `[검증] <service>.<method>():<line>` (완전 검증 — 호출된 게이트 함수의 파일·라인 인용 필수)",
         "> - `[부재]` (게이트 없음 — service Read 후 명시)",
         "> - `[부분]: <이유>` (부분 게이트·우회 가능 — 우회 경로 명시)",
         ">",
-        "> **금지**: 게이트 함수가 같은 컨트롤러/모듈에 있다고 추정해 다른 항목의 게이트를 복사 붙여넣지 말 것. "
-        "각 항목은 해당 service를 직접 Read해 채워야 한다. **게이트 호출 존재만으로 [검증] 금지 — 범위 적정성까지 확인**(phase1.md).",
+        "> **금지**: 게이트 함수가 같은 모듈에 있다고 추정해 다른 항목의 게이트를 복사 붙여넣지 말 것. "
+        "각 항목은 해당 service를 직접 Read해 채운다. **게이트 호출 존재만으로 [검증] 금지 — 범위 적정성까지 확인**(phase1.md).",
         ">",
-        "> **출처**: `taint`=dataflow 확정(고신뢰), `controller-scan`=source-only 진입점(taint flow 추적 실패 안전망, "
+        "> **출처**: `taint`=dataflow 확정(고신뢰), `controller-scan`=source-only 진입점(taint 추적 실패 안전망, "
         "DTO/람다/체이닝 우회분 포함), `taint+scan`=양쪽 모두.",
         ">",
-        "> **인증**: `[제외]`=인증 인터셉터/시큐리티가 명시적으로 제외한 경로(인증 미경유 — phase1.md '인증 게이트 미경유 진입점은 [미확인]로 종결 금지' 우선 검토 대상), "
-        "`[적용]`=그 외(단정 아님), `[미상]`=도구가 인증 설정을 못 찾음/미지원 프레임워크. `[제외]` 행이 표 상단에 정렬된다.",
+        "> **인증**: `[제외]`=인증 미경유(phase1.md '인증 게이트 미경유 진입점은 [미확인]로 종결 금지' 우선 검토 대상), "
+        "`[적용]`=그 외(단정 아님), `[미상]`=도구가 인증 설정을 못 찾음/미지원 프레임워크. `[제외]` 포함 파일이 상단 정렬된다.",
         ">",
-        "> 이 표는 '외부 식별자 수용 엔드포인트 중 안 본 것은 없다'의 백스톱이며 DAST 권한 diff 입력이다.",
+        "> 이 인벤토리는 '외부 식별자 수용 엔드포인트 중 안 본 것은 없다'의 완전성 백스톱이며 DAST 권한 diff 입력이다.",
         "",
-        "| # | 엔드포인트 | 외부입력(파라미터) | 위치 | 출처 | 인증 | 소유권게이트 |",
-        "|---|---|---|---|---|---|---|",
     ]
-    for i, r in enumerate(rows, 1):
-        out_lines.append(
-            f"| {i} | {r['endpoint']} | {', '.join(r['params']) or '?'} | {r['file']} | "
-            f"{r['source']} | {r.get('auth', '[미상]')} | [미확인] |"
-        )
-    out_lines.append("")
+    for f in sorted_files:
+        rs = groups[f]
+        excl = sum(1 for x in rs if x.get("auth") == "[제외]")
+        tag = f" · 인증 미경유 {excl}개" if excl else ""
+        out_lines.append(f"#### {f}  — 엔드포인트 {len(rs)}개{tag}")
+        out_lines.append("")
+        out_lines.append("| 확인 | 엔드포인트 | 외부입력(파라미터) | 위치 | 출처 | 인증 | 소유권게이트 |")
+        out_lines.append("|---|---|---|---|---|---|---|")
+        for r in rs:
+            out_lines.append(
+                f"| [ ] | {r['endpoint']} | {', '.join(r['params']) or '?'} | {r['file']} | "
+                f"{r['source']} | {r.get('auth', '[미상]')} | [미확인] |"
+            )
+        out_lines.append("")
     md = "\n".join(out_lines)
 
     if args.out:

@@ -340,7 +340,11 @@ python3 <NOAH_SAST_DIR>/tools/phase1_review_assert.py \
 - `1`: 평가 미완료 또는 eval MD 고아 상태 → phase1-review 재호출
 - `3`: 비차단 경고 (rederivation 편향 등) → 로그만 남기고 진행
 - `5`: Phase 1 원본 직접 참조 → 해당 참조를 eval MD로 전환
-- `7`: 커버리지 감사 실패 (고볼륨 스캐너 미감사 §6-A-2) → 해당 스캐너 phase1-review 재호출하여 COVERAGE 감사 블록 추가
+- `7`: 감사군 위반 → **출력 메시지의 위반 유형별 지시대로** 해당 스캐너 phase1-review 재호출/보완. exit 7은 다음 감사들이 공유한다:
+  - 커버리지 감사(고볼륨 스캐너 §6-A-2) → COVERAGE 감사 블록 보완
+  - 의무 감사(capability 스캐너 §2-D) → 능력형 매치 전수 disposition
+  - 고신뢰-safe tripwire → taint 확정 흐름의 safe 분류에 정당 사유+증거
+  - IDOR 누락 방지 게이트 2종(`session-override 미등록` / `무인증 중첩 자원 미해소`) → 해당 진입점을 후보 등록 또는 명시 해소
 
 **Phase 2 진입 시 사용할 Phase 1 결과 경로**: `<PHASE1_RESULTS_DIR>/evaluation/<scanner>-eval.md` (Phase 1 원본 MD가 아님). 이후 Step 8-4(Phase 2) 에이전트 프롬프트는 eval MD를 Phase 1 결과로 참조한다 (`sub-skills/scan-report-review/_contracts.md §6` C1 lint 강제).
 
