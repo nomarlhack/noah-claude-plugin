@@ -27,6 +27,8 @@ archetype: presence
 - **테스트 외 실 코드의 하드코딩**: `settings.py`, `application.properties`, `config.yml`에 직접 삽입
 - **Base64 인코딩된 시크릿**: `secret = "c2VjcmV0X2tleV8xMjM="` (디코딩하면 `secret_key_123`)
 - **주석에 남겨진 시크릿**: `// password: admin123`
+- **클라이언트 번들 누출(build-time inlining)**: 서버 전용 키가 Next.js `NEXT_PUBLIC_`/Vite `VITE_`/CRA `REACT_APP_`/webpack DefinePlugin 등으로 빌드 시 클라이언트 번들(`_next/static/chunks/*.js`, `*.bundle.js`)에 인라인됨. 소스(`process.env.NEXT_PUBLIC_...` 참조)는 깨끗해 보여도 빌드 산출물에서 노출되므로 **빌드 결과물도 점검 대상**. (`noah-public-env-secret-build-inline` 룰이 공개 prefix+비밀 키 이름을 소스 단계에서 예방 탐지)
+- **서버 전용 인증 스킴이 클라이언트 코드에 존재**: `Authorization: KakaoAK <32hex>` 같은 서버용 REST/Admin Key 헤더가 프론트엔드 파일(`.js/.ts/.vue/.html`)에 박힘. REST/Admin Key는 서버 전용이라 브라우저로 가는 코드에 있으면 그 자체로 취약. bare 32-hex는 MD5/해시와 구분 불가하므로 반드시 인증 스킴·API 호스트 같은 컨텍스트 앵커와 함께 판정한다. (`noah-kakao-key-in-auth-header` / `noah-kakao-key-hardcoded-frontend` 룰). **단, 키 등급(Admin vs JavaScript Key)·유효성은 형식만으론 불가능 → Phase2에서 `kapi.kakao.com` 검증 호출로 확인.**
 
 ## 안전 패턴 (FP Guard)
 

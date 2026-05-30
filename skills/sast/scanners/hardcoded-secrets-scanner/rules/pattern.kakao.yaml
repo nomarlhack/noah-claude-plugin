@@ -1,0 +1,99 @@
+rules:
+  # ─────────────────────────────────────────────────────────────
+  # Case 2: 캡처 가능한 요청 헤더에 키 포함
+  #   Authorization: KakaoAK <32-hex>  (서버 전용 REST/Admin Key 인증 스킴)
+  #   파일 유형 무관 — 코드/설정/로그/HAR 어디에 박혀도 탐지.
+  #   "KakaoAK <hex>" 자체가 헤더 값이라 Authorization 키워드 없이도 매칭.
+  # ─────────────────────────────────────────────────────────────
+  - id: noah-kakao-key-in-auth-header
+    severity: ERROR
+    languages: [generic]
+    message: |
+      Kakao REST/Admin Key가 'Authorization: KakaoAK <key>' 인증 헤더 형태로 노출됨.
+      KakaoAK 스킴은 서버 전용 인증이다. 이 형태가 클라이언트 코드/캡처 가능한
+      패킷·로그에 존재하면 외부에서 키를 탈취해 kapi.kakao.com을 임의 호출할 수 있다.
+    pattern-regex: 'KakaoAK\s+[0-9a-f]{32}\b'
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-798: Use of Hard-coded Credentials'
+        - 'CWE-200: Exposure of Sensitive Information'
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+      references:
+        - 'https://developers.kakao.com/docs/latest/ko/rest-api/getting-started'
+
+  # ─────────────────────────────────────────────────────────────
+  # Case 1: 사용자에게 노출되는 프론트엔드 파일에 Kakao 키 하드코딩
+  #   .js/.ts/.jsx/.tsx/.vue/.svelte/.html 등 클라이언트 전달 파일에 한정.
+  #   bare 32-hex 는 MD5/해시와 형식 동일 → 반드시 Kakao 컨텍스트 앵커와 함께 매칭.
+  # ─────────────────────────────────────────────────────────────
+  - id: noah-kakao-key-hardcoded-frontend
+    severity: ERROR
+    languages: [generic]
+    paths:
+      include:
+        - '*.js'
+        - '*.jsx'
+        - '*.mjs'
+        - '*.cjs'
+        - '*.ts'
+        - '*.tsx'
+        - '*.vue'
+        - '*.svelte'
+        - '*.html'
+        - '*.htm'
+        - '*.astro'
+    message: |
+      Kakao 앱 키(32-hex)가 클라이언트로 전달되는 프론트엔드 파일에 하드코딩됨.
+      REST/Admin Key라면 즉시 키 탈취·전체 사용자 PII 열거로 이어진다.
+      (JavaScript Key를 Kakao.init에 쓰는 것은 정상일 수 있으나 형식이 동일하므로,
+       Phase2에서 kapi.kakao.com 검증 호출로 Admin/JS 등급·유효성을 확인할 것.)
+    pattern-either:
+      # KakaoAK 스킴 + 키 (REST/Admin Key 강신호)
+      - pattern-regex: 'KakaoAK\s+[0-9a-f]{32}\b'
+      # KakaoAK 스킴 + 동적 키 삽입(변수 결합/템플릿) — "KakaoAK "+v, `KakaoAK ${v}`
+      # 뒤에 연결연산자/템플릿플레이스홀더/따옴표가 와야 매칭 → "KakaoAK 단어" 문장은 제외(FP 방지)
+      - pattern-regex: 'KakaoAK (?:["''`+]|\$\{)'
+      # Kakao JS SDK 초기화에 박힌 키
+      - pattern-regex: 'Kakao\.init\s*\(\s*["''`][0-9a-f]{32}["''`]'
+      # Kakao 키로 명명된 식별자에 32-hex 할당
+      - pattern-regex: '(?i)(rest[_-]?api[_-]?key|admin[_-]?key|javascript[_-]?key|app[_-]?key|kakao[_-]?key)["''`]?\s*[:=]\s*["''`][0-9a-f]{32}["''`]'
+      # Kakao API 호스트 참조(키 사용 호출처) — 클라이언트 번들에 박히면 검토 대상
+      - pattern-regex: 'k(?:api|auth)\.kakao\.com'
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-798: Use of Hard-coded Credentials'
+        - 'CWE-200: Exposure of Sensitive Information'
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: HIGH
+
+  # ─────────────────────────────────────────────────────────────
+  # Case 1-b: 빌드 시 클라이언트 번들에 인라인되는 "공개 환경변수"에 비밀값
+  #   Next.js NEXT_PUBLIC_*, Vite VITE_*, CRA REACT_APP_*, Nuxt NUXT_PUBLIC_*,
+  #   Expo EXPO_PUBLIC_*, Gatsby GATSBY_* 는 빌드 시 클라이언트로 인라인된다.
+  #   이런 prefix + (SECRET/ADMIN/REST_API/PRIVATE/PASSWORD/TOKEN/KAKAO 키) 조합은
+  #   소스가 process.env 참조로 깨끗해 보여도 빌드 산출물에서 키가 노출됨(예방 탐지).
+  #   .env 파일의 'NEXT_PUBLIC_...=값' 정의와 코드의 process.env.NEXT_PUBLIC_... 참조 모두 매칭.
+  # ─────────────────────────────────────────────────────────────
+  - id: noah-public-env-secret-build-inline
+    severity: ERROR
+    languages: [generic]
+    message: |
+      클라이언트로 인라인되는 공개 환경변수(NEXT_PUBLIC_/VITE_/REACT_APP_/NUXT_PUBLIC_/
+      EXPO_PUBLIC_/GATSBY_)에 서버 전용 비밀값(REST/Admin Key, secret, token 등)이 담겨 있다.
+      이 값은 빌드 시 _next/static/chunks/*.js 등 클라이언트 번들에 평문으로 인라인되어
+      모든 사용자에게 노출된다. 공개 prefix를 제거하고 서버 전용 환경변수/시크릿 매니저로 옮기되,
+      클라이언트는 키를 직접 들고 외부 API를 호출하지 말고 서버 프록시 경유로 변경할 것.
+    pattern-regex: '(?i)(NEXT_PUBLIC|VITE|REACT_APP|NUXT_PUBLIC|EXPO_PUBLIC|GATSBY)_[A-Z0-9_]*(ADMIN[_-]?KEY|SECRET|PRIVATE[_-]?KEY|PASSWORD|REST[_-]?API[_-]?KEY|CLIENT[_-]?SECRET|ACCESS[_-]?TOKEN|KAKAO[_A-Z0-9]*KEY)'
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-200: Exposure of Sensitive Information'
+        - 'CWE-798: Use of Hard-coded Credentials'
+      confidence: MEDIUM
+      likelihood: HIGH
+      impact: HIGH
