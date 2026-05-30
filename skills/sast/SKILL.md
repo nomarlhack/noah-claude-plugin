@@ -189,11 +189,14 @@ python3 <NOAH_SAST_DIR>/tools/select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_RO
 
 Phase 1 에이전트는 단일 메시지 안에서 모든 그룹의 Agent 도구를 동시에 호출하여 병렬 실행한다. 모든 에이전트가 완료된 후에만 Step 6로 진행한다. 완료 후 그룹 수와 수신된 결과 수를 대조하여, 누락된 에이전트가 있으면 해당 그룹만 재실행한다. 반환 요약에 `[INCOMPLETE: scanner-name]`이 있으면 해당 스캐너만 별도 그룹으로 재실행한다.
 
-**idor-scanner 인벤토리 샤딩:** idor-scanner 그룹이 `[INCOMPLETE: idor-scanner]`를 반환하거나 인벤토리(`<PHASE1_RESULTS_DIR>/idor-scanner.md`의 `### IDOR 검토 인벤토리`)가 임계(예: 40파일/120행) 초과면 deep-read를 병렬화한다:
+**[필수] idor-scanner 인벤토리 샤딩 (하드 게이트):** idor-scanner 그룹이 `[INCOMPLETE: idor-scanner]`(또는 `[INCOMPLETE: idor ...]` 어떤 형태든)를 반환하거나, 인벤토리(`<PHASE1_RESULTS_DIR>/idor-scanner.md`의 `### IDOR 검토 인벤토리` — 외부 인벤토리 파일을 참조해 `N 진입점 / M 파일`로 규모만 적은 경우 포함)가 임계(40파일/120행) 초과면, deep-read 샤딩을 **반드시 수행한다.** 이 조건은 메인 에이전트의 재량 사항이 아니다. **AI 자율 탐색(Step 6)·단일 후속 에이전트·"이미 일부 확인했다"는 판단으로 샤딩을 대체하거나 생략하는 것을 금지한다.** AI 자율 탐색은 샤딩을 보완할 수는 있어도 대체하지 못한다(전수성·완전성 백스톱이 다름).
 
-1. `python3 <NOAH_SAST_DIR>/tools/idor_shard.py <PHASE1_RESULTS_DIR>/idor-scanner.md --rows-per-shard 120 --out-dir <SHARD_DIR>` → `idor_shard_{1..K}.md`.
-2. 샤드당 1개 서브에이전트를 단일 메시지로 병렬 디스패치(각 프롬프트에 `idor-scanner/phase1.md` + 담당 `idor_shard_<n>.md` 전달).
-3. 병합: 각 샤드의 후보·인벤토리 행을 **`idor-scanner.md`(소스)에 결합**한 뒤 `phase1_build_master_list.py --merge` 재실행(파생본 직접 수정 금지). 상세는 `scanners/idor-scanner/phase1.md` "대규모 인벤토리 샤딩".
+> **기계적 강제 (예외 없음):** `phase1_build_master_list.py`가 위 조건을 검사하여, 샤딩 미완 상태이면 `IDOR_SHARDING_REQUIRED` **ERROR(exit 1)로 차단**한다(아래 "마스터 목록 생성" 단계에서 즉시 발동). 게이트 해제는 **오직 산출물 검증을 통과한 sentinel로만** 가능하다 — sentinel을 손으로 `touch`하거나, "환경상 불가"로 면제하거나, 빈 파일을 만들어 우회할 수 없다(스크립트가 샤드 결과 파일 실재·병합 상태를 재검증한다). 따라서 이 게이트를 통과하지 않고는 Step 6로 진행할 수 없다.
+
+1. `python3 <NOAH_SAST_DIR>/tools/idor_shard.py <인벤토리 MD 경로> --rows-per-shard 120 --max-shards 10 --out-dir <SHARD_DIR>` → `idor_shard_{1..K}.md` + `idor_shards_manifest.json`. (인벤토리가 외부 파일로 분리되어 있으면 idor-scanner.md가 아니라 그 외부 인벤토리 파일을 인자로 준다.)
+2. 샤드당 1개 서브에이전트를 단일 메시지로 병렬 디스패치(각 프롬프트에 `guidelines-phase1.md` + `idor-scanner/phase1.md`의 "대규모 인벤토리 샤딩"·"검토 단위는 파일" 규칙 + 담당 `idor_shard_<n>.md` 전달). 각 에이전트는 담당 파일을 통째로 Read해 호출 service 계층까지 추적하고 소유권 게이트를 `[검증]`/`[부재]`/`[부분]`으로 확정하며, 결과를 `<SHARD_DIR>/idor_shard_<n>_result.md`(manifest 블록 포함)로 저장한다.
+3. 병합: 각 샤드의 후보·인벤토리 행을 **`idor-scanner.md`(소스)에 결합**하고 `[INCOMPLETE]` 마커를 해소한다(파생본 직접 수정 금지). 상세는 `scanners/idor-scanner/phase1.md` "대규모 인벤토리 샤딩".
+4. **게이트 해제 (검증 경로 단일):** `python3 <NOAH_SAST_DIR>/tools/phase1_build_master_list.py <PHASE1_RESULTS_DIR> <PHASE1_RESULTS_DIR>/master-list.json --merge --idor-shards-merged <SHARD_DIR>`를 실행한다. 스크립트가 (a) 샤드 manifest의 K개 결과 파일이 모두 존재·비공백·manifest 마커 포함, (b) idor-scanner.md의 `[INCOMPLETE]` 해소를 검증한 뒤에만 sentinel을 발급하고 게이트를 연다. 검증 실패 시 `IDOR_SHARDS_INVALID`로 막힌다. **메인 에이전트가 sentinel을 직접 만들거나 게이트를 우회하는 행위는 금지(예외 없음).**
 
 **Phase 1 결과 디렉토리 생성:** 그룹 에이전트 실행 전에 디렉토리를 생성한다.
 

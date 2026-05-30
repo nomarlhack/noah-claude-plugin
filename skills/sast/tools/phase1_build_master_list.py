@@ -35,6 +35,14 @@ parser.add_argument(
     action="store_true",
     help="기존 master-list.json이 존재하면 phase2-review 결과 필드를 보존하며 병합",
 )
+parser.add_argument(
+    "--idor-shards-merged",
+    metavar="SHARD_DIR",
+    default=None,
+    help="idor 샤딩 deep-read 산출물(SHARD_DIR/idor_shards_manifest.json + idor_shard_*_result.md)을 "
+    "검증하고, 통과 시에만 게이트 해제 sentinel(idor-scanner.shard-merged)을 발급한다. "
+    "단순 touch로는 게이트를 풀 수 없다.",
+)
 args = parser.parse_args()
 
 phase1_dir = Path(args.phase1_dir)
@@ -171,6 +179,59 @@ def _read_scanner_prereq_group(scanner_name: str) -> str | None:
         return m.group(1) if m else None
     except OSError:
         return None
+
+
+IDOR_SENTINEL_NAME = "idor-scanner.shard-merged"
+_IDOR_RESULT_MIN_BYTES = 200
+
+
+def _validate_idor_shard_artifacts(shard_dir: Path, idor_md: Path):
+    """idor 샤딩 deep-read 산출물을 검증한다. 게이트 해제(sentinel 발급)의 유일한 정당 경로.
+
+    검증 항목 (하나라도 실패하면 게이트 해제 불가):
+      1. SHARD_DIR/idor_shards_manifest.json 존재 + K(shards) 파싱.
+      2. 각 샤드의 결과 파일 idor_shard_<n>_result.md 가 존재하고 비어있지 않으며(>200B)
+         NOAH-SAST MANIFEST 마커를 포함(실제 후보 산출 증거).
+      3. idor-scanner.md(소스)에서 [INCOMPLETE 마커가 실제로 해소됨(샤드 결과 병합 증거).
+
+    반환: (ok: bool, detail: str, evidence: dict)
+    """
+    manifest_path = shard_dir / "idor_shards_manifest.json"
+    if not manifest_path.is_file():
+        return False, f"샤드 manifest 없음: {manifest_path}", {}
+    try:
+        man = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        return False, f"샤드 manifest 파싱 실패: {e}", {}
+    shards = man.get("shards") or len(man.get("files", []))
+    if not shards:
+        return False, "샤드 manifest에 shards 수가 없음", {}
+    validated = []
+    for entry in man.get("files", []):
+        n = entry.get("shard")
+        shard_path = Path(entry.get("path", ""))
+        result_path = shard_path.with_name(shard_path.stem + "_result.md")
+        if not result_path.is_file():
+            return False, f"샤드 {n} 결과 파일 없음: {result_path}", {}
+        body = result_path.read_text(encoding="utf-8", errors="ignore")
+        if len(body.encode("utf-8")) < _IDOR_RESULT_MIN_BYTES:
+            return False, f"샤드 {n} 결과 파일이 비정상적으로 작음({result_path})", {}
+        if "NOAH-SAST" not in body or "MANIFEST" not in body:
+            return False, f"샤드 {n} 결과 파일에 manifest 마커 없음({result_path})", {}
+        validated.append(str(result_path))
+    if len(validated) != len(man.get("files", [])):
+        return False, "검증된 결과 파일 수가 샤드 수와 불일치", {}
+    if idor_md.is_file() and "[INCOMPLETE" in idor_md.read_text(encoding="utf-8", errors="ignore"):
+        return False, (
+            "idor-scanner.md에 [INCOMPLETE] 마커가 여전히 존재 — 샤드 결과를 소스 MD에 병합해 "
+            "미완 항목을 해소한 뒤 다시 실행하라"
+        ), {}
+    return True, f"{shards}개 샤드 결과 검증 통과", {
+        "shards": shards,
+        "shard_dir": str(shard_dir),
+        "result_files": validated,
+    }
+
 
 # Source→Sink Flow / Vulnerability Flow 섹션이 선택적인 스캐너 (설정/구성 기반)
 FLOW_OPTIONAL_SCANNERS = {
@@ -400,6 +461,98 @@ if expected_scanner_set is not None:
                 f"{scanner}: MISSING_FILE — Phase 1 결과 파일이 생성되지 않음 "
                 f"(예상: {phase1_dir / (scanner + '.md')})"
             )
+
+# 6.5 IDOR 샤딩 게이트 — idor 인벤토리가 임계 초과거나 [INCOMPLETE]면 샤드 deep-read를 강제한다.
+#      메인 에이전트의 판단으로 AI 자율 탐색/단일 에이전트로 대체하는 것을 기계적으로 차단한다.
+#      게이트 해제는 오직 검증된 sentinel로만 가능하다 — 단순 touch·환경 면제 같은 예외 경로는 없다.
+IDOR_SHARD_THRESHOLD_FILES = 40
+IDOR_SHARD_THRESHOLD_ROWS = 120
+_idor_md = phase1_dir / "idor-scanner.md"
+_idor_sentinel = phase1_dir / IDOR_SENTINEL_NAME
+
+
+def _idor_sentinel_is_valid(sentinel: Path, idor_md: Path) -> bool:
+    """sentinel이 검증 경로(--idor-shards-merged)로 발급되었고 지금도 유효한지 재확인한다.
+    빈 파일/수기 touch/forged 플래그를 거른다: JSON 구조 + 결과 파일 실재 + [INCOMPLETE] 해소를 재검증."""
+    if not sentinel.is_file():
+        return False
+    try:
+        meta = json.loads(sentinel.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False  # 빈 touch/비정형 → 무효
+    if not isinstance(meta, dict) or meta.get("gate") != "idor-sharding" or not meta.get("validated"):
+        return False
+    result_files = meta.get("result_files") or []
+    if not result_files or not all(Path(p).is_file() for p in result_files):
+        return False  # 산출물이 사라졌으면 무효
+    if idor_md.is_file() and "[INCOMPLETE" in idor_md.read_text(encoding="utf-8", errors="ignore"):
+        return False  # 병합이 되돌려졌으면 무효
+    return True
+
+
+# 6.5-a: --idor-shards-merged 가 주어지면 산출물을 검증하고 통과 시에만 sentinel을 발급한다.
+if args.idor_shards_merged is not None:
+    _ok, _detail, _evidence = _validate_idor_shard_artifacts(
+        Path(args.idor_shards_merged), _idor_md
+    )
+    if _ok:
+        _evidence.update({
+            "gate": "idor-sharding",
+            "validated": True,
+            "issued_at": datetime.now(timezone.utc).isoformat(),
+        })
+        _idor_sentinel.write_text(
+            json.dumps(_evidence, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        print(f"INFO: IDOR 샤딩 검증 통과 — sentinel 발급({_detail}).", file=sys.stderr)
+    else:
+        errors.append(
+            f"IDOR_SHARDS_INVALID — 샤딩 산출물 검증 실패: {_detail}. "
+            "샤드 deep-read를 실제로 완료하고 결과를 idor-scanner.md에 병합한 뒤 다시 실행하라. "
+            "게이트는 검증 통과 없이 해제되지 않는다."
+        )
+
+# 6.5-b: 게이트 판정 — 트리거 조건(임계 초과/[INCOMPLETE])이면 유효 sentinel이 있어야만 통과.
+if _idor_md.is_file() and not _idor_sentinel_is_valid(_idor_sentinel, _idor_md):
+    _t = _idor_md.read_text(encoding="utf-8", errors="ignore")
+    _has_incomplete = "[INCOMPLETE" in _t
+    _inv = _t.split("### IDOR 검토 인벤토리", 1)
+    _files = _rows = 0
+    if len(_inv) > 1:
+        _region = _inv[1]
+        # 인라인 인벤토리: #### 파일 섹션 수 / 표 행 수
+        _files = _region.count("\n#### ")
+        _rows = _region.count("\n| ")
+        # 외부 인벤토리 참조: "1116 진입점 / 196 파일" 같은 명시 수치도 인정
+        _m = re.search(r"(\d[\d,]*)\s*진입점\s*[/·]\s*(\d[\d,]*)\s*파일", _region)
+        if _m:
+            _rows = max(_rows, int(_m.group(1).replace(",", "")))
+            _files = max(_files, int(_m.group(2).replace(",", "")))
+    _over = _files > IDOR_SHARD_THRESHOLD_FILES or _rows > IDOR_SHARD_THRESHOLD_ROWS
+    _sentinel_present_but_invalid = _idor_sentinel.exists()
+    if _has_incomplete or _over:
+        _why = []
+        if _has_incomplete:
+            _why.append("idor-scanner.md에 [INCOMPLETE] 마커 존재(소유권 게이트 deep-read 미완)")
+        if _over:
+            _why.append(
+                f"인벤토리 {_files}파일/{_rows}행 > 임계"
+                f"({IDOR_SHARD_THRESHOLD_FILES}파일/{IDOR_SHARD_THRESHOLD_ROWS}행)"
+            )
+        if _sentinel_present_but_invalid:
+            _why.append(
+                "sentinel 파일이 존재하나 무효(수기 touch/빈 파일/산출물 소실/병합 미해소) — "
+                "검증 경로로만 발급된 sentinel만 인정"
+            )
+        errors.append(
+            "IDOR_SHARDING_REQUIRED — " + "; ".join(_why) + ". "
+            "AI 자율 탐색이나 단일 에이전트로 대체 금지(메인 에이전트 임의 판단으로 생략 불가, 예외 없음). "
+            "tools/idor_shard.py로 인벤토리를 샤딩 → 샤드당 1개 서브에이전트로 파일 단위 deep-read 병렬 수행 → "
+            "각 샤드 결과를 idor-scanner.md에 병합(=[INCOMPLETE] 해소)한 뒤, "
+            "phase1_build_master_list.py --merge --idor-shards-merged <SHARD_DIR> 를 실행하라. "
+            "이 검증 플래그가 산출물(샤드 결과 파일·병합 상태)을 확인한 경우에만 게이트가 해제된다 — "
+            "sentinel을 손으로 만들어 우회할 수 없다."
+        )
 
 # 7. stdout 출력
 if errors:
