@@ -184,6 +184,7 @@ REQUIRED_SECTIONS = [
 errors = []
 warnings = []
 candidates = []
+candidate_bodies = {}  # cid -> prose 본문 (진입점 묶음 검사용)
 clean_scanners = []
 skipped_scanners = []
 
@@ -279,6 +280,7 @@ for md in md_files:
         if 0 < mf_start < end:
             end = mf_start
         section = text[h.end() : end]
+        candidate_bodies[cid] = section
 
         # 필수 섹션 품질 검증
         for sub_name, min_len in REQUIRED_SECTIONS:
@@ -328,6 +330,24 @@ for c in candidates:
     if c["file"] and c["line"]:
         loc_groups[(c["file"], c["line"])].append(c["id"])
 duplicates = {loc: ids for loc, ids in loc_groups.items() if len(ids) > 1}
+
+# 4-B. 진입점 묶음 감지 (BUNDLED) — 진입점 통합은 금지(decision-framework §5)이므로,
+#   한 후보 본문에 서로 다른 route 어노테이션이 2개 이상이면 신호. §5 규약상 형제 route
+#   어노테이션은 본문에 붙이지 않고 메서드명으로 인용하므로, 잘 작성된 후보는 route 1개만
+#   갖는다 → route ≥2는 (a) 진입점 과대통합 또는 (b) 형제 route를 붙인 규약 위반 신호.
+#   IDOR 검토 인벤토리의 `GET /path` 행은 어노테이션 형태가 아니라 매치되지 않는다.
+ROUTE_ANNOT_RE = re.compile(
+    r"@(?:Get|Post|Put|Delete|Patch|Request)Mapping\s*\(\s*[^)]*?[\"']([^\"']+)[\"']",
+    re.IGNORECASE,
+)
+for cid, body in candidate_bodies.items():
+    routes = sorted({r.strip() for r in ROUTE_ANNOT_RE.findall(body)})
+    if len(routes) >= 2:
+        warnings.append(
+            f"{cid}: BUNDLED_ENTRYPOINTS — 후보 본문에 route 어노테이션 {len(routes)}개 "
+            f"({', '.join(routes)}). 진입점이 둘 이상이면 각각 별도 후보로 분리하라. 형제 deviance "
+            f"비교면 형제 route 어노테이션을 붙이지 말고 메서드명으로 인용하라 (decision-framework §5)."
+        )
 
 # 5. master-list.json 출력
 out_path.parent.mkdir(parents=True, exist_ok=True)
