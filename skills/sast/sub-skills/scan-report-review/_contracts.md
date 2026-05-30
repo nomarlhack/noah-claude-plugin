@@ -33,7 +33,7 @@
 | `4` | reopen_pending (품질 개선 힌트) | No | `phase1_eval_state.reopen=true` 후보 존재. phase1-review 선택적 재호출 (status는 이미 phase2-review가 확정) |
 | `5` | lint 위반 | Yes | Phase 1 원본 직접 참조 금지(§6) 위반. `evaluation/<scanner>-eval.md`로 참조 전환 |
 | `6` | missing_placeholder | Yes | 스켈레톤에 `<!-- SAFE_SECTION_HERE -->` 등 필수 플레이스홀더 누락 |
-| `7` | audit_violation (감사군 공유) | Yes | 아래 감사 중 하나 위반. **조치는 출력 메시지의 위반 유형을 따른다**: ⓐ `safe_bucket_unclassified`(safe 후보에 `safe_category` enum 누락) · ⓑ 커버리지 감사(고볼륨 스캐너 §6-A-2 미감사) · ⓒ 의무 감사(capability 스캐너 능력형 토큰 미처리 §2-D) · ⓓ 고신뢰-safe tripwire(taint 확정 흐름의 무근거 safe 분류) · ⓔ IDOR 누락 방지 게이트 2종(`session-override 미등록` / `무인증 중첩 자원 미해소`) |
+| `7` | audit_violation (감사군 공유) | Yes | 아래 감사 중 하나 위반. **조치는 출력 메시지의 위반 유형을 따른다**: ⓐ `safe_bucket_unclassified`(safe 후보에 `safe_category` enum 누락) · ⓑ 커버리지 감사(고볼륨 스캐너 §6-A-2 미감사) · ⓒ 의무 감사(capability 스캐너 능력형 토큰 미처리 §2-D) · ⓓ 고신뢰-safe tripwire(taint 확정 흐름의 무근거 safe 분류) · ⓔ IDOR 누락 방지 게이트 2종(`session-override 미등록` / `무인증 직접 객체참조 미해소` — path-var≥2 중첩 또는 path-var==1+출처=taint) |
 
 ---
 

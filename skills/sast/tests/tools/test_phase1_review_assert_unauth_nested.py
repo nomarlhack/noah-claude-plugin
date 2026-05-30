@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""phase1_review_assert.py 무인증 중첩 자원 등록 감사 회귀 테스트.
+"""phase1_review_assert.py 무인증 직접 객체참조 등록 감사 회귀 테스트.
 
-회귀 대상(클래스): 인증 미경유(`[제외]`) + path-variable 2개 이상(중첩 자원
-`/{parent}/.../{child}`) 진입점이 소유권게이트 [미확인]로 방치되고 master-list에도
-미등록이면 상위↔하위 식별자 매핑 미검증 BOLA가 조용히 누락된다(FN). session-override
-감사(①)와 동일 가족이며 _near_candidate 커버리지 계약을 공유한다.
+회귀 대상(클래스): 인증 미경유(`[제외]`) 진입점이 소유권게이트 [미확인]로 방치되고
+master-list에도 미등록이면 BOLA/IDOR가 조용히 누락된다(FN). 강제 대상은 두 가지:
+- path-variable 2개 이상(중첩 자원 `/{parent}/.../{child}`): 상위↔하위 매핑 미검증.
+- path-variable 1개 + 출처=taint(missing-owner-gate 흐름): 단일 객체 IDOR. 공개
+  카탈로그 오탐 회피를 위해 taint 신호가 있을 때만 강제(scan-only·path-var 0개는 제외).
+session-override 감사(①)와 동일 가족이며 _near_candidate 커버리지 계약을 공유한다.
 
 픽스처는 특정 프로젝트/도메인에 의존하지 않는 합성 값(편향 회피)을 쓴다.
 """
@@ -33,8 +35,8 @@ def _inv(rows: str) -> str:
     return _HEADER + rows + "\n\n다음 섹션\n"
 
 
-def _row(endpoint, loc, auth, gate):
-    return f"| 1 | {endpoint} | childId(@PathVariable String) | {loc} | taint+scan | {auth} | {gate} |"
+def _row(endpoint, loc, auth, gate, det="taint+scan"):
+    return f"| 1 | {endpoint} | childId(@PathVariable String) | {loc} | {det} | {auth} | {gate} |"
 
 
 class TestUnauthNestedResourceAudit(unittest.TestCase):
@@ -79,9 +81,29 @@ class TestUnauthNestedResourceAudit(unittest.TestCase):
                   "file": "/abs/path/ParentItemController.java", "line": 42}]
         self.assertEqual(pra._unauth_nested_resource_audit(d, cands), [])
 
-    def test_single_identifier_not_gated(self):
-        # path-var 1개 → 중첩 아님 → 게이트 대상 아님
-        d = self._phase1_dir(_inv(_row("GET /v1/items/{itemId}", "Ctrl.java:10", "[제외]", "[미확인]")))
+    def test_single_id_taint_flags_violation(self):
+        # path-var 1개 + 출처=taint(missing-owner-gate 흐름) + [제외][미확인] → 단일 객체 IDOR로 발화
+        d = self._phase1_dir(_inv(_row("GET /v1/items/{itemId}", "Ctrl.java:10", "[제외]", "[미확인]", det="taint")))
+        violations = pra._unauth_nested_resource_audit(d, candidates=[])
+        self.assertEqual(len(violations), 1)
+        self.assertIn("단일 객체참조", violations[0])
+
+    def test_single_id_scan_only_not_gated(self):
+        # path-var 1개지만 출처가 scan-only(약신호) → 공개 카탈로그 오탐 회피 위해 미발화
+        d = self._phase1_dir(
+            _inv(_row("GET /v1/items/{itemId}", "Ctrl.java:10", "[제외]", "[미확인]", det="controller-scan")))
+        self.assertEqual(pra._unauth_nested_resource_audit(d, candidates=[]), [])
+
+    def test_single_id_taint_registered_ok(self):
+        # path-var 1개 + taint지만 master-list에 등록됨 → 해소 인정
+        d = self._phase1_dir(_inv(_row("GET /v1/items/{itemId}", "Ctrl.java:10", "[제외]", "[미확인]", det="taint")))
+        cands = [{"id": "X-1", "scanner": "idor-scanner",
+                  "file": "/abs/path/Ctrl.java", "line": 10}]
+        self.assertEqual(pra._unauth_nested_resource_audit(d, cands), [])
+
+    def test_no_pathvar_taint_not_gated(self):
+        # path-var 0개(객체참조 아님)는 출처=taint여도 미발화 — 목록/검색 등
+        d = self._phase1_dir(_inv(_row("GET /v1/items", "Ctrl.java:10", "[제외]", "[미확인]", det="taint")))
         self.assertEqual(pra._unauth_nested_resource_audit(d, candidates=[]), [])
 
     def test_authenticated_nested_not_gated(self):

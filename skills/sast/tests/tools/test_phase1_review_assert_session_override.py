@@ -74,6 +74,39 @@ class TestSessionOverrideAudit(unittest.TestCase):
         idx = self._index(self._loc(19, rule="noah-java-idor-session-identity-override"))
         self.assertEqual(len(pra._session_override_audit(idx, candidates=[])), 1)
 
+    def test_absolute_index_matches_relative_candidate(self):
+        # 회귀: locindex는 절대경로, 후보 file은 상대경로(build_master_list 출력)여도 동일 파일로 인정.
+        # (정확매칭만 하면 포맷 차이로 거짓 위반 → 수동 절대화 땜질이 필요했던 모순)
+        d = tempfile.mkdtemp()
+        idx = Path(d)
+        abs_loc = "/Users/x/proj/" + _FILE  # 인덱스: 절대경로
+        (idx / "idor-scanner.locindex.json").write_text(
+            json.dumps({"locations": {f"{abs_loc}:27": {"tier": "ast", "rule_ids": [_RULE]}},
+                        "_scanner": {}}), encoding="utf-8")
+        cands = [{"id": "IDOR-X", "scanner": "idor-scanner", "file": _FILE, "line": 27}]  # 후보: 상대경로
+        self.assertEqual(pra._session_override_audit(idx, cands), [],
+                         "절대경로 인덱스 ↔ 상대경로 후보가 매칭되어 위반이 없어야 함")
+
+
+class TestSameFilePath(unittest.TestCase):
+    def test_relative_suffix_of_absolute(self):
+        self.assertTrue(pra._same_file_path("a/b/X.kt", "/root/proj/a/b/X.kt"))
+        self.assertTrue(pra._same_file_path("/root/proj/a/b/X.kt", "a/b/X.kt"))
+
+    def test_exact_match(self):
+        self.assertTrue(pra._same_file_path("a/b/X.kt", "a/b/X.kt"))
+
+    def test_same_basename_different_dir_does_not_match(self):
+        # 다른 모듈의 동명 파일은 매칭되면 안 됨(컴포넌트 경계 요구 → basename 단독 매칭 방지)
+        self.assertFalse(pra._same_file_path("mod1/X.kt", "mod2/X.kt"))
+
+    def test_partial_segment_does_not_match(self):
+        # 컴포넌트 경계("/") 요구 → "b/X.kt"가 "zab/X.kt"의 suffix처럼 보여도 매칭 안 됨
+        self.assertFalse(pra._same_file_path("b/X.kt", "zab/X.kt"))
+
+    def test_empty_is_false(self):
+        self.assertFalse(pra._same_file_path("", "a/X.kt"))
+
 
 if __name__ == "__main__":
     unittest.main()

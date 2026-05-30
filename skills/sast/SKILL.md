@@ -189,6 +189,12 @@ python3 <NOAH_SAST_DIR>/tools/select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_RO
 
 Phase 1 에이전트는 단일 메시지 안에서 모든 그룹의 Agent 도구를 동시에 호출하여 병렬 실행한다. 모든 에이전트가 완료된 후에만 Step 6로 진행한다. 완료 후 그룹 수와 수신된 결과 수를 대조하여, 누락된 에이전트가 있으면 해당 그룹만 재실행한다. 반환 요약에 `[INCOMPLETE: scanner-name]`이 있으면 해당 스캐너만 별도 그룹으로 재실행한다.
 
+**idor-scanner 인벤토리 샤딩:** idor-scanner 그룹이 `[INCOMPLETE: idor-scanner]`를 반환하거나 인벤토리(`<PHASE1_RESULTS_DIR>/idor-scanner.md`의 `### IDOR 검토 인벤토리`)가 임계(예: 40파일/120행) 초과면 deep-read를 병렬화한다:
+
+1. `python3 <NOAH_SAST_DIR>/tools/idor_shard.py <PHASE1_RESULTS_DIR>/idor-scanner.md --rows-per-shard 120 --out-dir <SHARD_DIR>` → `idor_shard_{1..K}.md`.
+2. 샤드당 1개 서브에이전트를 단일 메시지로 병렬 디스패치(각 프롬프트에 `idor-scanner/phase1.md` + 담당 `idor_shard_<n>.md` 전달).
+3. 병합: 후보 결합 후 `phase1_build_master_list.py` 재실행. 상세는 `scanners/idor-scanner/phase1.md` "대규모 인벤토리 샤딩".
+
 **Phase 1 결과 디렉토리 생성:** 그룹 에이전트 실행 전에 디렉토리를 생성한다.
 
 ```bash
@@ -344,7 +350,7 @@ python3 <NOAH_SAST_DIR>/tools/phase1_review_assert.py \
   - 커버리지 감사(고볼륨 스캐너 §6-A-2) → COVERAGE 감사 블록 보완
   - 의무 감사(capability 스캐너 §2-D) → 능력형 매치 전수 disposition
   - 고신뢰-safe tripwire → taint 확정 흐름의 safe 분류에 정당 사유+증거
-  - IDOR 누락 방지 게이트 2종(`session-override 미등록` / `무인증 중첩 자원 미해소`) → 해당 진입점을 후보 등록 또는 명시 해소
+  - IDOR 누락 방지 게이트 2종(`session-override 미등록` / `무인증 직접 객체참조 미해소` — path-var≥2 중첩 자원 또는 path-var==1 + 출처=taint 단일 객체참조) → 해당 진입점을 후보 등록 또는 명시 해소
 
 **Phase 2 진입 시 사용할 Phase 1 결과 경로**: `<PHASE1_RESULTS_DIR>/evaluation/<scanner>-eval.md` (Phase 1 원본 MD가 아님). 이후 Step 8-4(Phase 2) 에이전트 프롬프트는 eval MD를 Phase 1 결과로 참조한다 (`sub-skills/scan-report-review/_contracts.md §6` C1 lint 강제).
 

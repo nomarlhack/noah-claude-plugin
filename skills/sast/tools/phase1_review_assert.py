@@ -149,6 +149,19 @@ def _taint_safe_tripwire(index_dir: Path, candidates: list) -> list[str]:
 # 두 게이트(_session_override_audit, _unauth_nested_resource_audit)가 동일한 "위치가
 # master-list 후보와 라인 근접하는가"(register-or-discard) 의미를 공유한다. file 매칭 방식만
 # 시그널별로 다르므로(전체 경로 동일 vs basename 접미사) predicate로 주입한다.
+def _same_file_path(a: str, b: str) -> bool:
+    """경로 포맷(절대/상대) 무관 동일 파일 판정: 한쪽이 다른 쪽의 경로-suffix(컴포넌트 경계)면 동일.
+
+    locindex는 절대경로, master-list 후보 file은 상대경로일 수 있다(build_master_list 출력).
+    정확매칭(`a == b`)에 의존하면 포맷 차이만으로 누락 감사가 거짓 발화한다 —
+    _unauth_nested_resource_audit과 동일한 경로-견고 매칭을 공유해 재빌드/포맷에 안정적으로 만든다.
+    """
+    if not a or not b:
+        return False
+    a2, b2 = a.lstrip("/"), b.lstrip("/")
+    return a2 == b2 or a2.endswith("/" + b2) or b2.endswith("/" + a2)
+
+
 def _near_candidate(candidates: list, file_pred, line: int,
                     window: int = SESSION_OVERRIDE_WINDOW) -> bool:
     """후보 중 file_pred(file)이 참이고 |line - 후보라인| <= window 인 것이 있으면 True."""
@@ -220,8 +233,8 @@ def _session_override_audit(index_dir: Path, candidates: list) -> list[str]:
             oline = int(lpart)
         except ValueError:
             continue
-        # 전체 경로 동일 매칭(locindex loc는 절대경로) — 기존 동작 보존.
-        if not _near_candidate(candidates, lambda f, fp=fpart: f == fp, oline):
+        # 경로-견고 매칭(절대/상대 무관): locindex loc는 절대, 후보 file은 상대일 수 있다.
+        if not _near_candidate(candidates, lambda f, fp=fpart: _same_file_path(f, fp), oline):
             violations.append(
                 f"{loc}: session-identity-override 고신뢰 매치인데 대응 후보 없음 — "
                 f"클라이언트↔세션 신원 폴백 IDOR가 후보 등록 없이 누락됨(FN). "
@@ -272,6 +285,8 @@ def _parse_inventory_rows(text: str):
                     col["endpoint"] = i
                 elif "위치" in c:
                     col["loc"] = i
+                elif "출처" in c:
+                    col["det"] = i
                 elif "인증" in c:
                     col["auth"] = i
                 elif "소유권게이트" in c:
@@ -286,7 +301,15 @@ def _parse_inventory_rows(text: str):
 
 
 def _unauth_nested_resource_audit(phase1_dir: Path, candidates: list) -> list[str]:
-    """무인증 중첩 자원(path-var≥2)이 안전 확정·등록 없이([검증] 아님 + 미등록) 방치됐는지 검증(BOLA 조용한 누락 차단).
+    """무인증 직접 객체참조(중첩 path-var≥2, 또는 단일 path-var+taint)가 안전 확정·등록 없이
+    ([검증] 아님 + 미등록) 방치됐는지 검증(BOLA/IDOR 조용한 누락 차단).
+
+    대상 path-var 정책(공개 카탈로그 오탐 회피):
+    - path-var≥2(중첩 자원 `/{parent}/.../{child}`): 구조 신호만으로 강제. 상위↔하위
+      식별자 매핑 미검증은 그 자체로 BOLA 신호.
+    - path-var==1(단일 객체참조 `/{id}`): 단일 ID 무인증 조회는 IDOR의 표준형이나 공개
+      카탈로그(`/products/{id}` 등)도 많아, 인벤토리 `출처`에 고정밀 taint(missing-owner-gate
+      흐름)가 있을 때만 강제한다. scan-only 약신호와 path-var==0(객체참조 아님)은 제외.
 
     session-override(①)와 공통 계약이나 입력 소스가 다르다: auth=[제외] 신호는
     excludePathPatterns(교차 파일 설정) 기반이라 locindex(semgrep)에 없고 인벤토리 도구만
@@ -314,7 +337,12 @@ def _unauth_nested_resource_audit(phase1_dir: Path, candidates: list) -> list[st
         if AUTH_EXCLUDED_TOKEN not in auth:
             continue
         pv = _count_path_vars(endpoint)
-        if pv < NESTED_MIN_PATHVARS:
+        det = cell(cells, "det")
+        is_taint = "taint" in det.lower()
+        # pv>=2(중첩 자원): 구조 신호만으로 강제. pv==1(단일 객체참조): 공개 카탈로그 오탐을
+        # 피하기 위해 고정밀 missing-owner-gate 흐름(출처=taint)이 있을 때만 강제. pv==0(객체참조
+        # 아님)·pv==1 scan-only(약신호)는 제외.
+        if not (pv >= NESTED_MIN_PATHVARS or (pv == 1 and is_taint)):
             continue
         # 안전 판정([검증])만 인벤토리 텍스트로 해소 인정한다. [미확인](미판정)·[부재]·[부분]
         # (취약/부분 판정)은 phase1.md "[부재]→후보 승격" 정책 및 sibling _session_override_audit과
@@ -329,9 +357,11 @@ def _unauth_nested_resource_audit(phase1_dir: Path, candidates: list) -> list[st
         ):
             continue  # master-list 등록으로 해소됨
         state = "미판정([미확인])" if GATE_UNVERIFIED_TOKEN in gate else f"취약 판정({gate})"
+        kind = (f"중첩 자원(path-var {pv}≥2)" if pv >= NESTED_MIN_PATHVARS
+                else "단일 객체참조(path-var 1, 출처=taint)")
         violations.append(
-            f"{endpoint} ({loc}): 무인증(`[제외]`) 중첩 자원(path-var {pv}≥2)인데 "
-            f"소유권게이트 {state} + master-list 미등록 — 상위↔하위 식별자 매핑 미검증 BOLA 누락(FN). "
+            f"{endpoint} ({loc}): 무인증(`[제외]`) {kind}인데 "
+            f"소유권게이트 {state} + master-list 미등록 — 직접 객체참조 소유권 미검증 BOLA/IDOR 누락(FN). "
             f"안전이면 [검증] 확정, 취약/미판정이면 후보 등록하라"
         )
     return violations
@@ -638,12 +668,13 @@ def main() -> int:
             return 7
         nested_violations = _unauth_nested_resource_audit(phase1_dir, candidates)
         if nested_violations:
-            print(f"FAIL: 무인증 중첩 자원 미해소 {len(nested_violations)}건 (BOLA 누락):")
+            print(f"FAIL: 무인증 직접 객체참조 미해소 {len(nested_violations)}건 (BOLA/IDOR 누락):")
             for v in nested_violations[:20]:
                 print(f"  {v}")
             print(
-                "인증 미경유(`[제외]`) + path-variable 2개 이상(중첩 자원) 진입점은 상위↔하위 "
-                "식별자 매핑/소유권 미강제 시 BOLA다. 이는 phase1.md §159 '인증 미경유 [미확인] "
+                "인증 미경유(`[제외]`) 진입점 중 (a) path-variable 2개 이상(중첩 자원, 상위↔하위 "
+                "매핑 미검증) 또는 (b) path-variable 1개 + 출처=taint(missing-owner-gate 흐름, 단일 "
+                "객체 IDOR)는 소유권 미강제 시 BOLA/IDOR다. 이는 phase1.md §159 '인증 미경유 [미확인] "
                 "종결 금지'의 최소 강제선(floor)이다 — service Read로 [검증]/[부재] 확정 후 후보 "
                 "등록 또는 status=safe+safe_category 기재. ([제외] 행 전체의 §159 의무는 동일하게 유효.)"
             )
