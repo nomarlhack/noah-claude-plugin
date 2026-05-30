@@ -45,7 +45,7 @@
 - `1 PROCEDURE ANALYSE(EXTRACTVALUE(...,...))` — MySQL 5.x 에러 추출
 
 #### LIKE 와일드카드 데이터 릭
-- `?filter[email]=%@naver.com` (query) — 도메인별 사용자 식별
+- `?filter[email]=%@example.com` (query) — 도메인별 사용자 식별
 - `?filter[bank_account]=%` — 전체 계좌
 - `?q=admin%` — prefix 매칭
 

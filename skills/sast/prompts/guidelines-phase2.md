@@ -75,7 +75,7 @@ Phase 2 결과는 아래 형식의 테이블을 포함하여 반환한다.
     {
       "id": "XSS-1",
       "evidence": {
-        "commands": ["curl -X GET 'https://sandbox-developers.kakao.com/...' -H 'Cookie: ...'", "playwright script ..."],
+        "commands": ["curl -X GET 'https://sandbox.example.com/...' -H 'Cookie: ...'", "playwright script ..."],
         "responses": {"http_status": 200, "body_excerpt": "...<img onerror=alert(1)>..."},
         "observations": ["alert fired twice", "window.__xss_fired=true", "DOM contains raw onerror"]
       }
@@ -83,7 +83,7 @@ Phase 2 결과는 아래 형식의 테이블을 포함하여 반환한다.
     {
       "id": "XSS-2",
       "evidence": {
-        "commands": ["curl -X POST 'https://sandbox-developers.kakao.com/api/..' ..."],
+        "commands": ["curl -X POST 'https://sandbox.example.com/api/..' ..."],
         "responses": {"http_status": 403, "body_excerpt": "Query depth exceeds maximum"},
         "observations": ["blocked with specific vector reference"],
         "blocking_layer_hint": {"suspected": "gateway", "rationale": "response mentions depth limit"},

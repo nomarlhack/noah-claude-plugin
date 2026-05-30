@@ -31,10 +31,10 @@
 
 **Step 2: 페이로드 전송**
 `<scanner>-phase2.md`의 `evidence.commands[]`(실제 실행한 curl)를 **그대로(verbatim) 복사**한다 — 재작성·요약·플레이스홀더 치환 금지. 세션 쿠키·URL·파라미터·페이로드를 실행값 그대로 둔다. (호스트는 `SANDBOX_DOMAINS`가 빈 값일 때만 `<TARGET_HOST>` 허용.)
-예시(실행값을 그대로 채운 형태 — 빈칸 아님):
+예시(빈칸이 아닌 concrete 값으로 채운 *형태*를 보여줌). **아래 `sandbox.example.com`·`SESSION`/`CSRF`는 문서용 placeholder다 — 실제 보고서(확인됨/동적실행 항목)에는 이 예시값을 베끼지 말고 `evidence.commands[]`에 기록된 *진짜 실행한* sandbox 도메인·세션 쿠키·페이로드를 verbatim으로 넣는다.**
 ```
-curl -X POST 'https://sandbox-booking.kakao.com/api/.../endpoint?id=1024' \
-  -H 'Cookie: _kau=a1b2c3...; KSID=x9y8...' \
+curl -X POST 'https://sandbox.example.com/api/.../endpoint?id=1024' \
+  -H 'Cookie: SESSION=a1b2c3...; CSRF=x9y8...' \
   -d 'comment=<script>alert(document.cookie)</script>'
 ```
 
