@@ -150,14 +150,13 @@ rules:
           - pattern: $X
           - pattern-inside: |
               @PostAuthorize("...") $RT $M(...) { ... }
-      # 커스텀 AOP 인가 어노테이션은 코드베이스마다 이름이 달라 룰에 고정하지 않는다.
-      # (특정 이름을 sanitizer로 박으면 그 프로젝트에만 맞는 편향이 된다.) taint가
-      # 못 거르므로 후보로 올라가며, phase1.md 절차대로 에이전트가 service/AOP 계층을
-      # Read해 실제 인가 어노테이션을 확인한 뒤 제외한다(재현율 우선 — FN보다 FP가 낫다).
-      # 명시적 소유권 검증 호출
-      - pattern: checkOwner($X, ...)
-      - pattern: validateOwnership($X, ...)
-      - pattern: $V.verifyOwner(..., $X, ...)
+      # 커스텀 인가 호출(checkOwner/validateOwnership/verifyOwner 등)·AOP 어노테이션은
+      # 코드베이스마다 이름이 달라 룰에 고정하지 않는다. 특정 이름을 sanitizer로 박으면
+      # 그 프로젝트에만 맞는 편향(하드코딩)이 된다. taint가 못 거르므로 후보로 올라가며,
+      # phase1.md 절차대로 에이전트가 service/AOP 계층을 Read해 실제 소유권 검증·인가
+      # 어노테이션을 확인한 뒤 제외한다(재현율 우선 — FN보다 FP가 낫다).
+      # 위 구조적 sanitizer(equals/==/if-throw)와 프레임워크 공식 마커(@PreAuthorize/
+      # @PostAuthorize)만 룰에 고정한다.
     metadata:
       category: security
       subcategory:

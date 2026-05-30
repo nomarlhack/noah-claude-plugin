@@ -25,3 +25,44 @@ rules:
       confidence: LOW
       likelihood: LOW
       impact: HIGH
+
+  - id: noah-php-idor-session-identity-override
+    severity: WARNING
+    languages: [php]
+    message: |
+      신원 식별자가 클라이언트 입력과 세션 입력의 ?? / ?: 폴백으로 해석됨 — IDOR/BOLA 위험.
+      고정밀: 클라이언트($_GET/$_POST/$_REQUEST/request->input)와 세션($_SESSION/auth/user)이 섞인 폴백만 매치.
+      [주의] semgrep PHP 엔진은 복잡 룰+병렬 멀티파일 스캔에서 결과가 비결정적이다(-j 1에서만 안정).
+      PHP 대상은 단일 스레드 실행을 권장한다. 설계는 정상이며 결정성은 엔진 한계.
+    patterns:
+      - pattern-either:
+          - pattern: "$C ?? $S"
+          - pattern: "$S ?? $C"
+          - pattern: "$C ?: $S"
+          - pattern: "$S ?: $C"
+      - metavariable-pattern:
+          metavariable: $C
+          pattern-either:
+            - pattern: "$_GET[$CK]"
+            - pattern: "$_POST[$CK]"
+            - pattern: "$_REQUEST[$CK]"
+            - pattern: "$RC->query($CK)"
+            - pattern: "$RC->input($CK)"
+            - pattern: "$RC->get($CK)"
+      - metavariable-pattern:
+          metavariable: $S
+          pattern-either:
+            - pattern: "$_SESSION[$SK]"
+            - pattern: "$RS->user()"
+            - pattern: "$RS->user()->$SF"
+            - pattern: "auth()->user()"
+            - pattern: "auth()->id()"
+            - pattern: "Auth::id()"
+            - pattern: "Auth::user()"
+    metadata:
+      category: security
+      cwe:
+        - "CWE-639: Insecure Direct Object Reference"
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH

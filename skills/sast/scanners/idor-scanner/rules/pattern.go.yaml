@@ -24,3 +24,46 @@ rules:
       confidence: LOW
       likelihood: LOW
       impact: HIGH
+
+  - id: noah-go-idor-session-identity-override
+    severity: WARNING
+    languages: [go]
+    message: |
+      신원 식별자가 클라이언트 입력과 세션 입력의 폴백(빈값 시 세션으로 대체 / cmp.Or)으로 해석됨 — IDOR/BOLA 위험.
+      클라이언트(URL.Query/FormValue/mux.Vars/Gin c.Param)와 세션(Context.Value/session.Values/Gin c.GetString)이 섞인 폴백만 매치.
+    patterns:
+      - pattern-either:
+          # (a) if-재할당 관용구:  id := <client> ; ... ; if id == "" { id = <session> }
+          - patterns:
+              - pattern: |
+                  $ID := $C
+                  ...
+                  if $ID == "" { $ID = $S }
+          # (b) cmp.Or(<client>, <session>)  (Go 1.22+)
+          - patterns:
+              - pattern-either:
+                  - pattern: cmp.Or($C, $S)
+                  - pattern: cmp.Or($S, $C)
+      - metavariable-pattern:
+          metavariable: $C
+          pattern-either:
+            - pattern: $R.URL.Query().Get($CK)
+            - pattern: $R.FormValue($CK)
+            - pattern: $R.PostFormValue($CK)
+            - pattern: mux.Vars($R)[$CK]
+            - pattern: $CTX.Param($CK)
+            - pattern: $CTX.Query($CK)
+      - metavariable-pattern:
+          metavariable: $S
+          pattern-either:
+            - pattern: $R.Context().Value($SK)
+            - pattern: $SESS.Values[$SK]
+            - pattern: $CTX.GetString($SK)
+            - pattern: $CTX.MustGet($SK)
+    metadata:
+      category: security
+      cwe:
+        - "CWE-639: Insecure Direct Object Reference"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH

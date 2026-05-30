@@ -25,3 +25,41 @@ rules:
       confidence: LOW
       likelihood: LOW
       impact: HIGH
+
+  - id: noah-python-idor-session-identity-override
+    severity: WARNING
+    languages: [python]
+    message: |
+      신원 식별자가 클라이언트 입력과 세션 입력의 'or' 폴백으로 해석됨 — 클라이언트가
+      대상 신원을 지정/덮어쓸 수 있어 IDOR/BOLA 위험. 소유권 검증 확인 필요.
+      고정밀: 클라이언트(request.args/GET/POST/values)와 세션(session/current_user/request.user)이 섞인 or만 매치.
+    patterns:
+      - pattern-either:
+          - pattern: $C or $S
+          - pattern: $S or $C
+      - metavariable-pattern:
+          metavariable: $C
+          pattern-either:
+            - pattern: request.args.get(...)
+            - pattern: request.args[$X]
+            - pattern: request.GET.get(...)
+            - pattern: request.GET[$X]
+            - pattern: request.POST.get(...)
+            - pattern: request.values.get(...)
+            - pattern: request.form.get(...)
+      - metavariable-pattern:
+          metavariable: $S
+          pattern-either:
+            - pattern: session[$Y]
+            - pattern: session.get(...)
+            - pattern: request.session[$Y]
+            - pattern: request.user.$Y
+            - pattern: current_user.$Y
+            - pattern: g.user.$Y
+    metadata:
+      category: security
+      cwe:
+        - "CWE-639: Insecure Direct Object Reference"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH

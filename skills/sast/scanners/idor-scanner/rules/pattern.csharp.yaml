@@ -24,3 +24,38 @@ rules:
       confidence: LOW
       likelihood: LOW
       impact: HIGH
+
+  - id: noah-csharp-idor-session-identity-override
+    severity: WARNING
+    languages: [csharp]
+    message: |
+      신원 식별자가 클라이언트 입력과 세션 입력의 ?? 폴백으로 해석됨 — IDOR/BOLA 위험.
+      클라이언트(Request.Query/Form/RouteValues)와 세션(User.Claims/Identity, HttpContext.Session)이 섞인 폴백만 매치.
+    patterns:
+      - pattern-either:
+          - pattern: $C ?? $S
+          - pattern: $S ?? $C
+      - metavariable-pattern:
+          metavariable: $C
+          pattern-either:
+            - pattern: Request.Query[$CK]
+            - pattern: Request.Form[$CK]
+            - pattern: Request.RouteValues[$CK]
+            - pattern: $REQ.Query[$CK]
+            - pattern: $REQ.Form[$CK]
+      - metavariable-pattern:
+          metavariable: $S
+          pattern-either:
+            - pattern: User.FindFirst($SK)
+            - pattern: User.FindFirstValue($SK)
+            - pattern: User.Identity.$SF
+            - pattern: User.Claims
+            - pattern: HttpContext.User.$SF
+            - pattern: HttpContext.Session.$SM(...)
+    metadata:
+      category: security
+      cwe:
+        - "CWE-639: Insecure Direct Object Reference"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH

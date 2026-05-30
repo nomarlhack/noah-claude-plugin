@@ -22,3 +22,34 @@ rules:
       confidence: LOW
       likelihood: LOW
       impact: HIGH
+
+  - id: noah-ruby-idor-session-identity-override
+    severity: WARNING
+    languages: [ruby]
+    message: |
+      신원 식별자가 클라이언트 입력과 세션 입력의 || 폴백으로 해석됨 — IDOR/BOLA 위험.
+      클라이언트(params[])와 세션(session[]/current_user)이 섞인 폴백만 매치.
+    patterns:
+      - pattern-either:
+          - pattern: $C || $S
+          - pattern: $S || $C
+      - metavariable-pattern:
+          metavariable: $C
+          pattern-either:
+            - pattern: params[$CK]
+            - pattern: params.fetch($CK)
+            - pattern: params.dig(...)
+      - metavariable-pattern:
+          metavariable: $S
+          pattern-either:
+            - pattern: session[$SK]
+            - pattern: request.session[$SK]
+            - pattern: current_user.$SF
+            - pattern: current_user
+    metadata:
+      category: security
+      cwe:
+        - "CWE-639: Insecure Direct Object Reference"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH

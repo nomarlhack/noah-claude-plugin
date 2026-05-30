@@ -25,3 +25,42 @@ rules:
       confidence: LOW
       likelihood: LOW
       impact: HIGH
+
+  - id: noah-javascript-idor-session-identity-override
+    severity: WARNING
+    languages: [javascript, typescript]
+    message: |
+      신원 식별자가 클라이언트 입력과 세션 입력의 ||/?? 폴백으로 해석됨 — 클라이언트가
+      대상 신원을 지정/덮어쓸 수 있어 IDOR/BOLA 위험. 소유권 검증 확인 필요.
+      고정밀: 클라이언트(req.query/params/body)와 세션(req.user/session/auth)이 섞인 폴백만 매치.
+    patterns:
+      - pattern-either:
+          - pattern: $C || $S
+          - pattern: $S || $C
+          - pattern: $C ?? $S
+          - pattern: $S ?? $C
+      - metavariable-pattern:
+          metavariable: $C
+          pattern-either:
+            - pattern: $R.query.$X
+            - pattern: $R.query[$X]
+            - pattern: $R.params.$X
+            - pattern: $R.params[$X]
+            - pattern: $R.body.$X
+            - pattern: $R.body[$X]
+      - metavariable-pattern:
+          metavariable: $S
+          pattern-either:
+            - pattern: $R.user.$Y
+            - pattern: $R.user
+            - pattern: $R.session.$Y
+            - pattern: $R.auth.$Y
+            - pattern: $R.currentUser.$Y
+            - pattern: currentUser.$Y
+    metadata:
+      category: security
+      cwe:
+        - "CWE-639: Insecure Direct Object Reference"
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
