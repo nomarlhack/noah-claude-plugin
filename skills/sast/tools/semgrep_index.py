@@ -185,30 +185,57 @@ def collect_rule_files(rules_dir: Path) -> list[Path]:
     return files
 
 
-def run_semgrep(
+# php 전용 룰 파일(언어 suffix 컨벤션: pattern.php.yaml / taint.php.yaml).
+# semgrep의 PHP 분석기는 병렬 멀티파일 스캔에서 매치를 비결정적으로 누락한다
+# (-j 1 단일 스레드에서만 안정. 검증: 다른 7개 언어는 병렬에서도 결정적, PHP만 요동).
+# 따라서 php 룰은 -j 1 + *.php 한정으로 별도 패스 실행해 결정성을 확보한다.
+PHP_RULE_SUFFIXES = (".php.yaml", ".php.yml")
+
+# project_root별 .php 파일 존재 여부 캐시 (스캐너마다 트리를 다시 걷지 않도록).
+_HAS_PHP_CACHE: dict[str, bool] = {}
+
+
+def _project_has_php(project_root: str, extra_targets: list[str] | None) -> bool:
+    """project_root(및 mirror 타깃)에 .php 파일이 하나라도 있으면 True. 결과 캐시."""
+    if project_root in _HAS_PHP_CACHE:
+        return _HAS_PHP_CACHE[project_root]
+    found = False
+    for root in [project_root, *(extra_targets or [])]:
+        try:
+            if next(Path(root).rglob("*.php"), None) is not None:
+                found = True
+                break
+        except OSError:
+            pass
+    _HAS_PHP_CACHE[project_root] = found
+    return found
+
+
+def _invoke_semgrep(
     rule_files: list[Path],
     project_root: str,
-    extra_targets: list[str] | None = None,
-    exclude_abs: set[str] | None = None,
+    include_exts: list[str],
+    extra_targets: list[str] | None,
+    exclude_abs: set[str] | None,
+    jobs: int | None,
 ) -> tuple[dict, str | None]:
-    """semgrep 실행. 결과 JSON 파싱 후 (results, error) 반환.
-    extra_targets가 있으면 함께 스캔 (UTF-8 mirror 디렉토리 지원).
-    exclude_abs: semgrep --exclude-rule 대신 --exclude 경로로 제외할 절대경로 집합."""
+    """semgrep 1회 호출 → (data, error). jobs가 주어지면 -j <jobs>로 병렬도 고정."""
     cmd = ["semgrep", "scan", "--json", "--quiet", "--no-git-ignore"]
-    for ext in INCLUDE_EXTS:
+    for ext in include_exts:
         cmd.extend(["--include", ext])
     for rf in rule_files:
         cmd.extend(["--config", str(rf)])
-    # 스캔 대상에서 제외할 경로. project_root 기준 상대경로로 변환해서 --exclude-dir 적용.
+    # 스캔 대상에서 제외할 경로. project_root 기준 상대경로로 변환해서 --exclude 적용.
     if exclude_abs:
         proj = Path(project_root).resolve()
         for ep in exclude_abs:
             try:
                 rel = Path(ep).relative_to(proj)
-                # 최상위 디렉토리 이름만 있으면 --exclude-dir, 중첩 경로는 glob 패턴
                 cmd.extend(["--exclude", str(rel)])
             except ValueError:
                 pass  # project_root 밖 경로는 무시
+    if jobs is not None:
+        cmd.extend(["-j", str(jobs)])
     cmd.append(project_root)
     if extra_targets:
         cmd.extend(extra_targets)
@@ -224,9 +251,8 @@ def run_semgrep(
     except OSError as e:
         return {}, f"io_error: {e}"
 
-    # semgrep exit code: 0 (findings 0건도 0), 비0이면 오류
+    # semgrep exit code: 0 (findings 0건도 0), 1 (finding 있음), 2+ 오류
     if result.returncode not in (0, 1):
-        # 1은 finding 있을 때, 2 이상은 오류
         err_snippet = (result.stderr or "").strip().splitlines()[:5]
         return {}, f"semgrep_error: rc={result.returncode}: {' | '.join(err_snippet)}"
 
@@ -239,6 +265,59 @@ def run_semgrep(
         return {}, f"json_decode_error: {e}"
 
     return data, None
+
+
+def run_semgrep(
+    rule_files: list[Path],
+    project_root: str,
+    extra_targets: list[str] | None = None,
+    exclude_abs: set[str] | None = None,
+) -> tuple[dict, str | None]:
+    """semgrep 실행. 결과 JSON 파싱 후 (results, error) 반환.
+    extra_targets가 있으면 함께 스캔 (UTF-8 mirror 디렉토리 지원).
+    exclude_abs: --exclude 경로로 제외할 절대경로 집합.
+
+    php 전용 룰이 있고 프로젝트에 .php가 있으면 결정성 확보를 위해 2-패스로 실행:
+      (1) php 제외 룰 → 병렬(기본 -j)로 전체 스캔
+      (2) php 룰만 → -j 1 + *.php 한정으로 스캔
+    두 패스 결과를 병합한다. php가 없는 프로젝트는 기존과 동일하게 단일 패스."""
+    php_rules = [rf for rf in rule_files if str(rf).endswith(PHP_RULE_SUFFIXES)]
+    other_rules = [rf for rf in rule_files if rf not in php_rules]
+
+    # php 룰이 없거나 프로젝트에 .php가 없으면 단일 패스(기존 동작 그대로).
+    if not php_rules or not _project_has_php(project_root, extra_targets):
+        return _invoke_semgrep(
+            rule_files, project_root, INCLUDE_EXTS, extra_targets, exclude_abs, None
+        )
+
+    # 2-패스. .php는 패스2 전담이므로 패스1 include에서 제외(중복 스캔 방지).
+    merged: dict = {"results": [], "errors": []}
+
+    if other_rules:
+        non_php_exts = [e for e in INCLUDE_EXTS if e != "*.php"]
+        data_main, err_main = _invoke_semgrep(
+            other_rules, project_root, non_php_exts, extra_targets, exclude_abs, None
+        )
+        if err_main is not None:
+            # 메인 패스 실패는 기존처럼 전체 실패로 처리(보수적).
+            return {}, err_main
+        merged["results"].extend(data_main.get("results", []))
+        merged["errors"].extend(data_main.get("errors", []))
+
+    # php 패스: -j 1 단일 스레드 + *.php 한정 (결정성).
+    data_php, err_php = _invoke_semgrep(
+        php_rules, project_root, ["*.php"], extra_targets, exclude_abs, 1
+    )
+    if err_php is not None:
+        if not other_rules:
+            return {}, err_php
+        # 메인은 성공했는데 php 패스만 실패 → 메인 결과는 보존하고 php 실패는 비치명적 기록.
+        merged["errors"].append({"type": "php_pass_error", "message": err_php})
+    else:
+        merged["results"].extend(data_php.get("results", []))
+        merged["errors"].extend(data_php.get("errors", []))
+
+    return merged, None
 
 
 def normalize_check_id(check_id: str) -> str:
