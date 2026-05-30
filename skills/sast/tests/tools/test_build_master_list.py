@@ -125,6 +125,66 @@ class TestBuildMasterList(unittest.TestCase):
             self.assertEqual(r.returncode, 1)
             self.assertIn("NO_MANIFEST", r.stdout)
 
+    def _run_merge(self, phase1_dir, out_path):
+        return subprocess.run(
+            ["python3", SCRIPT, str(phase1_dir), str(out_path), "--merge"],
+            capture_output=True, text=True, timeout=30,
+        )
+
+    def test_manual_addition_preserved_on_rebuild(self):
+        """manual_addition:true 후보는 소스 MD에 없어도 --merge 재빌드 시 보존된다(모순1)."""
+        with tempfile.TemporaryDirectory() as d:
+            Path(os.path.join(d, "xss-scanner.md")).write_text(VALID_MD)
+            out = os.path.join(d, "master-list.json")
+            self.assertEqual(self._run(d, out).returncode, 0)
+            # 게이트가 추가한 것처럼 manual_addition 후보를 master-list에 주입(소스 MD엔 없음)
+            data = json.loads(Path(out).read_text())
+            data["candidates"].append({
+                "id": "IDOR-GATE-1", "scanner": "idor-scanner", "manual_addition": True,
+                "file": "src/X.java", "line": 26, "status": "candidate", "phase1_validated": True,
+                "title": "gate-added", "url_path": "/x",
+            })
+            Path(out).write_text(json.dumps(data, ensure_ascii=False))
+            # 재빌드
+            r = self._run_merge(d, out)
+            self.assertEqual(r.returncode, 0, f"stderr: {r.stderr}")
+            ids = {c["id"] for c in json.loads(Path(out).read_text())["candidates"]}
+            self.assertIn("IDOR-GATE-1", ids, "manual_addition 후보가 재빌드에 소멸하면 안 된다")
+            self.assertIn("manual_addition 후보 보존", r.stderr)
+
+    def test_unflagged_orphan_not_preserved(self):
+        """플래그 없는 고아 후보(진짜 누락)는 보존하지 않는다 — '재생성 가능' 안전성 유지."""
+        with tempfile.TemporaryDirectory() as d:
+            Path(os.path.join(d, "xss-scanner.md")).write_text(VALID_MD)
+            out = os.path.join(d, "master-list.json")
+            self.assertEqual(self._run(d, out).returncode, 0)
+            data = json.loads(Path(out).read_text())
+            data["candidates"].append({  # manual_addition 플래그 없음
+                "id": "ORPHAN-1", "scanner": "idor-scanner",
+                "file": "src/Y.java", "line": 1, "status": "candidate",
+            })
+            Path(out).write_text(json.dumps(data, ensure_ascii=False))
+            self._run_merge(d, out)
+            ids = {c["id"] for c in json.loads(Path(out).read_text())["candidates"]}
+            self.assertNotIn("ORPHAN-1", ids, "플래그 없는 고아는 보존되면 안 된다")
+
+    def test_path_format_tolerant_carryover(self):
+        """경로 포맷 차이(절대 vs 상대, 같은 파일·라인)는 sink 이동이 아니므로 eval 필드 보존(모순2)."""
+        with tempfile.TemporaryDirectory() as d:
+            Path(os.path.join(d, "xss-scanner.md")).write_text(VALID_MD)  # file=src/components/Comment.tsx
+            out = os.path.join(d, "master-list.json")
+            self.assertEqual(self._run(d, out).returncode, 0)
+            data = json.loads(Path(out).read_text())
+            c = data["candidates"][0]
+            c["file"] = "/abs/root/src/components/Comment.tsx"  # 절대경로(포맷만 다름, 같은 파일)
+            c["phase1_validated"] = True
+            Path(out).write_text(json.dumps(data, ensure_ascii=False))
+            r = self._run_merge(d, out)
+            self.assertEqual(r.returncode, 0, f"stderr: {r.stderr}")
+            self.assertNotIn("file,line) 변경", r.stderr, "포맷 차이를 이동으로 오판하면 안 됨")
+            c2 = json.loads(Path(out).read_text())["candidates"][0]
+            self.assertTrue(c2.get("phase1_validated"), "포맷 차이로 eval 필드가 소실되면 안 된다")
+
     def test_no_args(self):
         """인자 없이 실행 → argparse 인자 누락 에러 + exit 2"""
         r = subprocess.run(

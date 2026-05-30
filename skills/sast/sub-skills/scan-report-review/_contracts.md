@@ -66,7 +66,8 @@
     "retries": 0,
     "conflicts": []
   },
-  "safe_category": null | "no_external_path" | "defense_verified" | "not_applicable" | "false_positive" | "platform_default_defense" | "architectural_rationale_only"
+  "safe_category": null | "no_external_path" | "defense_verified" | "not_applicable" | "false_positive" | "platform_default_defense" | "architectural_rationale_only",
+  "manual_addition": true   // (선택) 게이트(FN 방지)·외부 증거로 추가돼 소스 MD에 없는 후보. phase1_build_master_list.py --merge가 재빌드 시 통째로 보존한다(미설정 고아는 보존 안 됨).
 }
 ```
 

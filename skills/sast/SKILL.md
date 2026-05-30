@@ -193,7 +193,7 @@ Phase 1 에이전트는 단일 메시지 안에서 모든 그룹의 Agent 도구
 
 1. `python3 <NOAH_SAST_DIR>/tools/idor_shard.py <PHASE1_RESULTS_DIR>/idor-scanner.md --rows-per-shard 120 --out-dir <SHARD_DIR>` → `idor_shard_{1..K}.md`.
 2. 샤드당 1개 서브에이전트를 단일 메시지로 병렬 디스패치(각 프롬프트에 `idor-scanner/phase1.md` + 담당 `idor_shard_<n>.md` 전달).
-3. 병합: 후보 결합 후 `phase1_build_master_list.py` 재실행. 상세는 `scanners/idor-scanner/phase1.md` "대규모 인벤토리 샤딩".
+3. 병합: 각 샤드의 후보·인벤토리 행을 **`idor-scanner.md`(소스)에 결합**한 뒤 `phase1_build_master_list.py --merge` 재실행(파생본 직접 수정 금지). 상세는 `scanners/idor-scanner/phase1.md` "대규모 인벤토리 샤딩".
 
 **Phase 1 결과 디렉토리 생성:** 그룹 에이전트 실행 전에 디렉토리를 생성한다.
 

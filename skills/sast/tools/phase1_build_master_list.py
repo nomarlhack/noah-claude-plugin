@@ -46,6 +46,9 @@ EVAL_FIELDS = {
     "safe_category", "phase1_validated", "phase1_discarded_reason", "phase1_eval_state",
 }
 existing_by_id = {}
+# 게이트/외부 추가 후보(소스 MD에 없음)는 재빌드 시 통째로 보존한다. `manual_addition: true`
+# 플래그가 있는 후보만 보존 — 플래그 없는 고아(=진짜 누락)는 보존하지 않아 "재생성 가능" 안전성 유지.
+manual_additions = {}
 if args.merge and out_path.is_file():
     try:
         prev = json.loads(out_path.read_text(encoding="utf-8"))
@@ -56,13 +59,29 @@ if args.merge and out_path.is_file():
                 snapshot["__prev_file"] = c.get("file")
                 snapshot["__prev_line"] = c.get("line")
                 existing_by_id[cid] = snapshot
+                if c.get("manual_addition") is True:
+                    manual_additions[cid] = dict(c)  # 전체 dict 보존(소스 MD 없음)
         print(
-            f"INFO: --merge 모드, 기존 {len(existing_by_id)}건의 phase2-review 결과 필드를 보존합니다.",
+            f"INFO: --merge 모드, 기존 {len(existing_by_id)}건의 phase2-review 결과 필드를 보존합니다"
+            f"(manual_addition {len(manual_additions)}건 통째 보존).",
             file=sys.stderr,
         )
     except (json.JSONDecodeError, OSError) as e:
         print(f"WARNING: --merge 실패, 새로 생성: {e}", file=sys.stderr)
         existing_by_id = {}
+        manual_additions = {}
+
+def _same_path(a, b):
+    """경로 포맷(절대/상대) 무관 동일 파일 판정: 한쪽이 다른 쪽의 경로-suffix(컴포넌트 경계)면 동일.
+
+    스캐너마다 결과 MD에 절대/상대경로를 섞어 쓰므로, false-carryover 가드가 포맷 차이만으로
+    "sink 이동"을 오판해 eval 필드를 버리던 문제를 막는다(phase1_review_assert._same_file_path와 동일 계약).
+    """
+    if not a or not b:
+        return a == b
+    a2, b2 = a.lstrip("/"), b.lstrip("/")
+    return a2 == b2 or a2.endswith("/" + b2) or b2.endswith("/" + a2)
+
 
 def _build_candidate_dict(cid, scanner, cand, md, existing_by_id, prereq_group=None):
     base = {
@@ -99,7 +118,7 @@ def _build_candidate_dict(cid, scanner, cand, md, existing_by_id, prereq_group=N
         prev_file = preserved.pop("__prev_file", None)
         prev_line = preserved.pop("__prev_line", None)
         if prev_file is not None and prev_line is not None and (
-            prev_file != base["file"] or prev_line != base["line"]
+            not _same_path(prev_file, base["file"]) or prev_line != base["line"]
         ):
             print(
                 f"WARNING: --merge {cid} (file,line) 변경 "
@@ -348,6 +367,15 @@ for cid, body in candidate_bodies.items():
             f"({', '.join(routes)}). 진입점이 둘 이상이면 각각 별도 후보로 분리하라. 형제 deviance "
             f"비교면 형제 route 어노테이션을 붙이지 말고 메서드명으로 인용하라 (decision-framework §5)."
         )
+
+# 4-b. manual_addition 후보 보존: 소스 MD에서 재생성되지 않은(=ID 미존재) 플래그 후보를 통째로 append.
+#      게이트(FN 방지)나 외부 증거로 추가된 후보가 재빌드에 소멸하던 모순을 차단한다.
+_built_ids = {c["id"] for c in candidates}
+for cid, full in manual_additions.items():
+    if cid not in _built_ids:
+        candidates.append(full)
+        print(f"INFO: manual_addition 후보 보존: {cid} ({full.get('file', '')}:{full.get('line', '')})",
+              file=sys.stderr)
 
 # 5. master-list.json 출력
 out_path.parent.mkdir(parents=True, exist_ok=True)
