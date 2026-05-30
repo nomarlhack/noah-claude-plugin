@@ -24,12 +24,14 @@ flowchart TD
     CODE --> INV
     LOC --> INV["idor_inventory.py<br/>taint + controller-scan"]
     INV -->|"dedup · auth 라벨 · 파일별 그룹핑"| CL["파일 단위 체크리스트<br/>(#### 파일 + 엔드포인트 행, 소유권게이트=[미확인])"]
-    CL -->|"파일 1개씩 통째 Read<br/>→ service 추적"| JUDGE["에이전트 판정<br/>[검증]/[부재]/[부분]"]
+    CL -->|"소규모: 단일 에이전트"| JUDGE["에이전트 파일 단위 검토<br/>(파일 통째 Read → service 추적)<br/>[검증]/[부재]/[부분]"]
+    CL -->|"대규모: idor_shard.py로<br/>K개 샤드 분할(파일 원자성)"| SHARD["샤드 1..K"]
+    SHARD -->|"샤드당 1 에이전트 병렬<br/>(deep-read 예산 확장)"| JUDGE
     JUDGE -->|"취약·불확정"| CAND["master-list 후보 등록"]
     JUDGE -->|"안전(증거)"| SAFE["status=safe + safe_category"]
     CAND --> GATE
     SAFE --> GATE["phase1_review_assert.py<br/>백스톱 게이트(exit 7)"]
-    GATE -->|"고신호 미판정 발견"| REDO["phase1-review 재호출"]
+    GATE -->|"고신호 미판정 발견"| REDO["phase1-review 재호출 / 인벤토리 보완"]
     GATE -->|"통과"| NEXT["다음 단계(동적 분석/리포팅)"]
 ```
 
@@ -72,6 +74,8 @@ raw 매치(수천~수만)는 그대로 검토할 수 없다. 인벤토리 생성
 
 **검토 단위는 파일이다**(일반 phase1의 파일 단위 디스패치와 동일). 엔드포인트 행을 따로따로 보지 않고, 각 `#### <파일>` 블록을 통째로 Read한다. `[제외]` 포함 파일부터 처리한다.
 
+> **대규모 인벤토리 샤딩**: 인벤토리가 임계(예: 40파일/120행) 초과면 단일 에이전트가 예산 초과로 일부 파일만 deep-read하고 나머지를 `[미확인]`로 방치한다. `idor_shard.py`가 인벤토리를 **파일 원자성·무손실·부하 균형**으로 K개 샤드(`idor_shard_{1..K}.md`)로 분할하고, 오케스트레이터가 샤드당 1개 에이전트를 병렬 디스패치해 deep-read 예산을 확장한다. 병합 시 각 샤드의 후보를 **소스 MD(`idor-scanner.md`)에 결합 후 `phase1_build_master_list.py --merge` 재실행**(파생본 직접 수정 금지). 세부: `scanners/idor-scanner/phase1.md` "대규모 인벤토리 샤딩".
+
 각 파일에서:
 1. 파일을 통째 Read하여 sibling 메서드·import·공유 service를 한 컨텍스트로 파악.
 2. 각 엔드포인트가 호출하는 **service/도메인 계층까지 따라가** 소유권 검증 유무를 확인.
@@ -110,12 +114,14 @@ raw 매치(수천~수만)는 그대로 검토할 수 없다. 인벤토리 생성
 | 게이트 | 신호 | 입력 |
 |--------|------|------|
 | `_session_override_audit` | 신원이 클라(`@RequestParam`)와 세션(`@RequestHeader`)의 null-폴백으로 해석되는 고정밀 매치 | locindex |
-| `_unauth_nested_resource_audit` | 인증 미경유(`[제외]`) + path-variable 2개 이상(중첩 자원 `/{parent}/.../{child}`) | 인벤토리 |
+| `_unauth_nested_resource_audit` | 인증 미경유(`[제외]`) + **(a)** path-variable 2개 이상(중첩 자원 `/{parent}/.../{child}`) **또는 (b)** path-variable 1개 + 출처=`taint`(단일 객체 IDOR) | 인벤토리 |
+
+> 두 게이트의 후보↔매치 경로 비교는 **경로 포맷(절대/상대) 무관 suffix 매칭**(`_same_file_path`)을 쓴다 — locindex(절대)와 master-list 후보(상대)의 포맷 차이로 거짓 위반이 나지 않게.
 
 **게이트가 못 잡는 것**(정직한 한계):
 - 판정이 거짓인 경우(손은 댐 — 별도 층인 taint-safe tripwire 등이 일부 담당).
-- 의미적 변종 — 신원 식별자가 소비되나 거부하지 않는 decoy, 단일 식별자 추측형 IDOR 등.
-→ 이들은 **파일 단위 검토(1차) + DAST(동적 권한 diff)**가 백스톱이다. 게이트는 1차 방어가 아니라 *고신호 슬라이스의 조용한 누락*을 막는 2차 그물이다.
+- 의미적 변종 — 신원 식별자가 소비되나 거부하지 않는 decoy, **인증된 경로**의 broken-gate(게이트 호출은 있으나 내용이 깨짐), taint 미발화(`controller-scan`만) 단일 식별자 IDOR 등. (무인증 + taint 신호 있는 단일 객체 IDOR는 위 (b)로 잡힌다.)
+→ 이들은 **파일 단위 검토(1차) + AI 자율 탐색 + DAST(동적 권한 diff)**가 백스톱이다. 게이트는 1차 방어가 아니라 *고신호 슬라이스의 조용한 누락*을 막는 2차 그물이다.
 
 > exit 7 감사군 전체: `sub-skills/scan-report-review/_contracts.md §2`. 게이트 세부: `docs/idor-inventory.md`.
 
