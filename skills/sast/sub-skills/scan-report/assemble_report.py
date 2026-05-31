@@ -273,6 +273,11 @@ def build_chain_section(ca):
 
     lines = ['## 연계 시나리오', '']
 
+    # 테이블 셀 값에 포함된 | 는 \| 로 이스케이프하고 개행은 공백으로 치환한다
+    # (요약/안전 테이블과 동일 규칙 — 미적용 시 셀이 분할되어 표가 깨진다)
+    def _cell(s):
+        return str(s).replace("|", "\\|").replace("\n", " ")
+
     chains = ca.get('chains', [])
     independent = ca.get('independent', [])
 
@@ -286,7 +291,7 @@ def build_chain_section(ca):
             lines.append('| Step | 취약점 | 설명 |')
             lines.append('|------|--------|------|')
             for j, step in enumerate(chain['steps'], 1):
-                lines.append(f'| {j} | {step["vuln"]} | {step["desc"]} |')
+                lines.append(f'| {j} | {_cell(step["vuln"])} | {_cell(step["desc"])} |')
             lines.append('')
             if chain.get('poc'):
                 lines.append(chain['poc'])
@@ -300,18 +305,20 @@ def build_chain_section(ca):
         lines.append('| 후보 | 체인 미구성 사유 |')
         lines.append('|------|----------------|')
         for item in independent:
-            lines.append(f'| {item["id"]} | {item["reason"]} |')
+            lines.append(f'| {_cell(item["id"])} | {_cell(item["reason"])} |')
         lines.append('')
 
     return '\n'.join(lines)
 
 
-def build_table_from_details(report_text, master_list_ids=None):
+def build_table_from_details(report_text, master_list_ids=None, id_to_remark=None):
     """상세 섹션을 파싱하여 취약점 요약 테이블을 자동 생성한다.
 
     master_list_ids: master-list.json의 candidates[].id 집합 (set). 제공되면
     상세 섹션 내 ``**ID**:`` 값의 유효성을 교차검증하고, 매칭되지 않는 ID는
-    ``—`` 폴백으로 처리한다. 미제공 시 ID 값을 그대로 수용 (기존 호출부 호환)."""
+    ``—`` 폴백으로 처리한다. 미제공 시 ID 값을 그대로 수용 (기존 호출부 호환).
+    id_to_remark: id -> 비고 문자열 맵 (선택). 제공되면 '상태' 우측에 '비고'
+    컬럼을 추가하여 후보 유지 사유(환경 제한/정보 부족 등)·확인 구분을 표시한다."""
     lines = report_text.split('\n')
 
     in_scanner_section = False
@@ -409,14 +416,24 @@ def build_table_from_details(report_text, master_list_ids=None):
         title = m.group(2)
         result = result[:m.start()] + f'{hashes} {actual_num}. {title}' + result[m.end():]
 
-    # 요약 테이블 생성 (ID 칼럼 추가)
-    table_lines = [
-        '| # | ID | 취약점 제목 | 유형 | 스캐너 | 상태 |',
-        '|---|-----|------------|------|--------|------|',
-    ]
-    for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
-        vid_cell = vid if vid else '—'
-        table_lines.append(f'| {idx} | {vid_cell} | {title} | {vtype} | {scanner} | {status} |')
+    # 요약 테이블 생성 (ID 칼럼 추가, id_to_remark 제공 시 비고 칼럼 추가)
+    if id_to_remark is not None:
+        table_lines = [
+            '| 순번 | ID | 취약점 제목 | 스캐너 | 상태 | 비고 |',
+            '|---|-----|------------|--------|------|------|',
+        ]
+        for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
+            vid_cell = vid if vid else '—'
+            remark = id_to_remark.get(vid, '—') if vid else '—'
+            table_lines.append(f'| {idx} | {vid_cell} | {title} | {scanner} | {status} | {remark} |')
+    else:
+        table_lines = [
+            '| 순번 | ID | 취약점 제목 | 스캐너 | 상태 |',
+            '|---|-----|------------|--------|------|',
+        ]
+        for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
+            vid_cell = vid if vid else '—'
+            table_lines.append(f'| {idx} | {vid_cell} | {title} | {scanner} | {status} |')
     new_table = '\n'.join(table_lines)
 
     # 헤딩 직후 placeholder 테이블을 자동 생성 테이블로 치환한다.
@@ -512,6 +529,7 @@ if __name__ == '__main__':
     # master-list.json이 제공되면 ID 집합을 로드하여 상세 섹션의 **ID** 값을
     # 교차검증한다. 미제공 시 build_table_from_details는 ID 값을 그대로 수용.
     master_list_ids = None
+    id_to_remark = None
     if args.master_list and os.path.isfile(args.master_list):
         try:
             with open(args.master_list, encoding='utf-8') as f:
@@ -520,11 +538,26 @@ if __name__ == '__main__':
                 c.get('id') for c in _ml_data.get('candidates', [])
                 if c.get('id')
             }
+            # id -> 비고(후보 유지 사유/확인 구분) 맵. status=confirmed면 동적 확인,
+            # candidate면 tag(환경 제한/정보 부족/동적 분석 생략 등)를 비고로 사용.
+            id_to_remark = {}
+            for c in _ml_data.get('candidates', []):
+                cid = c.get('id')
+                if not cid:
+                    continue
+                st = c.get('status')
+                if st == 'confirmed':
+                    id_to_remark[cid] = '동적 확인'
+                elif st == 'candidate':
+                    id_to_remark[cid] = c.get('tag') or '—'
+                else:
+                    id_to_remark[cid] = '—'
         except (json.JSONDecodeError, IOError) as e:
             print(f"WARNING: master-list.json 로드 실패, ID 검증 스킵: {e}", file=sys.stderr)
             master_list_ids = None
+            id_to_remark = None
 
-    full_report = build_table_from_details(full_report, master_list_ids)
+    full_report = build_table_from_details(full_report, master_list_ids, id_to_remark)
 
     # skeleton과 output이 같은 경로이면 비멱등 조립 위험 차단
     if os.path.abspath(args.skeleton) == os.path.abspath(args.output):
