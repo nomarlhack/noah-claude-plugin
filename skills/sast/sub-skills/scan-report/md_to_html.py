@@ -49,6 +49,10 @@ def _sync_dashboard(md):
 
 _md_text = _sync_dashboard(_md_text)
 
+# 첫 컬럼이 스캐너 이름인 표(이상 없음/미적용 스캐너 등)에서도 -scanner 접미사를 제거하여
+# 요약 테이블 스캐너 컬럼과 표기를 통일한다. 첫 셀이 숫자/ID인 표(요약·안전)는 매칭되지 않는다.
+_md_text = re.sub(r'(?m)^(\|\s*)([A-Za-z0-9][A-Za-z0-9-]*?)-scanner(\s*\|)', r'\1\2\3', _md_text)
+
 # 동기화된 MD 를 디스크에도 반영 (단일 진실 원천)
 with open(_md_path, 'w', encoding='utf-8') as f:
     f.write(_md_text)
