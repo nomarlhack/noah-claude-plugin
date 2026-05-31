@@ -151,10 +151,10 @@ strong{color:#000;font-weight:700}
 p{line-height:1.7;margin:9px 0;color:#1a1a1a;font-size:14px}
 ul,ol{margin:9px 0;padding-left:24px;line-height:1.8;color:#1a1a1a;font-size:14px}
 li{margin:3px 0}
-.masthead{background:#111;border:2px solid #111;border-radius:0;padding:32px 32px;margin-bottom:24px;color:#fff;box-shadow:7px 7px 0 #7c3aed}
-.mh-kicker{font-size:11px;letter-spacing:0.16em;font-weight:800;color:#fde047;text-transform:uppercase}
-.mh-title{font-size:2.1em;font-weight:800;letter-spacing:-0.02em;margin-top:10px;color:#fff}
-.mh-sub{font-size:13px;color:#cbd5e1;margin-top:10px;font-weight:600}
+.masthead{background:#fff;border:2px solid #111;border-radius:0;padding:32px 32px;margin-bottom:24px;color:#111;box-shadow:7px 7px 0 #7c3aed}
+.mh-kicker{font-size:11px;letter-spacing:0.16em;font-weight:800;color:#7c3aed;text-transform:uppercase}
+.mh-title{font-size:2.1em;font-weight:800;letter-spacing:-0.02em;margin-top:10px;color:#111}
+.mh-sub{font-size:13px;color:#666;margin-top:10px;font-weight:600}
 .dashboard{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin:0 0 26px}
 .dash-glabel{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#111;margin-bottom:12px;padding-bottom:7px;border-bottom:2px solid #111}
 .dash-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
