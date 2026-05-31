@@ -13,6 +13,8 @@
 3. Phase 1에서 도출된 각 후보(CONFIRM/OVERRIDE)가 **실제로 취약한지** 동적으로 검증. guidelines-phase2.md의 공통 지침을 따르되, 해당 스캐너 phase2.md는 검증에 활용할 **페이로드/우회 변형/응답 신호 cheat sheet**로 참고 (모든 페이로드를 기계적으로 실행하라는 의미가 아님 — 후보의 라벨/sink/컨텍스트에 맞는 페이로드를 선별 적용)
 4. guidelines-phase2.md 지침 1 및 지침 3에 따라 결과 파일을 `<PHASE1_RESULTS_DIR>/<scanner-name>-phase2.md`에 저장하고 요약을 반환. DISCARD로 skip한 후보는 manifest에 포함하지 않고 반환 텍스트에만 "DISCARD skip: N건" 표기
 
+   **반환 터스 규칙**: 반환에는 보고서가 쓰는 것만 — 후보별 status 한 줄 + 확인됨/후보의 재현 명령(POC)·동적 실행 결과(명령·HTTP 상태·응답 발췌). 분석 과정·코드 인용·판정 근거는 결과 파일에만(반환은 메인 컨텍스트에 누적됨).
+
 이미 읽은 파일은 다시 읽지 마세요.
 
 ## 자기 체크리스트 (반환 전 필수)

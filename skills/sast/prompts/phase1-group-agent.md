@@ -31,13 +31,14 @@
 
 ## 결과 반환 형식
 
-**분석 전문은 파일에 저장했으므로, 반환 메시지에는 스캐너별 후보 건수 요약만 포함합니다.**
+**반환은 스캐너당 한 줄 + 마커만. 코드·근거·흐름·아키텍처 산문은 결과 파일에만 쓴다(반환은 메인 컨텍스트에 누적됨).**
 
 ```
 xss-scanner: 후보 2건
 dom-xss-scanner: 이상 없음
-open-redirect-scanner: 후보 1건
 ```
+
+마커: `[SKIP]` / `[INCOMPLETE: scanner]` / `[WARNING: manifest 불일치 — scanner]` / `[FALLBACK: ...]`.
 
 > 보고서 파일(.md/.html)을 생성하지 마세요. 결과는 `<PHASE1_RESULTS_DIR>/<scanner-name>.md` 경로에만 작성합니다.
 

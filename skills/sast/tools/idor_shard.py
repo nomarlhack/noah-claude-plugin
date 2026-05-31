@@ -112,9 +112,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("inventory", help="idor 인벤토리 MD 경로(또는 idor-scanner.md)")
     ap.add_argument("--shards", type=int, default=None, help="샤드 개수 K")
-    ap.add_argument("--rows-per-shard", type=int, default=120, help="샤드당 목표 행 수(K 자동계산)")
+    ap.add_argument("--rows-per-shard", type=int, default=60, help="샤드당 목표 행 수(K 자동계산)")
     ap.add_argument("--out-dir", required=True, help="샤드 파일 출력 디렉토리")
-    ap.add_argument("--max-shards", type=int, default=8, help="K 자동계산 상한")
+    ap.add_argument("--max-shards", type=int, default=18, help="K 자동계산 상한")
     args = ap.parse_args()
 
     text = Path(args.inventory).read_text(encoding="utf-8")

@@ -151,12 +151,26 @@ python3 <NOAH_SAST_DIR>/tools/idor_inventory.py \
 인벤토리가 임계(예: 40파일/120행) 초과면 deep-read를 K개 샤드로 병렬화한다.
 
 ```bash
-python3 <NOAH_SAST_DIR>/tools/idor_shard.py <인벤토리.md> --rows-per-shard 120 --out-dir <SHARD_DIR>
+python3 <NOAH_SAST_DIR>/tools/idor_shard.py <인벤토리.md> --rows-per-shard 60 --max-shards 18 --out-dir <SHARD_DIR>
 ```
 
 - 출력: `idor_shard_{1..K}.md`(각 샤드 = 동일 헤더 + 자기 파일 섹션) + `idor_shards_manifest.json`. 파일 원자성·무손실·부하 균형 보장.
 - 샤드당 서브에이전트 1개: 자기 샤드의 모든 `#### <파일>`을 위 "검토 단위는 파일" 규칙대로 전수 처리(후보 등록 + 인벤토리 행 `[검증]`/`[부재]` 확정).
 - 병합(파일 원자성 → 샤드 간 중복 없음): 각 샤드의 후보 섹션·manifest·인벤토리 행을 **`idor-scanner.md`(소스)에 결합**한 뒤 `phase1_build_master_list.py --merge`로 재빌드. **파생본(master-list.json)이 아니라 소스 MD에 써야** 재빌드에 소멸하지 않는다.
+- **[필수] 샤드 반환은 아래 고정 템플릿 2줄만** (후보·인벤토리·게이트 근거·코드는 `idor_shard_<n>_result.md`에만 쓴다. 반환은 메인 컨텍스트에 누적됨. 메인은 병합 시 `result.md`를 직접 읽는다). 산문·표·후보 열거 금지:
+
+  ```
+  SHARD <n>: <OK | INCOMPLETE>
+  후보 <K>건 | 게이트 검증=<a> 부재=<b> 부분=<c> 미확인=<d> | <files>파일/<rows>행
+  ```
+
+  `<n>`=샤드 번호, `OK`=전수 처리 완료. `<a..d>` 합은 처리한 진입점 수와 일치한다.
+
+  `INCOMPLETE`인 경우 아래 줄을 덧붙인다:
+
+  ```
+  미처리: <남은 파일 목록 또는 수> | 사유: <한 줄, 실제 미완 원인>
+  ```
 
 **[필수] 검토 단위는 파일이다(일반 phase1의 파일 단위 디스패치와 동일).** 엔드포인트 행을 따로따로 보지 말고, 각 `#### <파일>` 블록을 **통째로 Read**하고 — 그 파일이 호출하는 service/도메인 계층까지 따라가 — 그 파일의 **모든 엔드포인트**(체크리스트 전 항목)가 소유권 게이트를 갖는지 확인한다. 체크리스트는 한 파일 안의 어떤 진입점도 빠뜨리지 않게 하는 완전성 장치이며, 파일 단위 검토는 sibling 메서드·import·공유 service를 한눈에 보게 해 행 단위 검토보다 판정 정확도가 높다. `[제외]` 포함 파일부터 처리한다.
 

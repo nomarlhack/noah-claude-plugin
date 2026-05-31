@@ -139,6 +139,8 @@ Phase 1 판정과 Phase 2 확정 status가 다르면 `phase1_eval_state.conflict
 
 ## 반환 형식
 
+**반환은 아래 집계 테이블 + ID 목록만. evidence·방어 코드 인용은 master-list.json에 이미 있으니 반복하지 않는다(반환은 메인 컨텍스트에 누적됨).**
+
 ```
 ## Phase 2 평가 결과
 
