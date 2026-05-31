@@ -417,6 +417,9 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
         result = result[:m.start()] + f'{hashes} {actual_num}. {title}' + result[m.end():]
 
     # 요약 테이블 생성 (ID 칼럼 추가, id_to_remark 제공 시 비고 칼럼 추가)
+    # 스캐너 컬럼 표시용: -scanner 접미사 제거 (xss-scanner / sqli-scanner → xss / sqli)
+    def _scanner_disp(sc):
+        return ' / '.join(re.sub(r'-scanner$', '', p.strip()) for p in str(sc).split('/'))
     if id_to_remark is not None:
         table_lines = [
             '| 순번 | ID | 취약점 제목 | 스캐너 | 상태 | 비고 |',
@@ -425,7 +428,7 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
         for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
             vid_cell = vid if vid else '—'
             remark = id_to_remark.get(vid, '—') if vid else '—'
-            table_lines.append(f'| {idx} | {vid_cell} | {title} | {scanner} | {status} | {remark} |')
+            table_lines.append(f'| {idx} | {vid_cell} | {title} | {_scanner_disp(scanner)} | {status} | {remark} |')
     else:
         table_lines = [
             '| 순번 | ID | 취약점 제목 | 스캐너 | 상태 |',
@@ -433,7 +436,7 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
         ]
         for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
             vid_cell = vid if vid else '—'
-            table_lines.append(f'| {idx} | {vid_cell} | {title} | {scanner} | {status} |')
+            table_lines.append(f'| {idx} | {vid_cell} | {title} | {_scanner_disp(scanner)} | {status} |')
     new_table = '\n'.join(table_lines)
 
     # 헤딩 직후 placeholder 테이블을 자동 생성 테이블로 치환한다.
