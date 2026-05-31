@@ -103,6 +103,7 @@ td{padding:11px 16px;border-bottom:1px solid #d8d8d2;font-size:13px;color:#1a1a1
 th{word-break:keep-all}
 .summary-table td{text-align:center;vertical-align:middle}
 .summary-table td:nth-child(3){text-align:left}
+.summary-table td:nth-child(2){white-space:nowrap}
 .id-table td:first-child{white-space:nowrap}
 tr:last-child td{border-bottom:none}
 tr:nth-child(even){background:#faf9f4}
