@@ -549,10 +549,12 @@ if __name__ == '__main__':
                 if not cid:
                     continue
                 st = c.get('status')
+                tag = c.get('tag') or ''
                 if st == 'confirmed':
-                    id_to_remark[cid] = '동적 확인'
+                    id_to_remark[cid] = '동적 테스트 완료'
                 elif st == 'candidate':
-                    id_to_remark[cid] = c.get('tag') or '—'
+                    # tag가 없거나 None이면 '동적 분석 생략'을 기본값으로 사용
+                    id_to_remark[cid] = tag if tag else '동적 분석 생략'
                 else:
                     id_to_remark[cid] = '—'
         except (json.JSONDecodeError, IOError) as e:

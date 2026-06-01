@@ -595,9 +595,12 @@ html_out = html_out.replace('<td>후보</td>', '<td><span class="badge badge-can
 
 # 비고(후보 유지 사유/확인 구분)값도 색상 뱃지로 변환
 _remark_badges = {
-    '동적 확인': 'badge-rk-confirmed',
+    '동적 테스트 완료': 'badge-rk-confirmed',
+    '동적 확인': 'badge-rk-confirmed',        # 구버전 호환
     '정보 부족': 'badge-rk-info',
-    '환경 제한': 'badge-rk-env',
+    '환경 제한 — 경로 미라우팅': 'badge-rk-env',
+    '환경 제한 — 인증 정보 부족': 'badge-rk-env',
+    '환경 제한': 'badge-rk-env',              # 부분 매칭 폴백
     '동적 분석 생략': 'badge-rk-skip',
 }
 for _label, _cls in _remark_badges.items():
