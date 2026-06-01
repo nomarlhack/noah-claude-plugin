@@ -53,6 +53,15 @@ _md_text = _sync_dashboard(_md_text)
 # 요약 테이블 스캐너 컬럼과 표기를 통일한다. 첫 셀이 숫자/ID인 표(요약·안전)는 매칭되지 않는다.
 _md_text = re.sub(r'(?m)^(\|\s*)([A-Za-z0-9][A-Za-z0-9-]*?)-scanner(\s*\|)', r'\1\2\3', _md_text)
 
+# 개요 정규화: '## 개요' 헤딩이 없고 h1 직후에 메타 블록(**키**: 값)이 평문으로 오면
+# 그 앞에 '## 개요' 헤딩을 삽입한다. 이렇게 하면 작성 스타일과 무관하게
+# 메타 블록이 개요 카드(배너)로 렌더된다.
+if not re.search(r'(?m)^##\s*개요\s*$', _md_text):
+    _ov_m = re.search(r'(?m)^(#\s+.+\n)((?:[ \t]*\n)*)(\*\*[^\n*]+\*\*[ \t]*:)', _md_text)
+    if _ov_m:
+        _md_text = (_md_text[:_ov_m.start()] + _ov_m.group(1)
+                    + '\n## 개요\n\n' + _ov_m.group(3) + _md_text[_ov_m.end():])
+
 # 동기화된 MD 를 디스크에도 반영 (단일 진실 원천)
 with open(_md_path, 'w', encoding='utf-8') as f:
     f.write(_md_text)
@@ -609,8 +618,8 @@ def _build_overview_banner(m):
     parts = []
     for k, v in rows:
         k, v = k.strip(), v.strip()
-        # 스캔 일시는 상단 마스트헤드에 표기되므로 개요에서는 중복 제외 (MD에는 유지)
-        if k == '스캔 일시':
+        # 스캔 일시는 상단 마스트헤드에 표기되므로, 스캔 방식은 표기 정책상 개요에서 제외 (MD에는 유지)
+        if k in ('스캔 일시', '스캔 방식'):
             continue
         if '::' in v:
             # '라벨 :: 항목 ;; 라벨 :: 항목' 컨벤션: 키 글자 없이 구분선만 넣고
