@@ -1,0 +1,34 @@
+rules:
+  - id: noah-kotlin-android-accountmanager-phase1-pattern
+    severity: WARNING
+    languages:
+      - kotlin
+    message: |
+      android-accountmanager-scanner Phase 1 패턴 매치 (Kotlin 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(caller 검증 여부, 토큰 전달 경로)를 확인한 후 수행.
+    pattern-either:
+      # AccountManager API
+      - pattern-regex: 'peekAuthToken\s*\('
+      - pattern-regex: 'blockingGetAuthToken\s*\('
+      - pattern-regex: 'getPassword\s*\('
+      - pattern-regex: 'getUserData\s*\('
+      - pattern-regex: 'addAccountExplicitly\s*\('
+      - pattern-regex: 'setUserData\s*\('
+      # AbstractAccountAuthenticator
+      - pattern-regex: 'AbstractAccountAuthenticator\b'
+      - pattern-regex: 'override\s+fun\s+getAuthToken\s*\('
+      # 토큰 Bundle 삽입
+      - pattern-regex: 'KEY_AUTHTOKEN\b'
+      - pattern-regex: 'KEY_ANDROID_PACKAGE_NAME\b'
+      # Caller 검증
+      - pattern-regex: 'Binder\.getCallingUid\s*\('
+      - pattern-regex: 'getCallerUid\s*\('
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-287: Improper Authentication"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

@@ -1,0 +1,29 @@
+rules:
+  - id: noah-java-android-accountmanager-phase1-pattern
+    severity: WARNING
+    languages:
+      - java
+    message: |
+      android-accountmanager-scanner Phase 1 패턴 매치 (Java 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(caller 검증 여부, 토큰 전달 경로)를 확인한 후 수행.
+    pattern-either:
+      - pattern-regex: 'peekAuthToken\s*\('
+      - pattern-regex: 'blockingGetAuthToken\s*\('
+      - pattern-regex: 'getPassword\s*\('
+      - pattern-regex: 'getUserData\s*\('
+      - pattern-regex: 'addAccountExplicitly\s*\('
+      - pattern-regex: 'setUserData\s*\('
+      - pattern-regex: 'AbstractAccountAuthenticator\b'
+      - pattern-regex: 'getAuthToken\s*\('
+      - pattern-regex: 'KEY_AUTHTOKEN\b'
+      - pattern-regex: 'KEY_ANDROID_PACKAGE_NAME\b'
+      - pattern-regex: 'Binder\.getCallingUid\s*\('
+    metadata:
+      category: security
+      subcategory:
+        - vuln
+      cwe:
+        - "CWE-287: Improper Authentication"
+      confidence: LOW
+      likelihood: LOW
+      impact: HIGH

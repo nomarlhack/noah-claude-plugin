@@ -1,0 +1,91 @@
+rules:
+  - id: noah-java-android-accountmanager-token-exposure-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      AbstractAccountAuthenticator.getAuthToken()에서 caller UID/패키지 검증 없이
+      SSO 토큰이 Bundle에 삽입되거나, peekAuthToken/getPassword 결과가 Intent/Log에
+      전달되면 GET_ACCOUNTS 권한을 가진 앱이 타 앱의 SSO 토큰을 탈취 가능.
+      안전: Binder.getCallingUid() + 허용 UID 화이트리스트,
+            또는 AccountManager.KEY_ANDROID_PACKAGE_NAME + 서명 검증.
+    pattern-sources:
+      - pattern: $AM.peekAuthToken($ACCOUNT, $TYPE)
+      - pattern: $AM.getPassword($ACCOUNT)
+      - pattern: $AM.getUserData($ACCOUNT, $KEY)
+      - pattern: $AM.blockingGetAuthToken($ACCOUNT, $TYPE, $NOTIFY)
+      - pattern: $OPTIONS.getString(AccountManager.KEY_AUTHTOKEN)
+
+    pattern-sinks:
+      # Bundle에 토큰 삽입
+      - pattern: $BUNDLE.putString(AccountManager.KEY_AUTHTOKEN, $X)
+      - pattern: $BUNDLE.putString("authtoken", $X)
+      # Intent extra
+      - pattern: $INTENT.putExtra($K, $X)
+      - pattern: $INTENT.putExtra(AccountManager.KEY_AUTHTOKEN, $X)
+      # Logcat
+      - pattern: Log.d($TAG, $X)
+      - pattern: Log.i($TAG, $X)
+      - pattern: Log.e($TAG, $X)
+      - pattern: Log.w($TAG, $X)
+      - pattern: Log.v($TAG, $X)
+      # 브로드캐스트
+      - pattern: sendBroadcast($INTENT)
+      - pattern: $CTX.sendBroadcast($INTENT)
+
+    pattern-sanitizers:
+      - pattern: Binder.getCallingUid()
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              int $UID = Binder.getCallingUid();
+              if ($ALLOWED.contains($UID)) { ... }
+      - pattern: $CTX.checkCallingOrSelfPermission($PERM)
+      - pattern: $CTX.enforceCallingOrSelfPermission($PERM, $MSG)
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-287: Improper Authentication", "CWE-522: Insufficiently Protected Credentials"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [SSO Token Exposure, AccountManager]
+      owasp: ["A07:2021 Identification and Authentication Failures"]
+      technology: [android, java, accountmanager]
+
+  - id: noah-java-android-accountmanager-token-in-log-taint
+    severity: ERROR
+    languages:
+      - java
+    mode: taint
+    message: |
+      AccountManager에서 가져온 authToken/password가 Logcat에 출력됨.
+      root 환경 또는 ADB 연결 시 토큰 노출. 로그에서 민감 자격증명 제거 필요.
+    pattern-sources:
+      - pattern: $AM.peekAuthToken($ACCOUNT, $TYPE)
+      - pattern: $AM.getPassword($ACCOUNT)
+      - pattern: $AM.getUserData($ACCOUNT, $KEY)
+      - pattern: $AM.blockingGetAuthToken($ACCOUNT, $TYPE, $NOTIFY)
+
+    pattern-sinks:
+      - pattern: Log.d($TAG, $X)
+      - pattern: Log.i($TAG, $X)
+      - pattern: Log.e($TAG, $X)
+      - pattern: Log.w($TAG, $X)
+      - pattern: Log.v($TAG, $X)
+      - pattern: System.out.println($X)
+
+    pattern-sanitizers: []
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-532: Insertion of Sensitive Information into Log File"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [Sensitive Data in Log]
+      owasp: ["A09:2021 Security Logging and Monitoring Failures"]
+      technology: [android, java, accountmanager]
