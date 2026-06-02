@@ -288,15 +288,27 @@ def check_md(path: str) -> list[str]:
         allowed = {f for f in ALLOWED_OVERVIEW_FIELDS}
         for fm in MD_OVERVIEW_FIELD.finditer(overview_block):
             field_name = fm.group(1).strip()
-            if field_name in allowed:
-                continue
             rel_line = overview_block.count("\n", 0, fm.start()) + 1
             abs_line = overview_start_line + rel_line
-            violations.append(
-                f"{path}:{abs_line} (개요 필드): 스펙 외 필드 '**{field_name}**:' — "
-                f"허용 필드는 vuln-format.md '통합 보고서 구조' 섹션 참조 "
-                f"(현재 허용: {ALLOWED_OVERVIEW_FIELDS})"
-            )
+            if field_name not in allowed:
+                violations.append(
+                    f"{path}:{abs_line} (개요 필드): 스펙 외 필드 '**{field_name}**:' — "
+                    f"허용 필드는 vuln-format.md '통합 보고서 구조' 섹션 참조 "
+                    f"(현재 허용: {ALLOWED_OVERVIEW_FIELDS})"
+                )
+                continue
+            # '테스트 환경' 값 형식 가드: 도메인·호스트 목록 또는 <TARGET_HOST>만 허용.
+            # 값은 모든 POC curl 호스트의 단일 진실 원천이므로 서술(한글 부가설명)을 금지한다.
+            # 예외: 동적 테스트 미수행 시 '해당 없음'으로 시작하는 값.
+            if field_name == "테스트 환경":
+                value = fm.group(2).strip()
+                if re.search(r"[가-힣]", value) and not value.startswith("해당 없음"):
+                    violations.append(
+                        f"{path}:{abs_line} (개요 필드): '테스트 환경' 값에 서술/한글 포함 — "
+                        f"도메인·호스트 목록 또는 <TARGET_HOST>만 허용(서술 금지). "
+                        f"'prod 확인' 등 부가 설명은 본문/블록쿼트로 분리하고, "
+                        f"동적 테스트 미수행 시에만 '해당 없음'을 사용한다."
+                    )
     return violations
 
 
