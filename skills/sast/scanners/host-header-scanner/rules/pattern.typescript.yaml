@@ -24,6 +24,21 @@ rules:
       - pattern-regex: 'getHeader\s*\('
       - pattern-regex: 'request\.remoteAddr'
       - pattern-regex: 'X-Original-Forwarded-For'
+      - pattern-regex: 'HttpHeaders\.HOST'
+      - pattern-regex: '@RequestHeader\([^)]*([Hh]ost|HOST|Forwarded)'
+      - pattern-regex: 'getFirst\([^)]*([Hh]ost|HOST|Forwarded)'
+      - pattern-regex: 'ServletUriComponentsBuilder'
+      - pattern-regex: 'fromCurrentRequest'
+      - pattern-regex: 'fromCurrentContextPath'
+      - pattern-regex: 'fromHttpRequest'
+      - pattern-regex: 'X-Host'
+      - pattern-regex: 'X-Original-Host'
+      - pattern-regex: 'X-Forwarded-Server'
+      - pattern-regex: 'X-Original-URL'
+      - pattern-regex: 'X-Rewrite-URL'
+      - pattern-regex: 'True-Client-IP'
+      - pattern-regex: 'CF-Connecting-IP'
+      - pattern-regex: 'X-Client-IP'
     metadata:
       category: security
       subcategory:

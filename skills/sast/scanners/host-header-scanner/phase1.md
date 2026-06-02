@@ -19,7 +19,7 @@ Host Header / IP Spoofing sink는 두 카테고리:
 | Node/Express | `req.headers.host`, `req.hostname`, `req.get('host')`, `req.protocol+'://'+req.get('host')` | `req.ip`/`req.ips` (`trust proxy` 의존), `req.headers['x-forwarded-for']`, `x-real-ip`, `x-client-ip`, `req.connection.remoteAddress` |
 | Django | `request.get_host`, `META['HTTP_HOST']`, `build_absolute_uri` (ALLOWED_HOSTS 없으면 위험) | `META['REMOTE_ADDR']`, `META.get('HTTP_X_FORWARDED_FOR','').split(',')[0]` |
 | Flask | `request.host`, `request.host_url`, `url_for(_external=True)` | `request.remote_addr`, `request.access_route`, `ProxyFix` |
-| Spring | `request.getServerName`, `request.getHeader("Host")`, `ServletUriComponentsBuilder.fromCurrentRequest` | `request.getRemoteAddr`, `getHeader("X-Forwarded-For")` |
+| Spring (MVC/WebFlux) | `request.getServerName`, `request.getHeader("Host")`, `@RequestHeader(HttpHeaders.HOST)`, WebFlux `exchange.request.headers.getFirst("Host")`, `ServletUriComponentsBuilder.fromCurrentRequest`/`fromCurrentContextPath`, `UriComponentsBuilder.fromHttpRequest` | `request.getRemoteAddr`, `getHeader("X-Forwarded-For")`, WebFlux `getFirst("X-Forwarded-For")` |
 | Rails | `request.host`, `request.host_with_port`, mailer `default_url_options` | `request.remote_ip`, `request.ip` |
 | Go | `r.Host`, `r.Header.Get("Host")`, `r.Header.Get("X-Forwarded-Host")` | `r.RemoteAddr`, `r.Header.Get("X-Forwarded-For")` |
 | C#/.NET | `Request.Host`, `HttpContext.Request.Headers["Host"]`, `Url.Action(...)` | `HttpContext.Connection.RemoteIpAddress`, `Request.Headers["X-Forwarded-For"]` |
