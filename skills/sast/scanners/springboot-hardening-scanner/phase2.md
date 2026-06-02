@@ -68,6 +68,26 @@ curl -s "https://target/nonexistent_$(date +%s)"
 |---|---|
 | `Whitelabel Error Page` 문자열 | 확인됨 |
 
+#### `WHITELABEL_SPEL_RISK` — SpEL 평가 / 입력 반사 (spring-boot#4763, CVE-2022-22963)
+
+Whitelabel/에러 응답에 입력값이 반사되는지, SpEL로 평가되는지 확인한다. **`${...}` 산술식이 평가 결과로 응답에 나타나면 SpEL injection(RCE급)이다.**
+
+```bash
+# 경로/파라미터에 SpEL 산술식 주입 (고유 숫자로 오탐 방지: 31337*1=31337)
+curl -s "https://target/\${31337*1}xyz" -H "Accept: text/html"
+curl -s "https://target/path?param=test\${31337*1}test" -H "Accept: text/html"
+```
+
+| 응답 | 판정 |
+|---|---|
+| 본문에 `31337` (평가 결과) 출현 | **확인됨 — SpEL injection (Critical/RCE)** |
+| 입력값 `${31337*1}` 그대로 반사 + HTML 미이스케이프 | 확인됨 — 반사형 XSS 검토 |
+| 입력값 반사되나 이스케이프됨 | 안전 |
+| 고정 문구만, 입력 미반사 | 안전 — `WHITELABEL_ENABLED`(정보 노출)만 유지 |
+
+> **오탐 주의**: `7*7=49`는 timestamp/requestId에 우연히 섞일 수 있으므로 **고유 큰 수(`31337*1`)로 검증**한다. 평가 숫자가 명시적으로 나타나야 확인됨.
+> 현대 Spring Boot(2.x/3.x)는 `getMessage()`에서 SpEL 미평가 → 대개 "고정 문구만"=안전. Phase 1 `WHITELABEL_SPEL_RISK` 후보(취약 버전/입력반사 설정)일 때 우선 검증한다.
+
 #### `STACKTRACE_EXPOSED`
 
 ```bash
