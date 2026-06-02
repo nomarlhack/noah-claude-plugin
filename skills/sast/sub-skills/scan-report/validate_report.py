@@ -311,6 +311,26 @@ if master_list_path and os.path.exists(master_list_path) and md_content:
     except (OSError, ValueError, _json.JSONDecodeError):
         pass  # master-list.json 읽기 실패 시 이 검증 스킵
 
+# (e) '스캔 방식' ↔ '테스트 환경' 정합성 (master-list 무관, 개요만으로 판정)
+# 동적 테스트를 수행했다면 실제 호스트가 있어야 한다. 플레이스홀더/'해당 없음'이면 모순.
+_method_m = re.search(r'\*\*스캔 방식\*\*:\s*(.+?)(?:\s*\n|$)', md_content)
+_env_m2 = re.search(r'\*\*테스트 환경\*\*:\s*(.+?)(?:\s*\n|$)', md_content)
+if _method_m and _env_m2:
+    _method = _method_m.group(1)
+    _env_v = _env_m2.group(1).strip()
+    # '동적' 포함하되 '미수행'이 아니면 동적 테스트 수행으로 본다
+    _did_dynamic = ('동적' in _method) and ('미수행' not in _method)
+    _env_no_host = (
+        _env_v.startswith('해당 없음')
+        or _env_v.replace(',', ' ').split() == ['<TARGET_HOST>']
+    )
+    if _did_dynamic and _env_no_host:
+        warnings.append(
+            f"'스캔 방식'에 동적 테스트가 명시됐으나 '테스트 환경'에 실제 호스트가 없음 "
+            f"('{_env_v}') — 동적 테스트를 수행했다면 실제 도메인이 들어가야 한다. "
+            f"미수행이면 '스캔 방식'의 동적 테스트 표기를 제거하고 '테스트 환경'을 '해당 없음'으로 둔다."
+        )
+
 # --json-output: 구조화 로그 덤프
 if json_output_arg:
     try:
