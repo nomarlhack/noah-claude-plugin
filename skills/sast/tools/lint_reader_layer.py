@@ -308,7 +308,8 @@ def check_md(path: str) -> list[str]:
                         tok = tok.strip()
                         if not tok or tok == "<TARGET_HOST>":
                             continue
-                        if re.search(r"[\s()]", tok):
+                        # 서술 표지: ASCII/전각 공백·괄호·대괄호 (IDN 글자는 안 건드림)
+                        if re.search(r"[\s()（）【】\[\]<>]", tok) and tok != "<TARGET_HOST>":
                             violations.append(
                                 f"{path}:{abs_line} (개요 필드): '테스트 환경' 값에 서술 포함 "
                                 f"('{tok}') — 쉼표 구분 도메인·호스트 또는 <TARGET_HOST>만 허용. "
