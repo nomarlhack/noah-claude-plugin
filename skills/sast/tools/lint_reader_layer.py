@@ -297,18 +297,25 @@ def check_md(path: str) -> list[str]:
                     f"(현재 허용: {ALLOWED_OVERVIEW_FIELDS})"
                 )
                 continue
-            # '테스트 환경' 값 형식 가드: 도메인·호스트 목록 또는 <TARGET_HOST>만 허용.
-            # 값은 모든 POC curl 호스트의 단일 진실 원천이므로 서술(한글 부가설명)을 금지한다.
-            # 예외: 동적 테스트 미수행 시 '해당 없음'으로 시작하는 값.
+            # '테스트 환경' 값 형식 가드: 쉼표 구분 호스트 토큰만 허용.
+            # 값은 모든 POC curl 호스트의 단일 진실 원천이므로 서술을 금지한다.
+            # 호스트 토큰엔 공백·괄호가 없다(한글 IDN 도메인은 허용). 서술은 공백·괄호를
+            # 동반하므로 토큰에 공백/괄호가 있으면 위반. 예외: '해당 없음'(동적 미수행).
             if field_name == "테스트 환경":
                 value = fm.group(2).strip()
-                if re.search(r"[가-힣]", value) and not value.startswith("해당 없음"):
-                    violations.append(
-                        f"{path}:{abs_line} (개요 필드): '테스트 환경' 값에 서술/한글 포함 — "
-                        f"도메인·호스트 목록 또는 <TARGET_HOST>만 허용(서술 금지). "
-                        f"'prod 확인' 등 부가 설명은 본문/블록쿼트로 분리하고, "
-                        f"동적 테스트 미수행 시에만 '해당 없음'을 사용한다."
-                    )
+                if not value.startswith("해당 없음"):
+                    for tok in value.split(","):
+                        tok = tok.strip()
+                        if not tok or tok == "<TARGET_HOST>":
+                            continue
+                        if re.search(r"[\s()]", tok):
+                            violations.append(
+                                f"{path}:{abs_line} (개요 필드): '테스트 환경' 값에 서술 포함 "
+                                f"('{tok}') — 쉼표 구분 도메인·호스트 또는 <TARGET_HOST>만 허용. "
+                                f"'prod 확인' 등 부가 설명은 본문/블록쿼트로 분리하고, "
+                                f"동적 테스트 미수행 시에만 '해당 없음'을 사용한다."
+                            )
+                            break
     return violations
 
 
