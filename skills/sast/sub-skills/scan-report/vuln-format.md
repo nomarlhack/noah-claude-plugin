@@ -344,8 +344,8 @@ curl -X <METHOD> "<TARGET_HOST>/<API_PATH>" -H "Cookie: <SESSION_COOKIE>" -d "<P
 ## 공통 HTML 보고서 사양
 
 모든 HTML 보고서는 다음 사양을 따른다:
-- 외부 의존성 없이 단일 파일로 동작하는 정적 HTML
-- 인라인 CSS로 스타일 포함 (외부 CDN 참조 없음)
+- 단일 파일 정적 HTML (코드·데이터 인라인). 단 웹폰트·mermaid 흐름도 렌더 라이브러리는 CDN(jsdelivr) 로드를 허용한다 — `## 인증 경계` 흐름도가 있을 때 `md_to_html.py`가 ` ```mermaid ` 블록을 `<div class="mermaid">`로 변환하고 mermaid.js를 로드한다
+- 인라인 CSS로 스타일 포함
 - 취약점 목록을 한눈에 볼 수 있는 요약 테이블
 - 각 취약점 상세 섹션 (원인 분석, POC, 응답 증거)
 - 코드 블록에 구문 하이라이팅 스타일 적용

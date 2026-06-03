@@ -270,6 +270,7 @@ out.append(f'''<!DOCTYPE html>
 state = {
     'in_code': False,
     'code_lang': '',
+    'used_mermaid': False,
     'code_buf': [],
     'in_table': False,
     'tbl_header': [],
@@ -404,9 +405,15 @@ for line in lines:
             state['code_lang'] = line[3:].strip()
             state['code_buf'] = []
         else:
-            escaped_code = '\n'.join(esc(cl) for cl in state['code_buf'])
-            lang = esc(state['code_lang']) if state['code_lang'] else ''
-            out.append(f'<pre><code class="language-{lang}">{escaped_code}</code></pre>')
+            if state['code_lang'].lower() == 'mermaid':
+                # mermaid 다이어그램: 원본 문법 보존(escape 금지) + .mermaid div로 렌더
+                raw_code = '\n'.join(state['code_buf'])
+                out.append(f'<div class="mermaid">{raw_code}</div>')
+                state['used_mermaid'] = True
+            else:
+                escaped_code = '\n'.join(esc(cl) for cl in state['code_buf'])
+                lang = esc(state['code_lang']) if state['code_lang'] else ''
+                out.append(f'<pre><code class="language-{lang}">{escaped_code}</code></pre>')
             state['in_code'] = False
             state['code_buf'] = []
         continue
@@ -568,6 +575,8 @@ close_chain()
 close_always_open()
 
 out.append(f'<script>{JS}</script>')
+if state['used_mermaid']:
+    out.append('<script type="module">import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"; mermaid.initialize({ startOnLoad: true });</script>')
 out.append('</body></html>')
 
 html_out = '\n'.join(out)
