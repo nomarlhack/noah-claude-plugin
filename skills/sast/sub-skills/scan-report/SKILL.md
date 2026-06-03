@@ -15,6 +15,7 @@ noah-sast에서 호출되며, `<NOAH_SAST_DIR>`은 이미 결정된 상태이다
 - 스캐너별 분석 결과 (확인됨/후보/안전 판정, Source→Sink 경로, 코드 스니펫)
 - AI 자율 탐색 결과 (`<PHASE1_RESULTS_DIR>/evaluation/ai-discovery-eval.md`, 부재 시 `<PHASE1_RESULTS_DIR>/ai-discovery.md` fallback)
 - 동적 테스트 결과 (curl 요청/응답 증거)
+- 인증 경계(`<PHASE1_RESULTS_DIR>/auth-boundary.json`): 표면별 {진입 도메인·base path·자격증명·신원 출처·인증 근거·도달성}. 인증 경계 표/흐름도 작성과 후보 `**진입 경계**:` 필드·POC 호스트 결정에 사용
 - 이상 없음 스캐너의 점검 항목 요약
 - 미적용 스캐너 목록 및 제외 사유
 
@@ -35,6 +36,7 @@ noah-sast에서 호출되며, `<NOAH_SAST_DIR>`은 이미 결정된 상태이다
 작성 항목:
 - 보고서 헤더 (개요): `vuln-format.md`의 "통합 보고서 구조" 형식을 따른다. **볼드 키-값 쌍**으로 작성하며, `## 개요`를 사용한다. 헤더 영역 안에 `###` 소제목을 두지 않는다. (`###`는 `md_to_html.py`에서 스캐너 헤딩 스타일이 적용될 수 있으므로 헤더 영역에서 사용 금지.)
 - 총괄 요약 테이블
+- 인증 경계 표 + mermaid 흐름도 (`vuln-format.md`의 `## 인증 경계` 형식. `AUTH_BOUNDARY` 기반으로 메인 에이전트가 직접 렌더. 표는 도메인·표면이 1개여도 항상 작성하되, **흐름도는 표면 또는 진입 도메인이 2개 이상일 때만** 작성한다(단일 표면이면 표로 충분). 흐름도는 도달성을 실선=확정·점선=동적 확인 필요·주석=범위 밖으로 표기)
 - 취약점 요약 테이블 (전체 항목의 제목/유형/스캐너/상태만)
 - 이상 없음 스캐너 점검 항목 요약 테이블
 - 미적용 스캐너 목록
@@ -62,6 +64,7 @@ noah-sast에서 호출되며, `<NOAH_SAST_DIR>`은 이미 결정된 상태이다
 
 1. 해당 스캐너의 취약점 데이터 전체 (파일 경로, 코드 스니펫, Source→Sink, 동적 테스트 증거). **Phase 1 결과는 `<PHASE1_RESULTS_DIR>/evaluation/<scanner-name>-eval.md`(phase1-review 평가본)을 전달**하고 서브에이전트가 Read하도록 지시한다. eval MD의 Override 여부(CONFIRM/OVERRIDE/DISCARD), 수정 권고, phase1_quality_notes가 보고서에 반영되도록 한다. **Phase 1 원본(`<PHASE1_RESULTS_DIR>/<scanner-name>.md`) 직접 참조 금지** (`sub-skills/scan-report-review/_contracts.md §6` C1 lint). eval MD가 부재하면 원본 MD를 fallback으로 사용.
    - **[필수] 동적 테스트 증거(POC 리터럴)는 `<PHASE1_RESULTS_DIR>/<scanner-name>-phase2.md` 경로를 함께 전달**하고 서브에이전트가 Read하도록 지시한다. 이 파일의 `evidence.commands[]`(실제 실행한 curl)·`evidence.responses[]`(실제 응답)가 POC의 단일 진실 원천이다. **동적 실행된 항목(evidence.commands 존재)의 "재현 방법 및 POC"는 이 리터럴을 그대로 인용(verbatim)**하며, 세션 쿠키·URL·파라미터·페이로드·응답을 플레이스홀더로 치환하거나 재작성하지 않는다. phase2.md가 부재한 항목(정적 후보)만 소스코드 기반 구체 curl로 기재한다.
+   - **[필수] 이 스캐너 후보들의 `AUTH_BOUNDARY` 표면 값(진입 도메인·base path·자격증명·신원 출처·인증 근거·도달성)을 프롬프트에 함께 전달**한다 — 서브에이전트가 각 후보의 `**진입 경계**:` 필드와 POC 호스트를 이 값으로 채운다. 전달하지 않으면 진입 경계를 추정하거나 비우게 된다.
 2. 다음 한 줄 지시: **"`<NOAH_SAST_DIR>/sub-skills/scan-report/vuln-format.md`를 Read 도구로 읽고, 그 안의 '확인됨 형식' / '후보 형식' / '이상 없음 형식' 템플릿을 그대로 따라 MD 텍스트를 작성하라."** 메인 에이전트는 템플릿 본문을 인라인으로 복사하지 않는다.
 3. 다음 필수 준수 사항:
 
@@ -72,7 +75,7 @@ noah-sast에서 호출되며, `<NOAH_SAST_DIR>`은 이미 결정된 상태이다
 > - 각 상세 섹션 `#### N. 제목` 헤딩 **바로 다음 줄**에 `**ID**: <master-list.candidates[].id>`를 포함한다. 프롬프트로 전달된 master-list id를 그대로 사용하며, 한 섹션에 `**ID**:` 라인은 정확히 1회만 존재한다.
 > - **동적 테스트를 실행한 항목(상태 무관, phase2.md `evidence.commands` 존재)**: 플레이스홀더 사용 금지. phase2.md의 실제 실행값(세션 쿠키, URL, 파라미터, 페이로드, 응답)을 **그대로(verbatim) 인용**한다. 무인증이라 쿠키가 불필요했던 후보도 실제 실행한 curl·응답을 그대로 기재한다(상태가 "후보"여도 동적 실행값이면 실값 필수).
 > - **정적 후보(동적 미실행, phase2.md 부재)**: 소스코드에서 파악한 엔드포인트, HTTP 메서드, 파라미터명, 페이로드를 구체적 curl 명령어로 기재한다. 플레이스홀더는 **환경상 직접 획득 불가한 값**(피해자 OTP, 외부 콜백 URL 등)에 한해 허용한다. 세션 쿠키는 sandbox에서 획득 가능하므로 동적 실행 항목에선 플레이스홀더 대상이 아니다.
-> - **POC curl 명령어의 호스트**: 프롬프트로 전달된 `SANDBOX_DOMAINS` 값 중 하나 또는 `<TARGET_HOST>` 플레이스홀더만 사용한다. 그 외 임의 호스트(예: `https://api.example.com` 같은 실제 프로덕션 도메인 직접 기술)는 금지한다. `SANDBOX_DOMAINS`가 빈 값인 경우에는 모든 POC 호스트를 `<TARGET_HOST>`로 통일한다. 이 호스트 값은 보고서 개요의 `**테스트 환경**` 필드와 일치해야 하며 `validate_report.py`의 URL 일관성 검증 기준이 된다.
+> - **POC curl 명령어의 호스트**: 프롬프트로 전달된 `SANDBOX_DOMAINS` 값 중 하나 또는 `<TARGET_HOST>` 플레이스홀더만 사용한다. 그 외 임의 호스트(예: `https://api.example.com` 같은 실제 프로덕션 도메인 직접 기술)는 금지한다. `SANDBOX_DOMAINS`가 빈 값인 경우에는 모든 POC 호스트를 `<TARGET_HOST>`로 통일한다. 이 호스트 값은 보고서 개요의 `**테스트 환경**` 필드와 일치해야 하며 `validate_report.py`의 URL 일관성 검증 기준이 된다. **각 후보의 호스트는 `AUTH_BOUNDARY`에서 그 후보 표면의 진입 도메인으로 채우되(표면이 1개여도 동일하게 적용), 그 표면의 `도달성=확정`인 경우에만 실제 도메인을 인라인하고 `동적 확인 필요`·진입 도메인 `미상`이면 `<TARGET_HOST>` 플레이스홀더를 쓴다. `도달성=확정`인 진입 도메인은 모두 개요 `**테스트 환경**` 필드에 포함해 `validate_report.py` 호스트 검증과 정합시킨다(추정 도메인을 정답처럼 박지 않는다).**
 > - 심각도(HIGH/MEDIUM/LOW)를 표시하지 않는다. 상태는 "확인됨" 또는 "후보"만 사용한다.
 > - 반환하는 MD 텍스트의 첫 줄은 `### [스캐너명] Scanner`로 시작한다.
 

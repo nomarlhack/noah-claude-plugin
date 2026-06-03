@@ -111,6 +111,20 @@ python3 <NOAH_SAST_DIR>/tools/semgrep_index.py --scanners-dir <NOAH_SAST_DIR>/sc
 - 프록시/CDN/로드밸런서 구조 확인
 - **sandbox/dev 도메인 추출**: 환경별 설정 파일, 인프라 설정, CORS/OAuth 설정 등에서 sandbox/dev 도메인을 추출하여 `SANDBOX_DOMAINS`에 보관한다. 보고서 POC URL의 호스트 플레이스홀더를 실제 도메인으로 채우는 데 사용한다.
 
+#### Step 3-1: 인증 경계 파악 (항상)
+
+표면별로 "어느 진입 도메인에서 어떤 자격증명으로 호출되고 사용자 신원이 어디서 오는지"를 파악해 **`<PHASE1_RESULTS_DIR>/auth-boundary.json`에 저장한다**(Bash `mkdir -p <PHASE1_RESULTS_DIR>`로 디렉토리 보장 후 Write). 구조: `{"surfaces": [{"surface_key", "domain", "base_path", "credential", "identity_source", "auth_basis", "reachability"}], "unknowns": [...]}` — `surface_key`(경로 prefix·호스트 등 표면 식별자)로 후보를 표면 행에 매핑한다. 이후 단계(Step 8-1·11·12)는 이 파일을 **Read해** 사용하며, **파일이 없으면 그 단계가 본 Step 3-1을 재수행**한다(컨텍스트 유실·중단 재개 안전). 보고서 총괄 요약·동적 진단 안내·POC 호스트 결정에 사용하며, 도메인·표면이 1개여도 항상 수행한다.
+
+- **진입 도메인 + base path**: 자기 외부 URL을 구성하는 코드(callback·preview·redirect의 base URL), ingress/게이트웨이 설정, 정적 클라이언트 산출물(테스트 페이지·API 스펙·요청 컬렉션)에서 추출한다. 이 서비스가 **호출하는** outbound 의존성 호스트는 제외한다. 추출할 소스가 전무하면 추정 없이 `미상`으로, 와일드카드/동적 도메인이면 패턴(`*.예시.com`)으로 둔다.
+- **표면**: 표면을 가르는 축(경로 prefix·호스트·헤더·포트·프로토콜·operation 등 — 인증/도메인이 실제로 갈리는 축)을 먼저 식별해 그룹핑한다. 어느 축으로도 분리할 수 없으면 단일 표면으로 두고 한계를 주석에 남긴다. 한 핸들러가 복수 표면에 속하면 각각 별도 행. 와일드카드 도메인은 **패턴 1행으로 접는다**(테넌트별 행 폭발 금지; POC에서 구체 호스트는 플레이스홀더).
+- **표면별 자격증명 종류 · 신원 출처**(신원 출처 enum: {토큰 / 요청바디 / 요청헤더 / 내장자격증명 / 상호TLS·인증서 / 없음(익명) / 미상}. `미상`은 인증이 외부 위임되어 신원 출처를 코드로 알 수 없는 경우).
+
+각 표면 행에 **두 상태를 분리**해 표기한다 (한 칸에 섞지 않으며, 두 축은 서로 독립이다):
+- **인증 근거**: `코드 근거`(자격증명·신원이 코드/설정에 명시) 또는 `범위 밖`(인증이 외부 라이브러리·게이트웨이·IdP에 위임되어 규칙이 repo에 없음 — 추정 금지). **진입 도메인이 `미상`이어도 인증 코드가 보이면 인증 근거는 `코드 근거`다**(두 축 독립).
+- **도달성**: 정적 단계에서는 항상 `동적 확인 필요`(어느 도메인에서 실제 응답하는지 정적으로 확정 불가). Step 11에서 동적 테스트가 실제 수행된 표면만 `확정`으로 승격한다. 비-HTTP 표면(WebSocket·gRPC 등)은 해당 프로토콜 도구로 검증한 경우에만 승격하고, 와일드카드 표면은 한 인스턴스 확인으로 패턴 행 전체를 `확정`하지 않는다(부분 확인은 주석).
+
+`SANDBOX_DOMAINS`에는 `미상`·와일드카드가 아닌 표면별 진입 도메인을 보관하되, 보고서 `**테스트 환경**` 필드에는 **그중 `도달성=확정`인 것만** 넣는다(추정·미확정 도메인을 동적 보고서 환경 필드에 섞지 않음 — `validate_report.py` (e) 정합).
+
 ### Step 4: 스캐너 선별
 
 **기본 원칙: 포함이 기본이고, 제외에는 근거가 필요하다.**
@@ -368,7 +382,7 @@ python3 <NOAH_SAST_DIR>/tools/phase1_review_assert.py \
 요청 항목은 **두 가지 결정을 명시적으로 분리하여** 한 메시지에 묻는다.
 
 **결정 1 — sandbox URL/세션 제공 여부 (`URL_PROVIDED`)**
-1. **테스트 환경 URL (sandbox 도메인)** — 보고서 개요 `**테스트 환경**` 필드와 모든 POC curl 호스트의 단일 진실 원천. Step 3에서 추출된 `SANDBOX_DOMAINS`가 있으면 기본값으로 제시.
+1. **테스트 환경 URL (sandbox 도메인)** — 보고서 개요 `**테스트 환경**` 필드와 모든 POC curl 호스트의 단일 진실 원천. Step 3에서 추출된 `SANDBOX_DOMAINS`가 있으면 기본값으로 제시. **`<PHASE1_RESULTS_DIR>/auth-boundary.json`을 Read해(파일이 없으면 Step 3-1을 재수행), 표면별 진입 도메인이 다르면 각 후보를 그 표면의 {진입 도메인, 자격증명}과 함께 제시해, 어느 도메인에서 어떤 인증으로 호출해야 하는지 사용자가 정확한 도메인·세션을 줄 수 있게 한다. 표기는 두 축을 분리한다 — `인증 근거=범위 밖`이면 "외부 자료 필요(이 분석으로 확정 불가)", `도달성=동적 확인 필요`이면 "동적 검증 대상"으로 적는다(한 표면이 두 축을 동시에 가질 수 있다).**
 2. **세션 쿠키/인증 토큰**
 3. **후보별 추가 정보** — SSRF의 외부 콜백 URL, OAuth 인가 코드 등 직접 획득 불가 항목만 나열
 
@@ -377,7 +391,7 @@ python3 <NOAH_SAST_DIR>/tools/phase1_review_assert.py \
 
 두 결정은 LLM 그룹 분기에서 별개로 평가된다. 매트릭스는 Step 8-3 참조. 사용자가 한 결정만 명시했고 다른 결정이 불명확하면 메인 에이전트는 명확화 1회 질문 후 진행한다.
 
-사용자가 제공한 sandbox 도메인은 `SANDBOX_DOMAINS`에 추가하여 scan-report 서브에이전트로 전달한다. `ATTACK_CONSENT=거부` 경로에서 `**테스트 환경**` 필드는 (URL_PROVIDED=Y면) 제공된 sandbox URL, (URL_PROVIDED=N이면) "해당 없음"으로 기재한다. POC curl 호스트는 URL_PROVIDED=N에서만 `<TARGET_HOST>` 플레이스홀더를 유지한다.
+사용자가 제공한 sandbox 도메인은 `SANDBOX_DOMAINS`에 추가하고, 해당 표면의 `auth-boundary.json` `domain`이 `미상`이면 제공값으로 갱신한 뒤 scan-report 서브에이전트로 전달한다. `ATTACK_CONSENT=거부` 경로에서 `**테스트 환경**` 필드는 (URL_PROVIDED=Y면) 제공된 sandbox URL, (URL_PROVIDED=N이면) "해당 없음"으로 기재한다. POC curl 호스트는 URL_PROVIDED=N에서만 `<TARGET_HOST>` 플레이스홀더를 유지한다.
 
 **LLM 그룹 사전 단계 안내 (LLM 그룹이 활성인 경우만 한 줄 첨부)** — `URL_PROVIDED=Y`이면 위 1·2의 sandbox URL과 세션이 Step 8-3 LLM endpoint probe 및 LLM 스캐너 Phase 2의 헬퍼 호출에 그대로 재사용된다. LLM endpoint 호스트가 사용자 제공 base URL과 다를 수 있음(예: HTTP API는 `api.sandbox`, 채팅 WS는 `chat.sandbox`/별도 게이트웨이)을 사용자에게 한 줄 안내한다. 별도 호스트는 probe-agent가 정적 분석으로 추출하므로 사용자 추가 입력은 없다. `URL_PROVIDED=N`이면 LLM endpoint는 정적 식별만 가능하다는 점도 한 줄로 안내.
 
@@ -570,7 +584,7 @@ Exit code별 조치 (`sub-skills/scan-report-review/_contracts.md §2` Exit Code
 메인 에이전트는 **기존 sr_*.md 파일을 수동 sed/편집으로 고치지 않는다**. 대신:
 
 1. `SANDBOX_DOMAINS` 확정(필요 시 사용자 확인)
-2. 해당 후보가 속한 스캐너의 **scan-report Step 4 서브에이전트를 재호출**. 프롬프트에 `SANDBOX_DOMAINS`와 확인됨 증거(HTTP 응답, 관찰된 페이로드 등)를 전달
+2. 해당 후보가 속한 스캐너의 **scan-report Step 2 서브에이전트를 재호출**. 프롬프트에 `SANDBOX_DOMAINS`와 확인됨 증거(HTTP 응답, 관찰된 페이로드 등)를 전달
 3. 서브에이전트가 확인됨 상태 + 실제 관찰 결과 + sandbox 도메인을 포함한 섹션을 새로 작성하여 반환
 4. `assemble_report.py`로 보고서 재조립
 
@@ -587,6 +601,8 @@ Exit code별 조치 (`sub-skills/scan-report-review/_contracts.md §2` Exit Code
 ### Step 11: 결과 검증
 
 동적 분석 및 연계 분석 완료 후, Step 12(보고서 작성)로 넘어가기 **전에** 다음을 검증한다.
+
+**[AUTH_BOUNDARY 도달성 승격]** 동적 테스트를 실제 수행(아래 체크리스트의 테스트 수행 `✓`)한 후보의 표면은 `<PHASE1_RESULTS_DIR>/auth-boundary.json`의 해당 표면 `도달성`을 `확정`으로 갱신한다(파일이 없으면 Step 3-1을 재수행 후 갱신). **부분 동적(일부 표면만 수행)이면 수행된 표면만 갱신하고 나머지는 `동적 확인 필요`로 유지**한다. 이 파일이 보고서의 POC 호스트 인라인(`도달성=확정`만 실제 도메인)과 `테스트 환경` 필드(확정 표면 도메인만)의 기준이다.
 
 **"후보" 상태는 소극적 선택지가 아니다.** 동적 테스트를 시도했으나 기술적으로 확인이 불가능한 경우에만 부여한다. 테스트를 시도하지 않은 채 "추가 검증 필요"로 남기는 것은 허용하지 않는다. 후보로 분류하려면 왜 동적 테스트가 불가능했는지 구체적인 사유(`[도구 한계]`/`[정보 부족]`/`[환경 제한]`)가 있어야 한다.
 
@@ -649,9 +665,10 @@ Step 3에서 추출한 `SANDBOX_DOMAINS`가 있으면, 보고서 서브에이전
 - 후보 마스터 목록: `<PHASE1_RESULTS_DIR>/master-list.json` (각 후보의 최종 상태: 확인됨/후보/안전)
 - 스캐너별 Phase 1 소스코드 분석 결과: `<PHASE1_RESULTS_DIR>/<scanner-name>.md` 파일들
 - AI 자율 탐색 결과: `<PHASE1_RESULTS_DIR>/ai-discovery.md` (후보 0건이면 생략 가능)
-- 스캐너별 동적 분석 결과: 각 Phase 2 에이전트의 반환 텍스트(재현 방법 및 POC + 동적 테스트 실행 결과 파트)를 scan-report Step 4 서브에이전트 프롬프트에 해당 스캐너 데이터로 포함한다
+- 스캐너별 동적 분석 결과: 각 Phase 2 에이전트의 반환 텍스트(재현 방법 및 POC + 동적 테스트 실행 결과 파트)를 scan-report Step 2 서브에이전트 프롬프트에 해당 스캐너 데이터로 포함한다
 - 연계 분석 결과 (전제조건 매트릭스, 연계 매트릭스, 공격 체인 또는 "체인 없음" 판정 사유, 독립 후보 정리, 위험도 재평가)
 - **SANDBOX_DOMAINS**: 확인된 sandbox 도메인 매핑 (확인받은 경우)
+- **인증 경계**: `<PHASE1_RESULTS_DIR>/auth-boundary.json` (표면별 진입 도메인·base path·자격증명·신원 출처·인증 근거·도달성 — 인증 경계 표/흐름도·후보 `**진입 경계**` 필드·POC 호스트 결정의 단일 진실 원천. scan-report Step 2 서브에이전트 프롬프트에도 각 후보 표면의 값을 전달)
 - 이상 없음 스캐너의 점검 항목 요약
 - 미적용 스캐너 목록 및 제외 사유
 

@@ -227,13 +227,13 @@ if master_list_path and os.path.exists(master_list_path) and md_content:
             r'\*\*테스트 환경\*\*:\s*(.+?)(?:\s*\n|$)',
             md_content
         )
-        _declared_host = None
+        # 테스트 환경은 쉼표 구분 호스트 목록일 수 있다(표면별로 진입 도메인이 다른 경우).
+        # 단일 호스트만 비교하면 멀티도메인 보고서의 정상 POC가 거짓 outlier로 잡힌다.
+        _declared_hosts = set()
         if _env_match:
             _env_value = _env_match.group(1).strip()
-            # "sandbox-developers.kakao.com" 같은 호스트명만 추출
-            _host_match = re.search(r'([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', _env_value)
-            if _host_match:
-                _declared_host = _host_match.group(1).lower()
+            for _tok in re.findall(r'([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})', _env_value):
+                _declared_hosts.add(_tok.lower())
 
         # POC curl 명령어의 호스트 추출
         _curl_hosts = re.findall(
@@ -246,14 +246,14 @@ if master_list_path and os.path.exists(master_list_path) and md_content:
             # 플레이스홀더 허용
             if '<' in h_lower or 'target_host' in h_lower or 'attacker' in h_lower:
                 continue
-            if _declared_host and h_lower == _declared_host:
+            if h_lower in _declared_hosts:
                 continue
             _host_outliers[h_lower] = _host_outliers.get(h_lower, 0) + 1
         for host, count in sorted(_host_outliers.items()):
-            if _declared_host:
+            if _declared_hosts:
                 warnings.append(
                     f"POC 호스트 '{host}' (발견 {count}회) — 개요 '테스트 환경' 호스트 "
-                    f"'{_declared_host}'와 불일치"
+                    f"목록 {sorted(_declared_hosts)}에 없음"
                 )
             else:
                 warnings.append(
