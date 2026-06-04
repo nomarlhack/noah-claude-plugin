@@ -66,7 +66,40 @@ if not re.search(r'(?m)^##\s*개요\s*$', _md_text):
 with open(_md_path, 'w', encoding='utf-8') as f:
     f.write(_md_text)
 
-lines = [l.rstrip('\n') for l in _md_text.splitlines()]
+# 총괄 요약 섹션은 상단 대시보드 카드와 정보가 동일하므로 HTML 본문에서는 렌더링하지 않는다.
+# 대시보드 카드 수치는 아래 _parse_dashboard 가 _md_text 원본(제거 전)에서 파싱하므로
+# MD 파일에는 데이터 원천으로 그대로 남는다(디스크 쓰기는 line 66~67에서 _md_text 로 이미 완료).
+# 코드펜스(```/~~~)를 추적하면서, 펜스 밖의 '## 총괄 요약' 헤딩 줄부터 다음 ## 헤딩 직전
+# (또는 문서 끝)까지 통째로 제거한다. 이렇게 하면 ① 표/불릿/설명문 등 본문 형식과 무관하게
+# 섹션 전체가 숨겨지고, ② 코드블록 내부의 동일 문자열은 헤딩으로 오인되지 않아 보존되며,
+# ③ '## 총괄 요약 상세' 같은 유사 헤딩(헤딩 텍스트 불일치)은 제거되지 않는다.
+def _strip_overview_section(md):
+    result, in_fence, fence_tok, skipping = [], False, None, False
+    for ln in md.split('\n'):
+        fm = re.match(r'^[ \t]*(`{3,}|~{3,})', ln)
+        if fm:
+            tok = fm.group(1)[0] * 3
+            if not in_fence:
+                in_fence, fence_tok = True, tok
+            elif tok == fence_tok:
+                in_fence, fence_tok = False, None
+            if not skipping:
+                result.append(ln)
+            continue
+        if not in_fence and re.match(r'^##[ \t]+총괄 요약[ \t]*$', ln):
+            skipping = True
+            continue
+        if skipping:
+            if not in_fence and re.match(r'^##[ \t]+', ln):
+                skipping = False
+                result.append(ln)
+            # 그 외(섹션 본문)는 버린다 — 코드펜스 안이면 종료 헤딩으로 보지 않으므로 계속 스킵
+            continue
+        result.append(ln)
+    return '\n'.join(result)
+
+_render_md = _strip_overview_section(_md_text)
+lines = [l.rstrip('\n') for l in _render_md.splitlines()]
 
 # 대시보드 수치를 MD에서 동적으로 집계 (suffix 유무 모두 허용, 첫 셀에 괄호 수식어 허용)
 def _parse_dashboard(md):
@@ -213,6 +246,12 @@ a.vuln-link:hover{background:#fde047;border-bottom-color:#111}
 .ov-chips{display:flex;flex-wrap:wrap;gap:7px}
 .ov-chip{display:inline-block;background:#ede9fe;color:#5b21b6;border:1.5px solid #111;border-radius:0;padding:2px 9px;font-size:12px;font-weight:600;white-space:nowrap}
 @media(max-width:640px){.ov-grid{grid-template-columns:1fr;gap:4px 0}.ov-k{margin-top:10px}}
+/* Mermaid 다이어그램: SVG가 컨테이너(열) 폭을 꽉 채우도록 강제.
+   mermaid 는 기본적으로 svg 에 max-width:자연폭px 를 인라인으로 박아 자연 크기 이상으로
+   확대되지 않으므로(→ 작은 그래프가 좌측에 쏠림), width/max-width 를 100% 로 덮어쓰고
+   height:auto 로 viewBox 비율을 유지한다. */
+.mermaid{margin:22px 0;text-align:center}
+.mermaid svg{width:100%!important;max-width:100%!important;height:auto;display:block;margin:0 auto}
 '''
 
 JS = '''
