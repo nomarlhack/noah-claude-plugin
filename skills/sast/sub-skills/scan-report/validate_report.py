@@ -145,6 +145,44 @@ if master_list_path and os.path.exists(master_list_path):
 
 warnings = []  # exit 6 경고 (fail 아님). 파일 유지.
 
+
+# (v11) mermaid 라벨 함정 검출 — `[/...]`는 평행사변형 도형 문법으로 오인되어
+# mermaid 11.x에서 syntax error 발생. 노드/서브그래프 라벨에 따옴표 권장.
+def _check_mermaid_labels(text: str) -> list[str]:
+    """mermaid 블록의 위험 라벨 검출. 위반 메시지 목록 반환."""
+    warns: list[str] = []
+    blocks = _re.findall(r"```mermaid\n(.*?)```", text, _re.DOTALL)
+    for i, block in enumerate(blocks, 1):
+        # 1) 평행사변형 오인: `[/text]` 형태이고 닫는 `/]`가 없음
+        for m in _re.finditer(r"\[(/[^/\]\n]*)\]", block):
+            warns.append(
+                f"mermaid block #{i}: 평행사변형 도형 오인 위험 — "
+                f"라벨 `[{m.group(1)[:40]}]`이 슬래시로 시작. 큰따옴표로 감싸세요 (예: [\"/api\"])."
+            )
+        # 2) 따옴표 없는 노드/서브그래프 라벨에 위험 문자 포함
+        for m in _re.finditer(r"\[([^\[\]\n]+)\]", block):
+            label = m.group(1).strip()
+            if not label:
+                continue
+            if label.startswith('"') and label.endswith('"'):
+                continue  # 이미 따옴표 처리
+            # 합법 평행사변형 [/text/] / [\text\] / 서브루틴 [[text]]는 skip
+            if (label.startswith("/") and label.endswith("/")) or \
+               (label.startswith("\\") and label.endswith("\\")):
+                continue
+            # 매칭 문자열이 `[[` 또는 `]]` 안의 내부일 가능성 (서브루틴)은 패스
+            if _re.search(r"[/:<>()|]", label):
+                warns.append(
+                    f"mermaid block #{i}: 따옴표 없는 라벨에 특수문자 포함 — "
+                    f"`[{label[:60]}]` (mermaid 파서 혼동 위험). 큰따옴표로 감싸세요."
+                )
+    return warns
+
+
+_mermaid_warns = _check_mermaid_labels(md_content) if 'md_content' in dir() else []
+warnings.extend(_mermaid_warns)
+
+
 # 6. ID 필드 존재/일치 + 양방향 집합 차 + POC 호스트 일관성 (경고 수준)
 # master_list_path가 없으면 이 검증은 스킵.
 if master_list_path and os.path.exists(master_list_path) and md_content:
@@ -355,6 +393,13 @@ if errors:
     print("FAIL:")
     for e in errors:
         print(f"  - {e}")
+    # (v11) mermaid 함정 경고는 FAIL과 별개로 함께 출력 — 사용자가 한 번에 인지하도록.
+    if _mermaid_warns:
+        print(f"  (별도 경고 {len(_mermaid_warns)}건 — mermaid 라벨 함정)")
+        for w in _mermaid_warns[:5]:
+            print(f"    ⚠  {w}")
+        if len(_mermaid_warns) > 5:
+            print(f"    … 외 {len(_mermaid_warns) - 5}건")
     # fail-closed: 구조가 깨진 보고서를 canonical 경로에서 치운다(재조립 강제).
     # 단 os.remove로 영구 삭제하지 않고 .invalid 백업으로 rename — 수작업 큐레이션본이
     # 잘못된 카운트로 단독 실행된 경우에도 소실되지 않게 한다.

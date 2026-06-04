@@ -256,35 +256,35 @@ curl -X <METHOD> "<TARGET_HOST>/<API_PATH>" -H "Cookie: <SESSION_COOKIE>" -d "<P
 **1) Monolith** (게이트웨이 없음):
 ```mermaid
 flowchart LR
-    C[클라이언트] -->|자격증명| S1[/api 표면]
-    C -->|자격증명| S2[/admin 표면]
+    C["클라이언트"] -->|자격증명| S1["/api 표면"]
+    C -->|자격증명| S2["/admin 표면"]
 ```
 
 **2) Single-gateway**:
 ```mermaid
 flowchart LR
-    C[클라이언트] -->|토큰| GW[gateway-a<br/>base: /api]
-    GW -->|확정| S1[/api/v1 표면]
-    GW -->|확정| S2[/api/v2 표면]
+    C["클라이언트"] -->|토큰| GW["gateway-a<br/>base: /api"]
+    GW -->|확정| S1["/api/v1 표면"]
+    GW -->|확정| S2["/api/v2 표면"]
 ```
 
 **3) Multi-gateway** (다중 클라이언트 페르소나):
 ```mermaid
 flowchart TD
-    subgraph Clients[클라이언트]
-        C1[앱 사용자]
-        C2[웹 클라이언트]
-        C3[파트너 서비스]
-        C4[운영 콘솔]
+    subgraph Clients["클라이언트"]
+        C1["앱 사용자"]
+        C2["웹 클라이언트"]
+        C3["파트너 서비스"]
+        C4["운영 콘솔"]
     end
-    subgraph Gateways[진입 게이트웨이]
-        GW1[gateway-a<br/>base: /pathA]
-        GW2[gateway-b<br/>base: /pathB]
+    subgraph Gateways["진입 게이트웨이"]
+        GW1["gateway-a<br/>base: /pathA"]
+        GW2["gateway-b<br/>base: /pathB"]
     end
-    subgraph Surfaces[애플리케이션 표면]
-        S1[/api]
-        S2[/web]
-        S3[/papi]
+    subgraph Surfaces["애플리케이션 표면"]
+        S1["/api"]
+        S2["/web"]
+        S3["/papi"]
     end
     C1 -->|토큰| GW1
     C2 -->|KA| GW2
@@ -298,6 +298,12 @@ flowchart TD
 ```
 
 변형: GraphQL federation·service mesh sidecar는 게이트웨이 노드 분할 또는 sidecar 노드 추가로 표현. multi-tenant SaaS는 클라이언트 페르소나 다중화로 표현.
+
+**[필수] mermaid 노드/서브그래프 라벨 표기 규칙 (작성 함정):**
+- 라벨이 다음 중 하나라도 포함하면 반드시 큰따옴표(`"..."`)로 감싼다: 슬래시(`/`), 콜론(`:`), 괄호(`(`/`)`), 파이프(`|`), `<br/>`·`<br>` 등 HTML 태그, 한글 외 특수문자.
+- 특히 `[/...]` 형태는 mermaid 11.x에서 평행사변형 도형 문법(`[/text/]`)으로 오인되어 syntax error 발생.
+- 안전 기본값: **모든 노드/서브그래프 라벨을 따옴표로 감싸는 것을 기본 정책**으로 한다.
+- edge label(`-->|...|`)은 파이프 안이므로 따옴표 불필요하나, 라벨에 파이프(`|`)·줄바꿈이 들어가야 한다면 다른 형태로 변형(예: `·`로 구분).
 
 POC 호스트 규칙:
 - `도달성=확정`인 게이트웨이만 실제 호스트 인라인. 그 외(`동적 확인 필요`·`미상`)는 플레이스홀더.
