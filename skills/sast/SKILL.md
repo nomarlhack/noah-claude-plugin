@@ -111,17 +111,109 @@ python3 <NOAH_SAST_DIR>/tools/semgrep_index.py --scanners-dir <NOAH_SAST_DIR>/sc
 - 프록시/CDN/로드밸런서 구조 확인
 - **sandbox/dev 도메인 추출**: 환경별 설정 파일, 인프라 설정, CORS/OAuth 설정 등에서 sandbox/dev 도메인을 추출하여 `SANDBOX_DOMAINS`에 보관한다. 보고서 POC URL의 호스트 플레이스홀더를 실제 도메인으로 채우는 데 사용한다.
 
-#### Step 3-1: 인증 경계 파악 (항상)
+#### Step 3-1: 인증 경계 파악 (항상, [필수])
 
-표면별로 "어느 진입 도메인에서 어떤 자격증명으로 호출되고 사용자 신원이 어디서 오는지"를 파악해 **`<PHASE1_RESULTS_DIR>/auth-boundary.json`에 저장한다**(Bash `mkdir -p <PHASE1_RESULTS_DIR>`로 디렉토리 보장 후 Write). 구조: `{"surfaces": [{"surface_key", "domain", "base_path", "credential", "identity_source", "auth_basis", "reachability"}], "unknowns": [...]}` — `surface_key`(경로 prefix·호스트 등 표면 식별자)로 후보를 표면 행에 매핑한다. 이후 단계(Step 8-1·11·12)는 이 파일을 **Read해** 사용하며, **파일이 없으면 그 단계가 본 Step 3-1을 재수행**한다(컨텍스트 유실·중단 재개 안전). 보고서 총괄 요약·동적 진단 안내·POC 호스트 결정에 사용하며, 도메인·표면이 1개여도 항상 수행한다.
+표면별로 "어느 진입 도메인에서 어떤 자격증명으로 호출되고 사용자 신원이 어디서 오는지"를 파악해 **`<PHASE1_RESULTS_DIR>/auth-boundary.json`에 저장한다**. 본 단계는 **lint 강제 게이트**가 있어, lint sentinel(`auth-boundary.lint-passed`)을 발급하지 않으면 Step 4·5의 진입점(`select_scanners.py`, `phase1_build_master_list.py`)이 ERROR로 차단된다 — 메인 에이전트가 우회 불가.
 
-- **진입 도메인 + base path**: 자기 외부 URL을 구성하는 코드(callback·preview·redirect의 base URL), ingress/게이트웨이 설정, 정적 클라이언트 산출물(테스트 페이지·API 스펙·요청 컬렉션)에서 추출한다. 이 서비스가 **호출하는** outbound 의존성 호스트는 제외한다. 추출할 소스가 전무하면 추정 없이 `미상`으로, 와일드카드/동적 도메인이면 패턴(`*.예시.com`)으로 둔다.
-- **표면**: 표면을 가르는 축(경로 prefix·호스트·헤더·포트·프로토콜·operation 등 — 인증/도메인이 실제로 갈리는 축)을 먼저 식별해 그룹핑한다. 어느 축으로도 분리할 수 없으면 단일 표면으로 두고 한계를 주석에 남긴다. 한 핸들러가 복수 표면에 속하면 각각 별도 행. 와일드카드 도메인은 **패턴 1행으로 접는다**(테넌트별 행 폭발 금지; POC에서 구체 호스트는 플레이스홀더).
-- **표면별 자격증명 종류 · 신원 출처**(신원 출처 enum: {토큰 / 요청바디 / 요청헤더 / 내장자격증명 / 상호TLS·인증서 / 없음(익명) / 미상}. `미상`은 인증이 외부 위임되어 신원 출처를 코드로 알 수 없는 경우).
+##### Schema (v11)
 
-각 표면 행에 **두 상태를 분리**해 표기한다 (한 칸에 섞지 않으며, 두 축은 서로 독립이다):
-- **인증 근거**: `코드 근거`(자격증명·신원이 코드/설정에 명시) 또는 `범위 밖`(인증이 외부 라이브러리·게이트웨이·IdP에 위임되어 규칙이 repo에 없음 — 추정 금지). **진입 도메인이 `미상`이어도 인증 코드가 보이면 인증 근거는 `코드 근거`다**(두 축 독립).
-- **도달성**: 정적 단계에서는 항상 `동적 확인 필요`(어느 도메인에서 실제 응답하는지 정적으로 확정 불가). Step 11에서 동적 테스트가 실제 수행된 표면만 `확정`으로 승격한다. 비-HTTP 표면(WebSocket·gRPC 등)은 해당 프로토콜 도구로 검증한 경우에만 승격하고, 와일드카드 표면은 한 인스턴스 확인으로 패턴 행 전체를 `확정`하지 않는다(부분 확인은 주석).
+```json
+{
+  "applicable": true,
+  "gateways": [
+    {"id": "<unique-id>", "host_pattern": "<host or pattern>", "base_path": "<base>", "evidence_paths": ["path:line", ...]}
+  ],
+  "clients": [
+    {"id": "<unique-id>", "persona": "<페르소나 설명>", "credential": "<자격증명 종류>", "evidence_paths": ["path:line", ...]}
+  ],
+  "routes": [
+    {
+      "surface_key": "<METHOD> <path-template>",  // 예: "GET /api/v1/users/{id}", "* /papi/**"
+      "client_ids": ["<client-id>", ...],          // M:N — 여러 클라이언트가 같은 surface 호출 가능
+      "gateway_id": "<gateway-id 또는 null>",
+      "credential_chain": "<자격증명→게이트웨이→백엔드 흐름 요약>",
+      "identity_source": "토큰|요청바디|요청헤더|내장자격증명|상호TLS·인증서|없음(익명)|미상",
+      "auth_basis": "코드 근거|범위 밖",
+      "reachability": "동적 확인 필요|확정",
+      "failure_modes": ["gateway_basepath_mismatch|credential_mismatch|missing_auth_header|downstream_propagation"],
+      "evidence_paths": ["path:line", ...]
+    }
+  ],
+  "unknowns": [
+    {"surface_key": "...", "missing_field": "...", "fallback_attempted": ["application-*.yml", "docs/specs/", ...]}
+  ]
+}
+```
+
+**`applicable=false`** (예외 우회): `{"applicable": false, "reason": "<reason>"}`만 있으면 됨. reason enum:
+- `no_auth_layer_detected`: CLI 도구·라이브러리 등 진입 경계 자체 부재 (정당 우회 — lint PASS)
+- `topology_unresolved`: A-pre 토폴로지 판별 실패 (**lint FAIL** — Step 3-1 재실행 강제)
+- `user_skip`: 사용자가 명시적으로 우회 요청 (lint PASS + WARN)
+
+##### A-pre: 토폴로지 사전 판별
+
+Step 3-1 진입 직후, 의존성 매니페스트와 indicator 파일로 적용 토폴로지를 결정한다 (불필요 grep 회피 — 비용 통제):
+
+| 토폴로지 | indicator | 활성 시 추가 grep |
+|---|---|---|
+| HTTP REST | (기본 활성) | application*.yml, controller |
+| gRPC | `*.proto` 존재 OR `grpc-*`/`protobuf` 의존성 OR `build/generated/source/proto/` | grpc 서비스 정의 |
+| GraphQL | `schema.graphql`/`*.graphqls` 존재 OR `graphql`/`apollo` 의존성 OR resolver 디렉터리 | resolver 매핑 |
+| Serverless | `serverless.yml`/`template.yaml`/`wrangler.toml` 존재 | function entrypoint |
+| Service Mesh | `istio/`/`linkerd/` 디렉터리 OR `VirtualService` CRD | mesh 라우팅 |
+
+모두 부재 시 "토폴로지 미확정" → `applicable: false, reason: "topology_unresolved"`로 두면 lint FAIL → 사용자 개입 요청.
+
+##### A-batch: 추출 의무 체크리스트 (Step 3-1 진입 시 1회 batch)
+
+다음 5종 소스를 한 번에 batch grep하여 캐시. 이후 surface별 처리는 캐시 조회만 수행한다 (per-surface 재실행 금지).
+
+1. **상류 게이트웨이 식별**:
+   - `application*.{yml,properties}`/`*.config`의 `*-host`/`*-url`/`baseUrl` 패턴
+   - `docs/`·`README*`의 base path 표
+   - `k8s/`·`helm/`·`.github/workflows/`·`Dockerfile*` ingress·env 규칙
+
+2. **클라이언트 페르소나 추출**: 서버 렌더 뷰/문서/픽스처에서 자격증명 리터럴 grep
+   - `templates/`·`views/`·`public/`·`docs/examples/`
+   - `*.http`·`postman*.json`·`*.feature`·`e2e/*`
+   - OpenAPI/Swagger 산출물 (소스 + `build/`/`target/`/`dist/` 양쪽)
+
+3. **다중 자격증명 수집**: 같은 base path에 다른 자격증명을 사용하는 분기 (hostname 분기로 토큰 변경, profile별 credential 등)
+
+4. **실패 모드 추론**:
+   - 게이트웨이 base path 비대칭 → `gateway_basepath_mismatch`
+   - 자격증명 검증 외부 위임 → `credential_mismatch`
+
+5. **신원 출처 분리** (enum 강제):
+   - **인증 근거** (`코드 근거` | `범위 밖`): 자격증명/신원이 코드에 명시되면 `코드 근거`. 외부 라이브러리·게이트웨이·IdP 위임이면 `범위 밖`. 추정 금지.
+   - **도달성** (`동적 확인 필요` | `확정`): 정적 단계는 항상 `동적 확인 필요`. Step 11 동적 테스트 후만 `확정` 승격.
+
+##### A-write: atomic write
+
+`auth-boundary.json`은 `.tmp` 접미사로 atomic write 후 rename — Step 3-1 abort/timeout 시 부분 파일 잔존 방지.
+
+##### A-lint: lint sentinel 강제 (Step 3-1 자체 마지막)
+
+Step 3-1 산출 직후 동일 호출에서 lint 도구를 실행한다:
+
+```bash
+python3 <NOAH_SAST_DIR>/tools/lint_auth_boundary.py <PHASE1_RESULTS_DIR>/auth-boundary.json
+```
+
+- exit 0 → sentinel `auth-boundary.lint-passed` 자동 발급 → Step 4 진입 가능
+- exit 1 → FAIL. 출력의 위반 사유를 보고 `auth-boundary.json` 수정 후 lint 재실행 (최대 3회 자동 재시도). 3회 이상 FAIL이면 사용자에게 도움 요청.
+- exit 2 → 파일 없음 (Step 3-1 자체가 미실행 상태)
+
+**M5 매칭 알고리즘 (lint와 보고서 슬라이싱 공통):**
+- METHOD 대문자 정확 일치
+- path 정규화: `{id}`·`{id:\d+}`·`{id?}` → `*`, `**` → `*`, trailing `/` 제거 (루트 `/` 유지)
+- `gateway_id` 명시 시 정확 일치, 미명시 시 무시
+
+##### 후속 단계 의존성
+
+- Step 4 (`select_scanners.py --phase1-dir=<PHASE1_RESULTS_DIR>`): sentinel 부재 시 ERROR 차단 (lint 강제 게이트)
+- Step 5 마지막 (`phase1_build_master_list.py <PHASE1_RESULTS_DIR>`): 동일 sentinel 검증 (이중 안전망)
+- Step 8-1·11·12: 본 파일을 Read해 사용. 부재 시 Step 3-1 재실행.
 
 `SANDBOX_DOMAINS`에는 `미상`·와일드카드가 아닌 표면별 진입 도메인을 보관하되, 보고서 `**테스트 환경**` 필드에는 **그중 `도달성=확정`인 것만** 넣는다(추정·미확정 도메인을 동적 보고서 환경 필드에 섞지 않음 — `validate_report.py` (e) 정합).
 
@@ -137,8 +229,11 @@ python3 <NOAH_SAST_DIR>/tools/semgrep_index.py --scanners-dir <NOAH_SAST_DIR>/sc
 
 ```bash
 python3 <NOAH_SAST_DIR>/tools/select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_ROOT> \
+  --phase1-dir=<PHASE1_RESULTS_DIR> \
   --write-expected-file=<PHASE1_RESULTS_DIR>/_expected_scanners.json
 ```
+
+> `--phase1-dir=<PHASE1_RESULTS_DIR>` 인자를 반드시 전달하라. 이 인자가 있으면 Step 3-1의 lint sentinel(`auth-boundary.lint-passed`)이 검증되어 메인 에이전트의 lint 우회를 차단한다. 미전달 시 본 게이트가 비활성화되어 빈약한 인증 경계로 보고서가 작성될 수 있다.
 
 스크립트 출력:
 - 적용/제외 판정 테이블 (매치 히트 건수 + 사유 포함)

@@ -36,7 +36,7 @@ noah-sast에서 호출되며, `<NOAH_SAST_DIR>`은 이미 결정된 상태이다
 작성 항목:
 - 보고서 헤더 (개요): `vuln-format.md`의 "통합 보고서 구조" 형식을 따른다. **볼드 키-값 쌍**으로 작성하며, `## 개요`를 사용한다. 헤더 영역 안에 `###` 소제목을 두지 않는다. (`###`는 `md_to_html.py`에서 스캐너 헤딩 스타일이 적용될 수 있으므로 헤더 영역에서 사용 금지.)
 - 총괄 요약 테이블
-- 인증 경계 표 + mermaid 흐름도 (`vuln-format.md`의 `## 인증 경계` 형식. `AUTH_BOUNDARY` 기반으로 메인 에이전트가 직접 렌더. 표는 도메인·표면이 1개여도 항상 작성하되, **흐름도는 표면 또는 진입 도메인이 2개 이상일 때만** 작성한다(단일 표면이면 표로 충분). 흐름도는 도달성을 실선=확정·점선=동적 확인 필요·주석=범위 밖으로 표기)
+- 인증 경계 표 + mermaid 흐름도 (`vuln-format.md`의 `## 인증 경계` 형식. `AUTH_BOUNDARY` 기반으로 메인 에이전트가 직접 렌더. 게이트웨이 표·클라이언트 표·경로 표 세 표를 모두 포함하되 빈 표는 생략. **흐름도 게이팅 (v11):** `len(routes) >= 2` OR `len(clients) >= 2` OR `len(gateways) >= 2`인 경우에만 작성 — 단일 표면이라도 다중 클라이언트면 흐름도 필수, 그 외엔 빈 흐름도 금지. 흐름도는 실선=`도달성=확정`·점선=`동적 확인 필요`/실패 모드. `vuln-format.md`의 monolith/single-gateway/multi-gateway 3종 예시 참조)
 - 취약점 요약 테이블 (전체 항목의 제목/유형/스캐너/상태만)
 - 이상 없음 스캐너 점검 항목 요약 테이블
 - 미적용 스캐너 목록
@@ -64,7 +64,12 @@ noah-sast에서 호출되며, `<NOAH_SAST_DIR>`은 이미 결정된 상태이다
 
 1. 해당 스캐너의 취약점 데이터 전체 (파일 경로, 코드 스니펫, Source→Sink, 동적 테스트 증거). **Phase 1 결과는 `<PHASE1_RESULTS_DIR>/evaluation/<scanner-name>-eval.md`(phase1-review 평가본)을 전달**하고 서브에이전트가 Read하도록 지시한다. eval MD의 Override 여부(CONFIRM/OVERRIDE/DISCARD), 수정 권고, phase1_quality_notes가 보고서에 반영되도록 한다. **Phase 1 원본(`<PHASE1_RESULTS_DIR>/<scanner-name>.md`) 직접 참조 금지** (`sub-skills/scan-report-review/_contracts.md §6` C1 lint). eval MD가 부재하면 원본 MD를 fallback으로 사용.
    - **[필수] 동적 테스트 증거(POC 리터럴)는 `<PHASE1_RESULTS_DIR>/<scanner-name>-phase2.md` 경로를 함께 전달**하고 서브에이전트가 Read하도록 지시한다. 이 파일의 `evidence.commands[]`(실제 실행한 curl)·`evidence.responses[]`(실제 응답)가 POC의 단일 진실 원천이다. **동적 실행된 항목(evidence.commands 존재)의 "재현 방법 및 POC"는 이 리터럴을 그대로 인용(verbatim)**하며, 세션 쿠키·URL·파라미터·페이로드·응답을 플레이스홀더로 치환하거나 재작성하지 않는다. phase2.md가 부재한 항목(정적 후보)만 소스코드 기반 구체 curl로 기재한다.
-   - **[필수] 이 스캐너 후보들의 `AUTH_BOUNDARY` 표면 값(진입 도메인·base path·자격증명·신원 출처·인증 근거·도달성)을 프롬프트에 함께 전달**한다 — 서브에이전트가 각 후보의 `**진입 경계**:` 필드와 POC 호스트를 이 값으로 채운다. 전달하지 않으면 진입 경계를 추정하거나 비우게 된다.
+   - **[필수] 이 스캐너 후보들의 `AUTH_BOUNDARY` 슬라이스를 프롬프트에 함께 전달 (v11 슬라이싱):**
+     1. 메인 에이전트가 이 스캐너의 후보 진입 경계 필드를 모아 surface_key 집합(`{"POST /papi/...", ...}`)을 만든다.
+     2. `auth-boundary.json`을 Read하여 (a) 해당 surface_key와 M5 매칭(METHOD 정확 + `{...}`·`**`→`*` 정규화 + trailing `/` 제거)되는 `routes[]` 행만, (b) 그 행이 참조하는 `gateway_id`와 `client_ids[]`에 해당하는 `gateways[]`·`clients[]` 행만 슬라이스한다.
+     3. 슬라이스된 부분(가벼운 JSON)을 서브에이전트 프롬프트에 동봉한다. **전체 `auth-boundary.json` 동봉 금지 — 후보×스캐너 곱으로 토큰 폭증.**
+     4. 서브에이전트는 각 후보 본문에 슬라이스의 `gateway_id`·`client_ids`·`failure_modes`·`credential_chain`을 자연어로 인라인 (예: "이 진입은 `oahu-gateway` Bearer 인증을 거쳐 도달. `credential_mismatch` 실패 모드가 있어 잘못된 자격증명 시 500"). 단순 ID 나열 금지 — 의미를 풀어 설명.
+     5. POC curl 호스트: 매칭된 게이트웨이의 `host_pattern`이 단일 호스트로 확정되고 `도달성=확정`이면 그 호스트를 인라인. 그 외(`동적 확인 필요`·와일드카드·미상)는 `<TARGET_HOST>` 플레이스홀더.
 2. 다음 한 줄 지시: **"`<NOAH_SAST_DIR>/sub-skills/scan-report/vuln-format.md`를 Read 도구로 읽고, 그 안의 '확인됨 형식' / '후보 형식' / '이상 없음 형식' 템플릿을 그대로 따라 MD 텍스트를 작성하라."** 메인 에이전트는 템플릿 본문을 인라인으로 복사하지 않는다.
 3. 다음 필수 준수 사항:
 

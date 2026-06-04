@@ -2,10 +2,14 @@
 """select_scanners.py — 패턴 인덱스 + 프로젝트 파일 기반 49개 스캐너 자동 선별.
 
 Usage:
-    python3 select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_ROOT> [--write-expected-file=PATH]
+    python3 select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_ROOT> \
+      [--write-expected-file=PATH] [--phase1-dir=PHASE1_RESULTS_DIR]
 
 Options:
     --write-expected-file=PATH  적용 스캐너 목록을 JSON 파일로 저장 (phase1_build_master_list.py가 읽음)
+    --phase1-dir=PATH           PHASE1_RESULTS_DIR 명시. 본 옵션이 주어지면 auth-boundary.json
+                                lint sentinel을 검증한 후에만 진행한다 (Step 4 입력 의존성 강제).
+                                미명시 시 lint 게이트 비활성 — 신규 호출은 항상 본 옵션 전달 권고.
 
 Output:
     - 적용/제외 판정 테이블 (매치 히트 건수 + 사유 포함)
@@ -21,6 +25,47 @@ if len(sys.argv) < 3:
 
 INDEX_DIR = sys.argv[1]
 PROJECT_ROOT = sys.argv[2]
+
+# === [v11 강제 게이트] auth-boundary.json sentinel 검증 ===
+# --phase1-dir 옵션이 주어지면 lint sentinel 검증 후에만 진행.
+# select_scanners는 Step 4 진입점이므로 본 게이트가 메인 에이전트의 lint 우회를 차단한다.
+# (--write-expected-file 인자의 부모 디렉터리에서 PHASE1_RESULTS_DIR 자동 추출도 fallback으로 지원.)
+_phase1_dir_arg: str | None = None
+for _arg in sys.argv[3:]:
+    if _arg.startswith("--phase1-dir="):
+        _phase1_dir_arg = _arg.split("=", 1)[1]
+        break
+if _phase1_dir_arg is None:
+    for _arg in sys.argv[3:]:
+        if _arg.startswith("--write-expected-file="):
+            _phase1_dir_arg = str(Path(_arg.split("=", 1)[1]).parent)
+            break
+
+if _phase1_dir_arg:
+    _phase1_dir = Path(_phase1_dir_arg)
+    _TOOLS_DIR = Path(__file__).resolve().parent
+    if str(_TOOLS_DIR) not in sys.path:
+        sys.path.insert(0, str(_TOOLS_DIR))
+    try:
+        from _validate_auth_boundary import check_sentinel as _check_auth_sentinel
+        _AUTH_BOUNDARY_PATH = _phase1_dir / "auth-boundary.json"
+        _AUTH_SENTINEL_PATH = _phase1_dir / "auth-boundary.lint-passed"
+        _ok, _msg = _check_auth_sentinel(_AUTH_BOUNDARY_PATH, _AUTH_SENTINEL_PATH)
+        if not _ok:
+            print(
+                f"ERROR: auth-boundary.json lint sentinel 검증 실패 — {_msg}\n"
+                f"  → Step 3-1 절차 (SKILL.md)를 재수행하고 다음을 실행하라:\n"
+                f"    python3 {_TOOLS_DIR}/lint_auth_boundary.py {_AUTH_BOUNDARY_PATH}\n"
+                f"  → lint PASS 후 sentinel({_AUTH_SENTINEL_PATH})이 발급되어야 Step 4 진입 가능",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    except ImportError:
+        print(
+            "WARNING: _validate_auth_boundary 모듈을 import할 수 없음. "
+            "lint 강제 게이트 비활성 — SAST 스킬 설치 상태 점검 필요.",
+            file=sys.stderr,
+        )
 
 # --- Helper: 프로젝트 파일 존재 여부 ---
 def has_file(*patterns):

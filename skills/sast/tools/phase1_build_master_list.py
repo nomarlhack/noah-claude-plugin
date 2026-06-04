@@ -48,6 +48,34 @@ args = parser.parse_args()
 phase1_dir = Path(args.phase1_dir)
 out_path = Path(args.output_json)
 
+# === [v11 강제 게이트] auth-boundary.json sentinel 검증 ===
+# Step 3-1 lint(auth-boundary.lint-passed sentinel)를 통과하지 않으면 진입 차단.
+# select_scanners.py와 동일 검증 — 이중 안전망.
+_TOOLS_DIR = Path(__file__).resolve().parent
+if str(_TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TOOLS_DIR))
+try:
+    from _validate_auth_boundary import check_sentinel as _check_auth_sentinel
+    _AUTH_BOUNDARY_PATH = phase1_dir / "auth-boundary.json"
+    _AUTH_SENTINEL_PATH = phase1_dir / "auth-boundary.lint-passed"
+    _ok, _msg = _check_auth_sentinel(_AUTH_BOUNDARY_PATH, _AUTH_SENTINEL_PATH)
+    if not _ok:
+        print(
+            f"ERROR: auth-boundary.json lint sentinel 검증 실패 — {_msg}\n"
+            f"  → Step 3-1 절차 (SKILL.md)를 재수행하고 다음을 실행하라:\n"
+            f"    python3 {_TOOLS_DIR}/lint_auth_boundary.py {_AUTH_BOUNDARY_PATH}\n"
+            f"  → lint PASS 후 sentinel({_AUTH_SENTINEL_PATH})이 발급되어야 본 스크립트 진입 가능",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+except ImportError:
+    # _validate_auth_boundary 모듈 부재는 SAST 스킬 손상 상태 — 경고만 출력하고 진행 (호환성).
+    print(
+        "WARNING: _validate_auth_boundary 모듈을 import할 수 없음. "
+        "lint 강제 게이트 비활성 — SAST 스킬 설치 상태 점검 필요.",
+        file=sys.stderr,
+    )
+
 # 병합 모드: 기존 master-list.json 로드 (phase2-review 결과 보존용)
 EVAL_FIELDS = {
     "status", "tag", "evidence_summary", "verified_defense", "rederivation_performed",

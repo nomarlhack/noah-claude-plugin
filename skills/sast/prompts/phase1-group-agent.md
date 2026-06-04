@@ -56,6 +56,12 @@ dom-xss-scanner: 이상 없음
 
 **자기 검증:** 각 스캐너의 결과 파일 Write 직후, manifest의 `declared_count`와 `## <ID>:` 헤더 수가 일치하는지 확인한다. 불일치 시 해당 스캐너를 반환 요약에 `[WARNING: manifest 불일치 — scanner-name]`으로 표기한다.
 
+**[필수] 인증 경계 교차검증 (v11):** 각 후보의 진입 경계 필드(`POST /papi/...` 등)를 `<PHASE1_RESULTS_DIR>/auth-boundary.json`의 `routes[]`와 매칭한다 (M5 매칭 알고리즘: METHOD 정확 일치, `{id}`·`{id:\d+}`·`{id?}`·`**`→`*` 정규화, trailing `/` 제거).
+
+- 매칭되는 route가 있으면, 그 route의 `gateway_id`·`client_ids`·`failure_modes`·`credential_chain`을 본문 "원인 분석"·"재현 방법 및 POC"에 반영한다 (예: "이 진입은 `oahu-gateway` 게이트웨이의 Bearer 인증을 거쳐 도달하며, `credential_mismatch` 실패 모드가 있음").
+- 매칭되는 route가 없거나 `surface_key`가 `미상`이면, **본 후보 작성을 중단하고** 반환 요약에 `[INCOMPLETE: auth_boundary:<후보_id>]` 마커를 추가한다. 메인 에이전트는 이 마커를 보고 Step 3-1 fallback을 수행한 뒤 그룹 재실행한다.
+- `auth-boundary.json`이 `applicable: false`이면 본 교차검증을 건너뛰고 진입 경계는 "해당 없음"으로 표기한다.
+
 **Write 후 재검증 (필수):** 각 스캐너의 결과 파일 Write 완료 후, **같은 파일을 Read 도구로 다시 읽어** 파일 끝의 manifest 블록이 다음을 모두 만족하는지 확인한다:
 
 - 여는 마커 `<!-- NOAH-SAST MANIFEST v1 -->` 존재
