@@ -660,11 +660,43 @@ def _build_overview_banner(m):
     rows = re.findall(r'<p><strong>(.+?)</strong>\s*:\s*(.+?)</p>', body, re.DOTALL)
     if not rows:
         return m.group(0)
-    def _chips(s):
-        return ''.join(
-            f'<span class="ov-chip">{it.strip()}</span>'
-            for it in s.split(',') if it.strip()
-        )
+    def _chips(s, multi=False):
+        # 칩 경계 분리. 괄호()/대괄호[] 내부의 구분자는 보존하여
+        # 'Spring WebFlux (Spring Boot 3.5.0)' 처럼 괄호 안에 슬래시·쉼표가 있어도
+        # 칩이 중간에서 끊기거나 괄호 짝이 깨지지 않게 한다.
+        # 입력 s 는 이미 HTML 이스케이프된 문자열(`<`→`&lt;`, `&`→`&amp;` 등)이므로
+        # 구분자 선정 시 엔티티(`&...;`)를 깨지 않도록 보수적으로 고른다.
+        #  - 항상: 쉼표(,) 경계.
+        #  - multi=True (스택)만 추가로:
+        #     · ';;' (세미콜론 2개) — 카테고리 라벨이 없는 구분 잔재. 엔티티의 단일 ';'는 보존.
+        #     · ' / ' (양옆이 공백인 슬래시) — 'A / B' 나열 구분. 'TCP/IP'·'CI/CD' 처럼
+        #       이름에 붙은 슬래시나 이스케이프된 '&lt;/script&gt;' 의 '/'는 보존.
+        #    대상·테스트 환경(multi=False)은 쉼표만 — 프로젝트명/도메인이 임의로 쪼개지지 않게.
+        items, buf, depth, i, n = [], [], 0, 0, len(s)
+        while i < n:
+            ch = s[i]
+            if ch in '([':
+                depth += 1; buf.append(ch); i += 1
+            elif ch in ')]':
+                depth = max(0, depth - 1); buf.append(ch); i += 1
+            elif depth == 0 and ch == ',':
+                items.append(''.join(buf)); buf = []; i += 1
+            elif depth == 0 and multi and ch == ';' and i + 1 < n and s[i + 1] == ';':
+                items.append(''.join(buf)); buf = []; i += 2
+            elif (depth == 0 and multi and ch == '/'
+                  and 0 < i < n - 1 and s[i - 1].isspace() and s[i + 1].isspace()):
+                items.append(''.join(buf)); buf = []; i += 1
+            else:
+                buf.append(ch); i += 1
+        items.append(''.join(buf))
+        # 양끝의 외톨이 구분자(/ ,)를 정리해 'Kotlin /' 같은 군더더기를 없앤다.
+        # ';' 는 절대 제거하지 않는다 — HTML 엔티티('&gt;', '&amp;')의 끝 세미콜론이 깨진다.
+        out = []
+        for it in items:
+            it = it.strip().strip('/,').strip()
+            if it:
+                out.append(f'<span class="ov-chip">{it}</span>')
+        return ''.join(out)
 
     parts = []
     for k, v in rows:
@@ -678,9 +710,10 @@ def _build_overview_banner(m):
             parts.append('<div class="ov-section"></div>')
             for seg in (s for s in v.split(';;') if s.strip()):
                 label, _, items = seg.partition('::')
-                parts.append(f'<div class="ov-k ov-k-sub">{label.strip()}</div><div class="ov-v ov-chips">{_chips(items)}</div>')
+                parts.append(f'<div class="ov-k ov-k-sub">{label.strip()}</div><div class="ov-v ov-chips">{_chips(items, multi=True)}</div>')
         else:
-            parts.append(f'<div class="ov-k">{k}</div><div class="ov-v ov-chips">{_chips(v)}</div>')
+            # 스택만 다구분자 분리(슬래시/세미콜론 허용). 대상·테스트 환경 등은 쉼표만.
+            parts.append(f'<div class="ov-k">{k}</div><div class="ov-v ov-chips">{_chips(v, multi=(k == "스택"))}</div>')
     cells = ''.join(parts)
     return (
         '<div class="overview-card">'
