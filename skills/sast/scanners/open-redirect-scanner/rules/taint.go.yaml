@@ -1,0 +1,56 @@
+rules:
+  - id: noah-go-open-redirect-taint
+    severity: ERROR
+    languages:
+      - go
+    mode: taint
+    message: |
+      Go에서 HTTP 입력이 http.Redirect / c.Redirect에 직접 들어가면 Open Redirect.
+      안전: 상대 경로 강제, url.Parse 후 host 화이트리스트 검증.
+    pattern-sources:
+      - pattern: r.URL.Query().Get($K)
+      - pattern: r.FormValue($K)
+      - pattern: r.Header.Get($K)
+      - pattern: mux.Vars(r)[$K]
+      # Gin
+      - pattern: c.Query($K)
+      - pattern: c.Param($K)
+      - pattern: c.PostForm($K)
+      # Echo
+      - pattern: c.QueryParam($K)
+      - pattern: c.PathParam($K)
+      # chi
+      - pattern: chi.URLParam(r, $K)
+
+    pattern-sinks:
+      # net/http
+      - pattern: http.Redirect($W, $R, $X, $CODE)
+      # Gin
+      - pattern: c.Redirect($CODE, $X)
+      # Echo
+      - pattern: c.Redirect($CODE, $X)
+      # 헤더 직접 설정
+      - pattern: $W.Header().Set("Location", $X)
+      - pattern: $W.Header().Set("location", $X)
+
+    pattern-sanitizers:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if strings.HasPrefix($X, "/") { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              $U, $ERR := url.Parse($X)
+              if $U.Host != "" { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-601: URL Redirection to Untrusted Site"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [Open Redirect]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [go, gin, echo, chi, net/http]

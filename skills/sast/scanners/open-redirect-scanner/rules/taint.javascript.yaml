@@ -58,11 +58,20 @@ rules:
       - pattern: request.payload.$K
       - pattern: request.query.$K
     pattern-sinks:
+      # Express / Fastify / Koa
       - pattern: res.redirect($X)
       - pattern: res.redirect($CODE, $X)
       - pattern: res.location($X)
       - pattern: reply.redirect($X)
       - pattern: ctx.redirect($X)
+      # Next.js App Router server actions
+      - pattern: redirect($X)
+      - pattern: permanentRedirect($X)
+      # 클라이언트 사이드 리다이렉트
+      - pattern: window.location.href = $X
+      - pattern: window.location.replace($X)
+      - pattern: window.location.assign($X)
+      - pattern: location.href = $X
     pattern-sanitizers:
       - patterns:
           - pattern: $X

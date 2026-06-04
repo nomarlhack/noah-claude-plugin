@@ -1,0 +1,52 @@
+rules:
+  - id: noah-csharp-open-redirect-taint
+    severity: ERROR
+    languages:
+      - csharp
+    mode: taint
+    message: |
+      C# ASP.NET Core에서 HTTP 입력이 Redirect / RedirectResult에 직접 들어가면
+      Open Redirect. 안전: LocalRedirect 사용, Url.IsLocalUrl 검증, 화이트리스트.
+    pattern-sources:
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $M([FromQuery] $T2 $X, ...) { ... }
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              public $T $M([FromRoute] $T2 $X, ...) { ... }
+      - pattern: Request.Query[$K]
+      - pattern: Request.Form[$K]
+      - pattern: HttpContext.Request.Query[$K]
+
+    pattern-sinks:
+      # Controller helper
+      - pattern: Redirect($X)
+      - pattern: RedirectPermanent($X)
+      # RedirectResult 직접 생성
+      - pattern: new RedirectResult($X)
+      - pattern: new RedirectResult($X, ...)
+      # Response.Redirect (WebForms / legacy)
+      - pattern: Response.Redirect($X)
+      - pattern: Response.Redirect($X, ...)
+
+    pattern-sanitizers:
+      # 로컬 URL만 허용
+      - pattern: LocalRedirect($X)
+      - pattern: Url.IsLocalUrl($X)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: |
+              if (Url.IsLocalUrl($X)) { ... }
+
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-601: URL Redirection to Untrusted Site"]
+      confidence: HIGH
+      likelihood: MEDIUM
+      impact: MEDIUM
+      vulnerability_class: [Open Redirect]
+      owasp: ["A01:2021 Broken Access Control"]
+      technology: [csharp, dotnet, aspnet]

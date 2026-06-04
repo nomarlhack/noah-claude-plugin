@@ -1,0 +1,43 @@
+rules:
+  - id: noah-javascript-srcmap-exposed-sink
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    message: |
+      프로덕션 빌드에서 소스맵이 명시적으로 활성화되어 있음 (Source Map Exposure).
+      공격자가 .map 파일에 접근하면 난독화 전 원본 소스코드가 노출됨.
+      안전: devtool을 'nosources-source-map' 또는 false로 설정,
+            서버에서 .map 파일 접근 차단, 내부 CDN에만 제공.
+    pattern-either:
+      # Webpack — devtool 소스맵 활성
+      - pattern: "module.exports = {..., devtool: 'source-map', ...}"
+      - pattern: "module.exports = {..., devtool: 'inline-source-map', ...}"
+      - pattern: "module.exports = {..., devtool: 'cheap-source-map', ...}"
+      - pattern: "module.exports = {..., devtool: 'eval-source-map', ...}"
+      - pattern: "module.exports = {..., devtool: 'hidden-source-map', ...}"
+      # Vite — build.sourcemap 활성
+      - pattern: "defineConfig({..., build: {..., sourcemap: true, ...}, ...})"
+      - pattern: "defineConfig({..., build: {..., sourcemap: 'inline', ...}, ...})"
+      - pattern: "defineConfig({..., build: {..., sourcemap: 'hidden', ...}, ...})"
+      # Next.js — 프로덕션 소스맵 활성
+      - pattern: "module.exports = {..., productionBrowserSourceMaps: true, ...}"
+      # Create React App — 환경변수 오버라이드
+      - pattern-regex: 'GENERATE_SOURCEMAP\s*=\s*true'
+      # esbuild — external/inline sourcemap
+      - pattern-regex: "sourcemap\\s*:\\s*['\"]external['\"]"
+      - pattern-regex: "sourcemap\\s*:\\s*['\"]inline['\"]"
+      # Rollup — output.sourcemap
+      - pattern-regex: "output\\s*:\\s*\\{[^}]*sourcemap\\s*:\\s*true"
+      # Angular — sourceMap 활성 (angular.json에서는 generic으로 탐지)
+      - pattern-regex: '"sourceMap"\\s*:\\s*true'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-540: Inclusion of Sensitive Information in Source Code"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [Source Map Exposure]
+      owasp: ["A05:2021 Security Misconfiguration"]
+      technology: [javascript, typescript, webpack, vite, nextjs, esbuild, rollup]

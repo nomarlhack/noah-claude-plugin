@@ -4,24 +4,28 @@ rules:
     languages:
       - javascript
     message: |
-      sourcemap-scanner Phase 1 sink/source 패턴 매치 (JavaScript 한정).
-      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+      sourcemap-scanner Phase 1 패턴 매치 (JavaScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(설정값, 프로덕션 환경 여부)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'devtool'
-      - pattern-regex: 'sourcemap'
-      - pattern-regex: 'source-map'
-      - pattern-regex: 'productionBrowserSourceMaps'
-      - pattern-regex: 'productionSourceMap'
-      - pattern-regex: 'GENERATE_SOURCEMAP'
+      # Webpack devtool
+      - pattern-regex: 'devtool\s*:'
+      # Vite
+      - pattern-regex: 'build\.sourcemap\b'
+      - pattern-regex: 'sourcemap\s*:\s*(true|[''"]inline[''"]|[''"]external[''"]|[''"]hidden[''"])'
+      # Next.js
+      - pattern-regex: 'productionBrowserSourceMaps\b'
+      # CRA
+      - pattern-regex: 'GENERATE_SOURCEMAP\b'
+      # esbuild / Rollup
+      - pattern-regex: 'sourcemap\s*:\s*[''"]external[''"]'
+      # 배포된 소스맵 참조
       - pattern-regex: 'sourceMappingURL'
-      - pattern-regex: 'build\.sourcemap'
-      - pattern-regex: 'webpack'
     metadata:
       category: security
       subcategory:
         - vuln
       cwe:
-        - "CWE-540: Source Map Exposure"
+        - "CWE-540: Inclusion of Sensitive Information in Source Code"
       confidence: LOW
       likelihood: LOW
-      impact: HIGH
+      impact: MEDIUM

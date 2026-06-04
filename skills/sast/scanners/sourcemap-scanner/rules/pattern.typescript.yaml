@@ -4,24 +4,25 @@ rules:
     languages:
       - typescript
     message: |
-      sourcemap-scanner Phase 1 sink/source 패턴 매치 (TypeScript 한정).
-      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+      sourcemap-scanner Phase 1 패턴 매치 (TypeScript 한정).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(설정값, 프로덕션 환경 여부)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'devtool'
-      - pattern-regex: 'sourcemap'
-      - pattern-regex: 'source-map'
-      - pattern-regex: 'productionBrowserSourceMaps'
-      - pattern-regex: 'productionSourceMap'
-      - pattern-regex: 'GENERATE_SOURCEMAP'
+      # tsconfig.json
+      - pattern-regex: '"sourceMap"\s*:\s*true'
+      - pattern-regex: '"inlineSourceMap"\s*:\s*true'
+      - pattern-regex: '"inlineSources"\s*:\s*true'
+      # Vite / esbuild (TS 환경)
+      - pattern-regex: 'build\.sourcemap\b'
+      - pattern-regex: 'sourcemap\s*:\s*(true|[''"]inline[''"]|[''"]external[''"])'
+      # NestJS / Angular 빌드 설정
+      - pattern-regex: 'productionSourceMap\b'
       - pattern-regex: 'sourceMappingURL'
-      - pattern-regex: 'build\.sourcemap'
-      - pattern-regex: 'webpack'
     metadata:
       category: security
       subcategory:
         - vuln
       cwe:
-        - "CWE-540: Source Map Exposure"
+        - "CWE-540: Inclusion of Sensitive Information in Source Code"
       confidence: LOW
       likelihood: LOW
-      impact: HIGH
+      impact: MEDIUM

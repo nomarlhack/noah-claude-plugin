@@ -1,0 +1,37 @@
+rules:
+  - id: noah-srcmap-exposed-generic-sink
+    severity: ERROR
+    languages:
+      - generic
+    message: |
+      빌드 설정 또는 환경변수에서 소스맵이 명시적으로 활성화되어 있음 (Source Map Exposure).
+      .map 파일이 프로덕션 서버에 노출되면 원본 소스코드가 복원 가능.
+      안전: 프로덕션 빌드에서 소스맵 비활성화 또는 내부 서버에만 제한 제공.
+    pattern-either:
+      # .env 파일 — CRA/Vite 환경변수
+      - pattern-regex: 'GENERATE_SOURCEMAP\s*=\s*true'
+      # tsconfig.json
+      - pattern-regex: '"sourceMap"\s*:\s*true'
+      # Angular angular.json / tsconfig.app.json
+      - pattern-regex: '"sourceMap"\s*:\s*\{\s*"scripts"\s*:\s*true'
+      - pattern-regex: '"sourceMap"\s*:\s*\{\s*"styles"\s*:\s*true'
+      # Parcel — 기본 활성이지만 명시적 설정 탐지
+      - pattern-regex: '"source-maps"\s*:\s*true'
+      # Webpack config
+      - pattern-regex: 'devtool\s*:\s*[''"]source-map[''"]'
+      - pattern-regex: 'devtool\s*:\s*[''"]inline-source-map[''"]'
+      - pattern-regex: 'devtool\s*:\s*[''"]hidden-source-map[''"]'
+      - pattern-regex: 'devtool\s*:\s*[''"]eval-source-map[''"]'
+      # 이미 배포된 .map URL 참조
+      - pattern-regex: '//# sourceMappingURL=.+\.map'
+      - pattern-regex: '/\*# sourceMappingURL=.+\.map \*/'
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-540: Inclusion of Sensitive Information in Source Code"]
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      vulnerability_class: [Source Map Exposure]
+      owasp: ["A05:2021 Security Misconfiguration"]
+      technology: [webpack, vite, nextjs, angular, parcel, esbuild, rollup]

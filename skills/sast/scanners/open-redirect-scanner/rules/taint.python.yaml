@@ -32,12 +32,21 @@ rules:
       - pattern: await request.json()
       - pattern: request.raw_args[$K]
     pattern-sinks:
+      # Django
       - pattern: redirect($X)
       - pattern: redirect($X, ...)
       - pattern: HttpResponseRedirect($X)
+      - pattern: HttpResponsePermanentRedirect($X)
+      # Flask
       - pattern: flask.redirect($X)
+      # FastAPI / Starlette
       - pattern: RedirectResponse($X)
       - pattern: RedirectResponse(url=$X)
+      # Tornado
+      - pattern: self.redirect($X)
+      - pattern: self.redirect($X, ...)
+      # Sanic
+      - pattern: response.redirect($X)
     pattern-sanitizers:
       - pattern: url_has_allowed_host_and_scheme($X, ...)
       - pattern: is_safe_url($X, ...)

@@ -56,8 +56,18 @@ rules:
       - pattern: $this->request->getGet($K)
       - pattern: $this->request->getPost($K)
     pattern-sinks:
+      # PHP 내장
       - pattern: 'header($X);'
       - pattern: 'header("Location: " . $X);'
+      # Laravel
+      - pattern: redirect($X)
+      - pattern: redirect()->to($X)
+      - pattern: redirect()->away($X)
+      - pattern: Redirect::to($X)
+      - pattern: Redirect::away($X)
+      # Symfony
+      - pattern: new RedirectResponse($X)
+      - pattern: $HELPER->redirect($X)
     pattern-sanitizers:
       - pattern: filter_var($X, FILTER_VALIDATE_URL)
       - patterns:

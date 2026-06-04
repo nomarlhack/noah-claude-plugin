@@ -4,24 +4,24 @@ rules:
     languages:
       - generic
     message: |
-      sourcemap-scanner Phase 1 sink/source 패턴 매치.
-      후보 수집용 — 정탐 판정은 코드 컨텍스트(source 도달성, sanitizer 부재)를 확인한 후 수행.
+      sourcemap-scanner Phase 1 패턴 매치 (언어 무관).
+      후보 수집용 — 정탐 판정은 코드 컨텍스트(설정값, 프로덕션 환경 여부)를 확인한 후 수행.
     pattern-either:
-      - pattern-regex: 'devtool'
-      - pattern-regex: 'sourcemap'
-      - pattern-regex: 'source-map'
+      # 공통 키워드
+      - pattern-regex: 'sourceMappingURL'
+      - pattern-regex: 'GENERATE_SOURCEMAP'
       - pattern-regex: 'productionBrowserSourceMaps'
       - pattern-regex: 'productionSourceMap'
-      - pattern-regex: 'GENERATE_SOURCEMAP'
-      - pattern-regex: 'sourceMappingURL'
-      - pattern-regex: 'build\.sourcemap'
-      - pattern-regex: 'webpack'
+      # 설정 파일 내 sourceMap 키
+      - pattern-regex: '"sourceMap"\s*:'
+      - pattern-regex: 'sourcemap\s*:'
+      - pattern-regex: 'source-map'
     metadata:
       category: security
       subcategory:
         - vuln
       cwe:
-        - "CWE-540: Source Map Exposure"
+        - "CWE-540: Inclusion of Sensitive Information in Source Code"
       confidence: LOW
       likelihood: LOW
-      impact: HIGH
+      impact: MEDIUM

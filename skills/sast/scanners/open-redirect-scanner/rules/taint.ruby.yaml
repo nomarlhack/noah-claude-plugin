@@ -12,6 +12,8 @@ rules:
       - pattern: params[$K]
       - pattern: params.require($K)
       - pattern: request.params[$K]
+      - pattern: cookies[$K]
+      - pattern: request.cookies[$K]
 
     pattern-sinks:
       # Rails
@@ -19,6 +21,8 @@ rules:
       - pattern: redirect_to($X, ...)
       - pattern: "redirect_to url: $X"
       - pattern: "redirect_back(fallback_location: $X)"
+      - pattern: "redirect_back_or_to($X)"
+      - pattern: "redirect_back_or_to($X, ...)"
       # Sinatra / Rack
       - pattern: redirect($X)
       - pattern: redirect($X, ...)
