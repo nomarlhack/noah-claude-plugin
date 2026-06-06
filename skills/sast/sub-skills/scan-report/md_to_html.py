@@ -243,8 +243,11 @@ a.vuln-link:hover{background:#fde047;border-bottom-color:#111}
 .ov-v code{background:#ede9fe;color:#5b21b6}
 .ov-section{grid-column:1 / -1;border-top:2px solid #111;margin-top:6px}
 .ov-k-sub{font-weight:700;text-transform:none;letter-spacing:0;color:#222}
-.ov-chips{display:flex;flex-wrap:wrap;gap:7px}
-.ov-chip{display:inline-block;background:#ede9fe;color:#5b21b6;border:1.5px solid #111;border-radius:0;padding:2px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.ov-chips{display:flex;flex-wrap:wrap;gap:7px;align-items:flex-start}
+/* 칩이 길어도 컨테이너(열) 안에서 줄바꿈되어 서로 겹치지 않게 한다.
+   min-width:0 으로 flex 아이템 축소를 허용하고, overflow-wrap:anywhere 로 긴 경로/토큰을
+   강제 줄바꿈한다. 짧은 칩은 max-width 를 넘지 않으므로 한 줄을 유지한다. */
+.ov-chip{display:inline-block;background:#ede9fe;color:#5b21b6;border:1.5px solid #111;border-radius:0;padding:2px 9px;font-size:12px;font-weight:600;white-space:normal;max-width:100%;min-width:0;overflow-wrap:anywhere}
 @media(max-width:640px){.ov-grid{grid-template-columns:1fr;gap:4px 0}.ov-k{margin-top:10px}}
 /* Mermaid 다이어그램: SVG가 컨테이너(열) 폭을 꽉 채우도록 강제.
    mermaid 는 기본적으로 svg 에 max-width:자연폭px 를 인라인으로 박아 자연 크기 이상으로
@@ -698,6 +701,20 @@ def _build_overview_banner(m):
                 out.append(f'<span class="ov-chip">{it}</span>')
         return ''.join(out)
 
+    def _shorten_target(s):
+        # 대상 값에 섞인 절대 경로를 디렉토리명(basename)으로 축약한다.
+        # 입력은 이미 inline 처리되어 백틱이 <code>로 바뀐 상태:
+        #   '... <code>/Users/x/y/mcqueen-develop</code> ...' → '... <code>mcqueen-develop</code> ...'
+        # '/' 앞이 공백·태그·괄호·문자열 시작일 때만(=절대 경로) 매칭하여,
+        # 상대 표기('org/repo')나 슬래시 없는 식별자('com.kakao.persona.mcqueen')는 건드리지 않는다.
+        def _repl(m):
+            seg = m.group(0).rstrip('/')
+            return seg.rsplit('/', 1)[-1] or seg
+        # '/' 직전이 공백·'>'(여는 태그 끝)·'(' 또는 문자열 시작일 때만 절대 경로로 본다.
+        # '<' 는 허용 집합에서 제외 — '</code>' 같은 닫는 태그의 '/code' 를 경로로 오인하면
+        # 닫는 태그가 '<code>' 로 망가진다.
+        return re.sub(r'(?<![^\s>(])/[^\s<>(),]+', _repl, s)
+
     parts = []
     for k, v in rows:
         k, v = k.strip(), v.strip()
@@ -712,8 +729,10 @@ def _build_overview_banner(m):
                 label, _, items = seg.partition('::')
                 parts.append(f'<div class="ov-k ov-k-sub">{label.strip()}</div><div class="ov-v ov-chips">{_chips(items, multi=True)}</div>')
         else:
+            # 대상은 풀 경로를 디렉토리명으로 축약(풀 경로 노출 방지).
+            vv = _shorten_target(v) if k == '대상' else v
             # 스택만 다구분자 분리(슬래시/세미콜론 허용). 대상·테스트 환경 등은 쉼표만.
-            parts.append(f'<div class="ov-k">{k}</div><div class="ov-v ov-chips">{_chips(v, multi=(k == "스택"))}</div>')
+            parts.append(f'<div class="ov-k">{k}</div><div class="ov-v ov-chips">{_chips(vv, multi=(k == "스택"))}</div>')
     cells = ''.join(parts)
     return (
         '<div class="overview-card">'
