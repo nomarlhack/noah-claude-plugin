@@ -229,6 +229,7 @@ a.vuln-link:hover{background:#fde047;border-bottom-color:#111}
 .badge-rk-info{background:#fef9c3;color:#a16207}
 .badge-rk-env{background:#ccfbf1;color:#0f766e}
 .badge-rk-skip{background:#f1f1ee;color:#666}
+.badge-rk-neutral{background:#eceae4;color:#444}
 @media print{
   body{max-width:none;padding:16px;background:white;color:black;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   table,.card,details.scanner-block,details.vuln-block,details.chain-block,details.chain-card,.always-open,.overview-card,pre,.masthead{box-shadow:none;break-inside:avoid}
@@ -373,6 +374,25 @@ def split_table_cells(line):
         cells.append(''.join(current))
     return [c for c in cells if c != '']
 
+# 비고(후보 유지 사유/확인 구분) 라벨 → 색상 뱃지 클래스.
+# 알려진 라벨은 의미색, 그 외 비어있지 않은 값은 중립색으로 — 비고 컬럼의 모든 셀이
+# 일관되게 뱃지로 표시되도록 한다(화이트리스트에 없다고 평문으로 남지 않게).
+_remark_badges = {
+    '동적 테스트 완료': 'badge-rk-confirmed',
+    '동적 확인': 'badge-rk-confirmed',        # 구버전 호환
+    '정보 부족': 'badge-rk-info',
+    '환경 제한 — 경로 미라우팅': 'badge-rk-env',
+    '환경 제한 — 인증 정보 부족': 'badge-rk-env',
+    '환경 제한': 'badge-rk-env',              # 부분 매칭 폴백
+    '동적 분석 생략': 'badge-rk-skip',
+}
+_remark_empty = {'', '-', '—', '–', 'N/A', '해당 없음', '없음'}
+def _remark_badge_class(txt):
+    for _lbl, _cls in _remark_badges.items():
+        if txt == _lbl or txt.startswith(_lbl):
+            return _cls
+    return 'badge-rk-neutral'
+
 def do_flush_table():
     if not state['in_table']:
         return
@@ -386,12 +406,25 @@ def do_flush_table():
         _tbl_cls = ' class="id-table"'
     else:
         _tbl_cls = ''
+    # '비고' 컬럼 인덱스 — 해당 컬럼의 비어있지 않은 셀은 모두 뱃지로 렌더한다.
+    _remark_idx = None
+    for _i, _h in enumerate(state['tbl_header']):
+        if _h.strip() == '비고':
+            _remark_idx = _i
+            break
     out.append(f'<table{_tbl_cls}>')
     if state['tbl_header']:
         out.append('<thead><tr>' + ''.join(f'<th>{inline(c.strip())}</th>' for c in state['tbl_header']) + '</tr></thead>')
     out.append('<tbody>')
     for row in state['tbl_rows']:
-        out.append('<tr>' + ''.join(f'<td>{inline(c.strip())}</td>' for c in row) + '</tr>')
+        _cells = []
+        for _ci, c in enumerate(row):
+            _txt = c.strip()
+            if _ci == _remark_idx and _txt not in _remark_empty:
+                _cells.append(f'<td><span class="badge {_remark_badge_class(_txt)}">{inline(_txt)}</span></td>')
+            else:
+                _cells.append(f'<td>{inline(_txt)}</td>')
+        out.append('<tr>' + ''.join(_cells) + '</tr>')
     out.append('</tbody></table>')
     state['in_table'] = False
     state['tbl_header'] = []
@@ -644,18 +677,7 @@ html_out = re.sub(
 html_out = html_out.replace('<td>확인됨</td>', '<td><span class="badge badge-confirmed">확인됨</span></td>')
 html_out = html_out.replace('<td>후보</td>', '<td><span class="badge badge-candidate">후보</span></td>')
 
-# 비고(후보 유지 사유/확인 구분)값도 색상 뱃지로 변환
-_remark_badges = {
-    '동적 테스트 완료': 'badge-rk-confirmed',
-    '동적 확인': 'badge-rk-confirmed',        # 구버전 호환
-    '정보 부족': 'badge-rk-info',
-    '환경 제한 — 경로 미라우팅': 'badge-rk-env',
-    '환경 제한 — 인증 정보 부족': 'badge-rk-env',
-    '환경 제한': 'badge-rk-env',              # 부분 매칭 폴백
-    '동적 분석 생략': 'badge-rk-skip',
-}
-for _label, _cls in _remark_badges.items():
-    html_out = html_out.replace(f'<td>{_label}</td>', f'<td><span class="badge {_cls}">{_label}</span></td>')
+# (비고 컬럼 뱃지화는 do_flush_table 에서 컬럼 단위로 처리하므로 후처리 불필요)
 
 # 개요 섹션을 다크 배너 + 메타 그리드로 변환
 def _build_overview_banner(m):
