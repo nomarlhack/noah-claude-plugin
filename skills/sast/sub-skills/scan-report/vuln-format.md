@@ -270,6 +270,21 @@ curl -X <METHOD> "<TARGET_HOST>/<API_PATH>" -H "Cookie: <SESSION_COOKIE>" -d "<P
 - 실선(`-->`)=`도달성=확정` 정상 경로, 점선(`-.->`)=`동적 확인 필요` 또는 실패 모드
 - 게이트웨이→표면 비대칭(`gateway_basepath_mismatch`)은 점선 + label로 명시
 
+**[필수] 게이트웨이 뒤 ≠ 인증됨 — 인증 경계는 백엔드 표면에 있다.** 게이트웨이는
+라우팅/엣지(리버스 프록시·ingress)일 뿐 모든 요청을 인증하지 않는다. 인증은 백엔드가
+경로별(예: Spring Security `authenticationPatterns` vs `permitAll`)로 강제한다.
+흐름도가 `클라이언트 → 게이트웨이 → 표면`만 그리면 "게이트웨이를 거쳤으니 인증됨"으로
+오해되므로, 다음을 반드시 반영한다:
+- **게이트웨이 노드 라벨에 라우팅 역할을 명시**한다 (예: `"ka-gw · 라우팅(인증 미수행)<br/>base: /"`).
+- **표면(백엔드) 노드를 인증 필요 vs permitAll(익명 허용)로 구분**한다. 표면 라벨에
+  `인증 필요` / `permitAll` 를 적고, `classDef` 로 색을 분리한다
+  (인증 필요=`fill:#fee2e2,stroke:#b91c1c`, permitAll/익명=`fill:#f1f1ee,stroke:#666`).
+- **익명(permitAll) 경로를 누락하지 않는다.** route 의 `identity_source` 가 `"없음(익명)"`
+  이거나 `client_ids` 가 빈 배열인 표면은 **익명(anonymous) 클라이언트 노드에서 점선**으로
+  permitAll 표면에 연결한다. `/open/**`·`/actuator/**`·`/auth/*/handshake` 같은 permitAll
+  경로가 흐름도에 보여야 "게이트웨이 뒤인데 왜 무인증?"이 자명해진다.
+- 백엔드 표면 subgraph 라벨에 인증 주체를 적는다 (예: `"백엔드 인증 경계 · Spring Security 경로별"`).
+
 토폴로지별 3종 예시:
 
 **1) Monolith** (게이트웨이 없음):
@@ -314,6 +329,36 @@ flowchart TD
     GW2 -->|확정 · 200| S3
     GW1 -.->|컨텍스트 불일치 · 500| S2
     GW2 -.->|컨텍스트 불일치 · 500| S1
+```
+
+**4) Routing-gateway + 경로별 인증 (게이트웨이 뒤 ≠ 인증, 익명 경로 포함)**:
+게이트웨이는 라우팅만 하고, 인증은 백엔드가 경로별로 강제한다. 인증 사용자와 익명 트래픽이
+같은 게이트웨이를 통과하지만 도달하는 표면의 인증 정책이 다르다.
+```mermaid
+flowchart TD
+    subgraph Clients["클라이언트"]
+        C1["인증 사용자 · 카카오 세션"]
+        C2["익명 · anonymous"]
+    end
+    subgraph Edge["엣지 게이트웨이 · 라우팅만(인증 미수행)"]
+        GW["ka-gw<br/>base: /"]
+    end
+    subgraph Backend["백엔드 인증 경계 · Spring Security 경로별"]
+        S1["/api/** 표면<br/>인증 필요"]
+        S2["/open/api/** 표면<br/>permitAll"]
+        S3["/actuator/** 표면<br/>permitAll"]
+        S4["/auth/*/handshake 표면<br/>permitAll"]
+    end
+    C1 -->|카카오 세션 · 200| GW
+    C2 -.->|자격증명 없음| GW
+    GW -->|확정 · 인증 강제| S1
+    GW -->|확정 · 익명 허용| S2
+    GW -->|확정 · 익명 허용| S3
+    GW -->|확정 · 익명 허용| S4
+    classDef authed fill:#fee2e2,stroke:#b91c1c,color:#111
+    classDef anon fill:#f1f1ee,stroke:#666,color:#111
+    class S1 authed
+    class S2,S3,S4 anon
 ```
 
 변형: GraphQL federation·service mesh sidecar는 게이트웨이 노드 분할 또는 sidecar 노드 추가로 표현. multi-tenant SaaS는 클라이언트 페르소나 다중화로 표현.
