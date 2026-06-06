@@ -1,0 +1,64 @@
+rules:
+  - id: noah-kotlin-ioh-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      LLM 응답이 검증 없이 코드 실행/OS 명령/SQL/HTTP fetch(SSRF)/tool dispatch sink로
+      흐르면 Insecure Output Handling → RCE/Injection/SSRF. (LLM05:2025)
+      커스텀/사내 LLM 클라이언트(JarvisClient 등) 응답도 사용자 입력과 동급 신뢰로 취급한다.
+      안전: 출력 스키마 검증, enum allowlist, 도메인 allowlist, 출력 인코딩.
+    pattern-sources:
+      # 표준 SDK 응답 추출 (특정 형태만 — `$RESP.text`/`$RESP.content` 단독은
+      # 모든 .text/.content 프로퍼티를 LLM 응답으로 오인하므로 두지 않는다)
+      - pattern: $RESP.choices[0].message.content
+      - pattern: $RESP.choices[$I].message.content
+      - pattern: $RESP.content[0].text
+      - pattern: $RESP.completion
+      # 커스텀/사내 LLM 클라이언트 호출 반환값 — LLM 특정 메서드명만.
+      # `.complete/.generate/.invoke/.sendMessage` 같은 일반 메서드명은 비-LLM 호출
+      # (CompletableFuture.complete, repo.invoke, idGen.generate 등)까지 LLM 응답으로
+      # 오인하므로 두지 않는다(reactive/일반 케이스는 pattern.kotlin + phase1 이 커버).
+      - pattern: $CLIENT.chatCompletion(...)
+      - pattern: $CLIENT.createChatCompletion(...)
+      - pattern: $CLIENT.createMessage(...)
+      - pattern: $CLIENT.generateContent(...)
+      - pattern: $CLIENT.streamChat(...)
+      - pattern: $CLIENT.sendStreamMessage(...)
+      # 주: A2A part.text 류는 모든 `.text` 프로퍼티를 LLM 응답으로 오인하므로
+      # taint source 로 두지 않는다(오탐). reactive 스트림의 part.text→sink 흐름은
+      # pattern.kotlin + phase1(자동 taint 0건이라고 안전 단정 금지)에서 커버한다.
+    pattern-sinks:
+      # 코드/스크립트 실행
+      - pattern: Runtime.getRuntime().exec(...)
+      - pattern: $E.eval($X)
+      - pattern: ProcessBuilder($X, ...)
+      - pattern: $PB.command($X, ...)
+      # SQL
+      - pattern: $STMT.executeQuery($X)
+      - pattern: $STMT.execute($X)
+      - pattern: $STMT.executeUpdate($X)
+      # HTTP fetch (SSRF) — LLM이 지정한 URL을 검증 없이 호출
+      # (taint source 가 도달한 경우만 매치되므로 uri/get 단독 패턴으로 충분)
+      - pattern: $C.getForObject($X, ...)
+      - pattern: $C.getForEntity($X, ...)
+      - pattern: $W.uri($X)
+      # tool/function dispatch — LLM이 지정한 타입으로 도구 라우팅.
+      # `$T.valueOf($X)` 는 모든 enum 파싱을 잡아 오탐이 크므로 두지 않는다(fromString 만).
+      - pattern: ToolType.fromString($X)
+      - pattern: $T.fromString($X)
+    pattern-sanitizers:
+      - pattern: $X.toInt()
+      - pattern: $X.toLong()
+      - pattern: Integer.parseInt($X)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-94: Insecure Output Handling"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Code Injection]
+      owasp: ["LLM05:2025 Improper Output Handling"]
+      technology: [kotlin, spring, llm]

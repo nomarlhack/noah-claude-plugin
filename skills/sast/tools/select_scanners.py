@@ -283,6 +283,60 @@ def has_dep_any(*names):
         return True
     return False
 
+# --- 소스/설정 레벨 LLM 통합 시그널 ---
+# 표준 SDK(openai/anthropic/langchain ...) 의존성이 없어도, 내부/사내 LLM 인프라
+# (예: 카카오 Jarvis Agent Builder A2A API)를 커스텀 HTTP 클라이언트로 호출하는
+# 프로젝트는 매니페스트만으로 LLM 통합을 알 수 없다. 이 경우 소스/설정에 남는
+# 강한 LLM 시그널(엔드포인트 경로·요청 시그니처·system prompt·사내 플랫폼명)을 보고
+# LLM 그룹 스캐너를 활성화한다. 과활성화돼도 매치가 0이면 '이상 없음'으로 끝나므로,
+# 미탐(취약점 누락)보다 비용이 낮다 — recall 우선.
+_LLM_SOURCE_RE = re.compile(
+    # 'messages.create/stream' 은 DB/ORM(repo.messages.create)·메시징과 충돌하여
+    # 제외한다(표준 SDK 의 messages.create 는 의존성 매니페스트로 이미 잡힘).
+    r"chat/completions|/v1/chat\b|chatcompletion|generatecontent"
+    r"|system[_-]?prompt|system[_-]?instruction"
+    r"|prompttemplate|systemmessage"
+    # 사내/에이전트 플랫폼의 실제 호출 구조 (Jarvis A2A 등).
+    # 'jarvis'/'kanana' 같은 플랫폼명 단독은 제외 — 그 플랫폼의 데이터 모델
+    # (예: KananaOrder)만 다루는 다운스트림 서비스까지 오탐하기 때문. LLM을 직접
+    # 호출하는 클라이언트/요청 타입/엔드포인트 시그니처만 시그널로 인정한다.
+    r"|jarvisclient|a2amessage|/api/agents/|/v1/message:(?:stream|send)",
+    re.IGNORECASE,
+)
+_LLM_SOURCE_EXTS = (
+    ".kt", ".java", ".py", ".ts", ".js", ".scala", ".go", ".rb", ".php", ".cs",
+    ".yaml", ".yml", ".properties", ".conf", ".gradle", ".kts",
+)
+_LLM_SKIP_DIRS = {
+    ".git", "node_modules", "build", "target", ".gradle", "dist", "out",
+    "vendor", "__pycache__", ".idea", ".venv", "venv",
+}
+_llm_source_signal = None
+def has_llm_source_signal():
+    """소스/설정 파일에 내부 LLM 통합 시그널이 있으면 True (매니페스트 무관)."""
+    global _llm_source_signal
+    if _llm_source_signal is not None:
+        return _llm_source_signal
+    checked = 0
+    for root, dirs, files in os.walk(PROJECT_ROOT):
+        dirs[:] = [d for d in dirs if d not in _LLM_SKIP_DIRS]
+        for fn in files:
+            if not fn.endswith(_LLM_SOURCE_EXTS):
+                continue
+            checked += 1
+            if checked > 8000:  # 안전 상한
+                _llm_source_signal = False
+                return False
+            try:
+                with open(os.path.join(root, fn), encoding="utf-8", errors="ignore") as f:
+                    if _LLM_SOURCE_RE.search(f.read()):
+                        _llm_source_signal = True
+                        return True
+            except OSError:
+                pass
+    _llm_source_signal = False
+    return False
+
 # --- prereq_group 동적 로드 (스캐너 frontmatter의 단일 진실 원천) ---
 # 각 스캐너의 phase1.md frontmatter에 `prereq_group: <name>`이 선언된 경우,
 # 그 스캐너는 사전 단계가 필요한 특수 그룹에 속한다. check_exclude의 그룹별
@@ -598,8 +652,8 @@ def check_exclude(scanner):
             "replicate", "together-ai", "groq-sdk", "litellm", "ollama",
             "@huggingface/inference", "langchain", "@langchain/core",
             "@langchain/openai", "@langchain/anthropic", "llamaindex",
-        ):
-            return "LLM SDK/프레임워크 의존성 없음"
+        ) and not has_llm_source_signal():
+            return "LLM SDK/프레임워크 의존성 없음 (소스 LLM 시그널도 없음)"
     # open-redirect, crlf, path-traversal, http-method-tampering, host-header,
     # css-injection, redos, http-smuggling, idor: 아키텍처만으로 제외하기 어려움 → 포함
     return None

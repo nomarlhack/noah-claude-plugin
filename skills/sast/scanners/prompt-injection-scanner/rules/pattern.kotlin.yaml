@@ -56,6 +56,16 @@ rules:
       - pattern-regex: 'Retriever'
       - pattern-regex: 'VectorStore'
       - pattern-regex: 'RAG'
+      # 커스텀/사내 LLM 클라이언트 호출 시그니처 (표준 SDK import 없는 경우)
+      - pattern-regex: 'chatCompletion'
+      - pattern-regex: 'streamChat'
+      - pattern-regex: 'sendStreamMessage'
+      - pattern-regex: 'A2AMessage'
+      - pattern-regex: 'JarvisClient'
+      # 사용자 입력을 prompt에 조립하는 흔한 형태 (instruction 영역 혼입 후보)
+      - pattern-regex: 'buildUserInput'
+      - pattern-regex: 'systemPrompt'
+      - pattern-regex: 'grounding[_-]?search'
     metadata:
       category: security
       subcategory:

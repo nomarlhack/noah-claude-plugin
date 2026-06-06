@@ -1,0 +1,69 @@
+rules:
+  - id: noah-kotlin-prompt-injection-taint
+    severity: ERROR
+    languages:
+      - kotlin
+    mode: taint
+    message: |
+      Spring HTTP 입력(@RequestBody/@RequestParam/@PathVariable 등)이 LLM 호출의
+      prompt/message에 검증·분리 없이 결합되면 Prompt Injection. (LLM01:2025)
+      커스텀/사내 LLM 클라이언트(JarvisClient.streamChat/sendMessage 등) 포함.
+      안전: 시스템/사용자 메시지 분리, 입력 검증·구조화, 신뢰 경계 표시.
+    pattern-sources:
+      # Spring 컨트롤러 파라미터 바인딩.
+      # Kotlin 은 expression body(fun f(...) = expr)가 흔하므로 block body({ ... })와
+      # expression body(= ...)를 각 어노테이션마다 둘 다 둔다. (trailing ... 단일 패턴은
+      # Kotlin 파서가 거부하므로 합칠 수 없다.)
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @RequestBody $X: $T, ...) { ... }"
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @RequestBody $X: $T, ...) = ..."
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @RequestParam $X: $T, ...) { ... }"
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @RequestParam $X: $T, ...) = ..."
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @RequestParam(...) $X: $T, ...) { ... }"
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @RequestParam(...) $X: $T, ...) = ..."
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @PathVariable $X: $T, ...) { ... }"
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @PathVariable $X: $T, ...) = ..."
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @RequestHeader $X: $T, ...) { ... }"
+      - patterns:
+          - pattern: $X
+          - pattern-inside: "fun $M(..., @RequestHeader $X: $T, ...) = ..."
+      # 서블릿 직접 접근
+      - pattern: $REQ.getParameter(...)
+      - pattern: $REQ.getHeader(...)
+    pattern-sinks:
+      # LLM 특정 메서드만 taint sink 로 둔다. `.invoke/.complete/.generate/.run` 같은
+      # 일반 메서드명은 비-LLM 호출(coroutine/operator/repository)까지 오탐하므로
+      # 제외하고 pattern.kotlin + phase1(LLM 도달성 컨텍스트 분석)에 위임한다.
+      - pattern: $C.chatCompletion(...)
+      - pattern: $C.createChatCompletion(...)
+      - pattern: $C.createMessage(...)
+      - pattern: $C.generateContent(...)
+      - pattern: $C.streamChat(...)
+      - pattern: $C.sendStreamMessage(...)
+    metadata:
+      category: security
+      subcategory: [vuln]
+      cwe: ["CWE-77: Prompt Injection"]
+      confidence: MEDIUM
+      likelihood: MEDIUM
+      impact: HIGH
+      vulnerability_class: [Prompt Injection]
+      owasp: ["LLM01:2025 Prompt Injection"]
+      technology: [kotlin, spring, llm]

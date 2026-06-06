@@ -62,6 +62,15 @@ rules:
       - pattern-regex: 'AgentExecutor'
       - pattern-regex: 'function_call'
       - pattern-regex: 'tool_call'
+      # 커스텀/사내 LLM 클라이언트 호출 시그니처 (표준 SDK import가 없는 경우)
+      - pattern-regex: 'chatCompletion'
+      - pattern-regex: 'streamChat'
+      - pattern-regex: 'sendStreamMessage'
+      - pattern-regex: 'A2AMessage'
+      - pattern-regex: 'JarvisClient'
+      # LLM 출력 기반 도구/함수 디스패치 sink (LLM이 지정한 타입으로 라우팅).
+      # 도달성(타입 문자열이 LLM 응답에서 왔는지)은 phase1 컨텍스트 분석에서 확인.
+      - pattern-regex: 'ToolType\.fromString'
     metadata:
       category: security
       subcategory:

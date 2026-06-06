@@ -44,6 +44,10 @@ Prompt Injection sink는 "사용자가 제어할 수 있는 텍스트가 system/
 - **본 저장소가 LLM API를 직접 호출하지 않더라도** prompt·context·도구 호출 payload를 합성·조립하여 외부 LLM 서비스/게이트웨이로 forward하는 코드가 있다면 그 합성 지점이 sink다. "LLM 라이브러리 import가 없음 → 이상 없음" 결론을 내리기 전에 외부 LLM 경계로 나가는 호출의 payload 조립 과정을 확인한다.
 - **동적 키-값 컨테이너의 일괄 forward**: map/dict/object 타입의 metadata·extra·params 같은 컨테이너에 사용자 입력을 채워 LLM 컨텍스트로 보내는 경로 — 필드 화이트리스트·스키마 검증이 없으면 임의 키가 system/instruction 영역으로 흘러갈 수 있다.
 - **전송 채널은 sink 판정의 면제 사유가 아니다** — REST 외 WebSocket/SSE/메시지 큐/이벤트 스트림 등 어떤 채널의 본문이라도 사용자 제어가 가능하면 source로 다룬다.
+- **보조/2차 LLM 호출도 sink다** — 메인 대화 응답 외에, thread 제목·요약·welcome 메시지·가드레일 판정 등 **보조 작업용 LLM 호출**에 사용자 입력(utterance 등)을 직접 문자열 보간하면 동일하게 인젝션이 성립한다. 메인 챗 엔드포인트만 보고 보조 LLM 경로(별도 graph/agent 호출)를 빠뜨리지 않는다.
+- **태그로 감싸도 이스케이프 안 하면 구조 탈출** — Kotlin `buildString`/triple-quote(`""" ... """`) 템플릿에서 사용자 입력을 `<user_message>…</user_message>` 같은 구분 태그로 감싸더라도, 입력 안의 닫는 태그(`</user_message>`)나 `<system>`을 이스케이프하지 않으면 사용자가 구조를 위조해 지시 영역으로 탈출할 수 있다. "태그로 감쌌으니 안전"으로 단정하지 말고 입력 이스케이프 여부를 확인한다.
+- **RAG/grounding 결과의 간접 인젝션** — 벡터검색·`grounding_search`로 가져온 외부 문서를 신뢰 마커 없이 컨텍스트에 주입하면, 문서 안에 심긴 지시가 실행될 수 있다(소스 문서 출처를 클라이언트가 인지 못 해도 성립).
+- **자동 taint 미탐을 안전으로 단정 금지** — Kotlin reactive(Flux/Mono) 스트림·콜백 람다·함수 경계를 넘는 입력→LLM 흐름은 semgrep taint가 추적하지 못한다(자동 taint 0건이 안전을 뜻하지 않음). 사용자 입력이 prompt/message·요청 variables 조립으로 흐르는 경로를 코드로 직접 확인한다.
 
 ## 안전 패턴 (FP Guard)
 

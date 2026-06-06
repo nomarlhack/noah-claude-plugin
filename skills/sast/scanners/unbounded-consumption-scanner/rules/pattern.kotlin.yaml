@@ -50,6 +50,17 @@ rules:
       - pattern-regex: 'django-ratelimit'
       - pattern-regex: 'Bucket4j'
       - pattern-regex: 'redis'
+      # 커스텀/사내 LLM 호출 지점 (비용 발생 sink)
+      - pattern-regex: 'chatCompletion'
+      - pattern-regex: 'streamChat'
+      - pattern-regex: 'sendStreamMessage'
+      - pattern-regex: 'JarvisClient'
+      # 토큰/스텝 상한 게이트(방어) 또는 그 단서
+      - pattern-regex: 'tokenBudget'
+      - pattern-regex: '[Tt]rim.*[Bb]udget'
+      - pattern-regex: 'maxSteps'
+      - pattern-regex: 'maxTokens'
+      - pattern-regex: 'streamCompletionTimeout'
     metadata:
       category: security
       subcategory:

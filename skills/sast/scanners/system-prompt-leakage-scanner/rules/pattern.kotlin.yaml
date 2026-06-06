@@ -39,6 +39,14 @@ rules:
       - pattern-regex: 'secret'
       - pattern-regex: 'password'
       - pattern-regex: 'token'
+      # 커스텀/사내 LLM 클라이언트 — system prompt/지시가 흐르는 호출·요청 구조
+      # (표준 SDK import 없는 사내 인프라에서 system prompt 정의·전송 지점 노출용)
+      - pattern-regex: 'systemPrompt'
+      - pattern-regex: 'chatCompletion'
+      - pattern-regex: 'streamChat'
+      - pattern-regex: 'sendStreamMessage'
+      - pattern-regex: 'A2AMessage'
+      - pattern-regex: 'JarvisClient'
     metadata:
       category: security
       subcategory:

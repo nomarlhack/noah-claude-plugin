@@ -50,6 +50,10 @@ Insecure Output Handling sink는 "LLM 응답 텍스트가 컨텍스트별 인코
 - **응답 전달 채널은 sink 의미론에 영향을 주지 않는다** — REST 외 WebSocket/SSE/메시지 큐/푸시 등 어떤 전송 경로로 응답이 도착하든, 최종 렌더·실행 지점이 sink 기준이다.
 - **링크/이미지 sanitize는 URL 속성에 한정된다** — `href`/`src` 자체는 라이브러리가 검증해도, 클릭/로드 핸들러를 별도 코드로 가로채 URL을 처리하면 기본 보호는 작동하지 않는다.
 - **렌더 함수·컴포넌트 호출 자체가 sink는 아니다** — 동일한 마크다운/HTML 변환이 (a) 사용자 화면 노출, (b) plain text 정규화·스트립·길이 계산, (c) 내부 로그·DB 저장 후 외부 노출 없이 종결 등 다양한 의미로 사용된다. 호출 결과가 **사용자에게 도달하는 UI**(브라우저 DOM, SSR 응답 본문, 이메일/푸시/PDF 본문 등)로 흐르는지 데이터 흐름을 확인한 뒤 sink로 판정한다. 호출이 보인다는 이유만으로 후보로 등록하지 않는다.
+- **서버측 SSRF — LLM 응답 URL을 서버가 fetch** — 모델 응답·도구 결과(grounding/검색 참조 등)에 포함된 URL을 **서버가** HTTP 클라이언트(`RestTemplate`/`WebClient`/`getForObject` 등)로 직접 가져오면 SSRF다. 클라이언트측 마크다운 이미지 자동 fetch(`EXFIL_RENDER`)와 구분: 여기서는 서버가 내부망·클라우드 메타데이터 엔드포인트로 요청할 수 있다. 도메인 allowlist(예: `isYoutubeDomain` 같은 가드)가 있으면 그 범위 안인지 확인한다.
+- **LLM이 지정한 타입으로 enum/도구 dispatch** — `ToolType.fromString(<llm가 준 type>)` 후 컨버터/핸들러로 라우팅하는 패턴. enum에 없으면 무시되지만, 매핑된 도구가 권한·부수효과(외부 호출·상태 변경)를 가지면 LLM이 도구 선택을 좌우한다(`TOOL_DISPATCH`). `fromString`/`valueOf`의 인자가 모델 응답에서 왔는지 확인한다.
+- **reactive/콜백 경계를 넘는 흐름** — Flux/Mono `concatMap`·`map`·`flatMap`·`forEach` 람다나 별도 핸들러 함수 안에서 LLM chunk(`part.text`/`part.data`)가 추출되어 sink로 흐르는 경우, 단순 taint(semgrep)가 스트림 연산자·람다·함수 경계를 넘지 못해 놓친다. **스트림 파이프라인과 콜백을 직접 따라가며** 도달성을 판정한다(자동 taint 0건이라고 안전으로 단정 금지).
+- **커스텀/사내 LLM 클라이언트 응답도 source** — `openai`/`anthropic` 같은 표준 SDK import가 없어도, 사내 HTTP 클라이언트(`JarvisClient.streamChat()`/`sendMessage()`/`sendStreamMessage()`, A2A `A2AMessageStreamResponse` 등)의 반환값·스트림 청크는 동일하게 신뢰 불가 출력으로 취급한다.
 
 ## 안전 패턴 (FP Guard)
 
@@ -80,6 +84,7 @@ Insecure Output Handling sink는 "LLM 응답 텍스트가 컨텍스트별 인코
 | 모델 응답이 `innerHTML`/`dangerouslySetInnerHTML`/마크다운·리치텍스트 렌더에 sanitize 없이 도달 **+ 렌더 결과가 사용자에게 노출되는 UI로 흐름** | 후보 (라벨: `XSS`) |
 | 모델이 결정한 tool/function 호출이 권한·스키마 검증 없이 실행 | 후보 (라벨: `TOOL_DISPATCH`) |
 | 응답에 외부 URL/이미지가 포함되어 클라이언트가 자동 fetch | 후보 (라벨: `EXFIL_RENDER`) |
+| 응답/도구결과에 포함된 URL을 **서버**가 직접 fetch (RestTemplate/WebClient), 도메인 allowlist 없음 | 후보 (라벨: `SSRF`) |
 | 모델 응답이 안전한 컨텍스트(plain text 렌더, 로그 only, parameterized 쿼리 등)에만 사용 | 제외 |
 | 응답에 위험 키워드가 있을 수 있다는 추정뿐, 실제 sink 없음 | 제외 |
 
