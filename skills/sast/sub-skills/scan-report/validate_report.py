@@ -176,6 +176,17 @@ def _check_mermaid_labels(text: str) -> list[str]:
                     f"mermaid block #{i}: 따옴표 없는 라벨에 특수문자 포함 — "
                     f"`[{label[:60]}]` (mermaid 파서 혼동 위험). 큰따옴표로 감싸세요."
                 )
+        # 3) edge label(`-->|...|`)의 괄호 — 파이프 안은 따옴표로 감쌀 수 없어
+        #    괄호 `()`가 그대로 노출되면 mermaid 11.x 파서가 syntax error를 낸다.
+        #    엣지 화살표(-->, -.->, ==>, --, -.- 등) 뒤의 `|...|` 만 검사한다.
+        for m in _re.finditer(r"(?:--+>?|-\.-+>?|==+>?)\s*\|([^|\n]*)\|", block):
+            label = m.group(1)
+            if "(" in label or ")" in label:
+                warns.append(
+                    f"mermaid block #{i}: edge label 괄호 — "
+                    f"`|{label[:50]}|` 의 () 가 syntax error 를 유발한다. "
+                    f"괄호를 제거(노드 라벨로 빼거나 `·`로 대체)하세요."
+                )
     return warns
 
 
