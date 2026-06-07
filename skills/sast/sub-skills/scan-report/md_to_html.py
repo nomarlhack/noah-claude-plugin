@@ -667,7 +667,10 @@ def add_link(m):
     return f'<tr><td>{num}</td><td>{linked}</td>{rest}'
 
 html_out = re.sub(
-    r'<tr><td>(\d+)</td><td>((?:(?!</td>).)+)</td>(.*?<td>(?:확인됨|후보)</td>(?:<td>[^<]*</td>)*</tr>)',
+    # 상태 셀 뒤의 추가 셀(비고 등)은 do_flush_table 에서 이미 뱃지(<span>)로 변환될 수
+    # 있으므로 평문 셀([^<]*)이 아니라 '셀 안에 </td>가 없는' 패턴으로 받아야 한다.
+    # (평문만 허용하면 비고 뱃지 행에서 행 매칭이 실패해 바로가기 링크가 누락된다.)
+    r'<tr><td>(\d+)</td><td>((?:(?!</td>).)+)</td>(.*?<td>(?:확인됨|후보)</td>(?:<td>(?:(?!</td>).)*</td>)*</tr>)',
     add_link,
     html_out,
     flags=re.DOTALL
