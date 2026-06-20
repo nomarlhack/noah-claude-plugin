@@ -344,9 +344,12 @@ FAIL: 주석 없음 / `accounted < files`
 
 ### 단계별 산출물
 
-#### `<scanner>.json` — 룰별 위치 목록 (semgrep 인덱싱)
+---
 
-룰 ID를 키로, 매칭된 위치 목록을 값으로 저장한다. Phase 1 에이전트가 특정 룰의 매치 위치를 조회할 때 사용한다.
+#### `<scanner>.json` — 룰별 위치 목록
+
+**왜 필요한가**: 특정 룰이 어느 파일·라인에서 매칭됐는지 빠르게 조회하기 위한 인덱스다.  
+**어디서 쓰이는가**: Phase 1 에이전트가 분석 시작 전 "이 룰은 몇 건이나 매칭됐는가"를 확인할 때 사용한다.
 
 ```json
 {
@@ -357,9 +360,10 @@ FAIL: 주석 없음 / `accounted < files`
 
 ---
 
-#### `<scanner>.locindex.json` — 위치별 매칭 정보 (semgrep 인덱싱)
+#### `<scanner>.locindex.json` — 위치별 매칭 정보
 
-같은 `file:line`에 여러 룰이 걸리면 1개로 병합한다. tier는 가장 높은 것으로 승격하고 `rule_ids`에 모두 보존한다. Phase 1 에이전트가 `locindex_summary.py`를 통해 읽어 분석 우선순위를 결정한다.
+**왜 필요한가**: `<scanner>.json`은 룰 기준이라 같은 `file:line`이 여러 룰에 중복 등장한다. locindex는 위치 기준으로 재정리해 중복을 1개로 병합하고 tier를 승격한다. 그리고 수만 줄이 되는 파일을 에이전트가 직접 읽을 수 없으므로 `locindex_summary.py`가 2,000줄 이내로 요약해준다.  
+**어디서 쓰이는가**: Phase 1 에이전트가 `locindex_summary.py`를 실행해 "어느 파일을 먼저 Read할지" 우선순위를 결정할 때 사용한다.
 
 ```json
 {
@@ -369,7 +373,7 @@ FAIL: 주석 없음 / `accounted < files`
     "tier_counts": { "taint": 379, "ast": 3310, "generic": 1049 }
   },
   "locations": {
-    "render.js:22":             { "tier": "ast",   "rule_ids": ["noah-javascript-xss-phase1-pattern"] },
+    "render.js:22":               { "tier": "ast",   "rule_ids": ["noah-javascript-xss-phase1-pattern"] },
     "ArticleController.java:313": { "tier": "taint", "rule_ids": ["noah-java-xss-taint"] }
   }
 }
@@ -377,9 +381,10 @@ FAIL: 주석 없음 / `accounted < files`
 
 ---
 
-#### `<scanner>.md` — 스캐너별 분석 결과 (Phase 1 정적 분석)
+#### `<scanner>.md` — 스캐너별 분석 결과
 
-그룹 에이전트가 작성하는 파일. 후보 섹션, 게이트 주석, MANIFEST 블록으로 구성된다. phase1-review가 원본으로 읽으며 **수정 금지**다.
+**왜 필요한가**: 그룹 에이전트가 분석한 결과를 기록하는 파일이다. 후보, 게이트 주석, MANIFEST 블록이 담긴다. 에이전트가 "무엇을 분석했고, 왜 후보로 올렸는지/올리지 않았는지"를 남기는 기록이다.  
+**어디서 쓰이는가**: phase1-review 에이전트가 원본으로 읽는다. 이 파일은 **수정 금지**다 — 리뷰 결과는 반드시 별도 eval MD에 기록한다.
 
 ```
 # ssrf-scanner Phase 1 분석 결과
@@ -399,9 +404,10 @@ FAIL: 주석 없음 / `accounted < files`
 
 ---
 
-#### `master-list.json` — 전체 후보 메타데이터 (Phase 1 정적 분석 → 리뷰)
+#### `master-list.json` — 전체 후보 메타데이터
 
-`phase1_build_master_list.py`가 모든 `<scanner>.md`와 `ai-discovery.md`를 집약하여 생성한다. Phase 2 ~ 보고서까지 **단일 진실 원천**이다.
+**왜 필요한가**: 21개 스캐너가 각자 `.md` 파일을 만들면 후보가 흩어진다. `phase1_build_master_list.py`가 이를 하나로 집약해 이후 모든 단계가 같은 파일을 참조하도록 한다.  
+**어디서 쓰이는가**: Phase 2 에이전트, phase2-review, 연계 분석, 보고서까지 **모든 단계**가 이 파일을 읽고 쓴다. 각 단계가 담당하는 필드가 정해져 있다 — phase1-review는 `phase1_*` 필드만, phase2-review는 `status/tag/evidence_summary`만 쓴다.
 
 ```json
 {
@@ -419,13 +425,12 @@ FAIL: 주석 없음 / `accounted < files`
 }
 ```
 
-phase1-review 완료 후 `phase1_validated`, `safe_category`, `phase1_discarded_reason` 필드가 갱신된다.
-
 ---
 
-#### `evaluation/<scanner>-eval.md` — 리뷰 평가본 (Phase 1 리뷰)
+#### `evaluation/<scanner>-eval.md` — 리뷰 평가본
 
-리뷰 에이전트가 Phase 1 원본 MD를 수정하지 않고 새로 작성하는 파일. Phase 2 에이전트와 보고서는 원본 MD 대신 이 파일을 참조한다.
+**왜 필요한가**: 원본 `.md`를 수정하면 "Phase 1이 뭘 판단했는지"가 덮어씌워진다. 원본은 보존하고 리뷰 결과를 별도 파일로 남겨야 두 판정의 차이를 추적할 수 있다.  
+**어디서 쓰이는가**: Phase 2 에이전트와 보고서가 원본 MD 대신 이 파일을 참조한다. OVERRIDE 판정이면 수정 권고가 담겨있어 Phase 2가 올바른 경로를 테스트하도록 안내한다.
 
 ```
 <!-- SOURCE_HASH: sha256:9ac2921e70...2121a -->
@@ -443,12 +448,9 @@ phase1-review 완료 후 `phase1_validated`, `safe_category`, `phase1_discarded_
 
 ### Override 여부
 CONFIRM
-
-### phase1_quality_notes
-taint tier — dataflow 확정 (rule: noah-ts-ssrf-taint)
 ```
 
-`SOURCE_HASH`는 원본 MD의 SHA-256 해시다. 원본이 수정되면 해시가 달라져 eval MD가 "고아 상태"로 처리된다.
+`SOURCE_HASH`는 원본 MD의 SHA-256 해시다. 원본이 수정되면 해시가 달라져 eval MD가 "고아 상태"로 처리되고 `phase1_validated`가 false로 돌아간다.
 
 ### 스크립트 및 참조 파일
 
