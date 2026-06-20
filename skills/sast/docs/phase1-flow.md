@@ -56,15 +56,6 @@ flowchart TD
 
 ## 1단계: semgrep 인덱싱
 
-**산출물**
-
-| 파일 | 내용 | 다음 단계에서 |
-|------|------|-------------|
-| `PATTERN_INDEX_DIR/<scanner>.json` | 룰 ID별 매치 위치 목록 | Phase 1 에이전트가 특정 룰 위치 조회에 사용 |
-| `PATTERN_INDEX_DIR/<scanner>.locindex.json` | file:line별 tier/rule_ids + 스캐너 메타 | Phase 1 에이전트가 분석 우선순위 결정에 사용 |
-
----
-
 ### 왜 인덱싱이 필요한가
 
 21개 그룹 에이전트가 병렬로 실행된다. 각 에이전트가 소스코드를 직접 스캔하면 같은 파일을 21번 스캔하는 낭비가 생기고, 에이전트마다 결과가 달라질 수 있다. **스캔을 1회만 실행해 인덱스로 저장**하고 각 에이전트가 인덱스를 읽는 구조다.
@@ -134,16 +125,6 @@ stdout에 `run_semgrep_index_exit=N`으로 출력한다.
 
 ## 2단계: Phase 1 정적 분석
 
-**산출물**
-
-| 파일 | 내용 | 다음 단계에서 |
-|------|------|-------------|
-| `PHASE1_RESULTS_DIR/<scanner>.md` | 스캐너별 분석 결과 — 후보 섹션, 게이트 주석, MANIFEST 블록 | phase1-review가 원본으로 읽음 (수정 금지) |
-| `PHASE1_RESULTS_DIR/ai-discovery.md` | AI 자율 탐색 후보 목록 | master-list.py가 scanner.md와 함께 집약 |
-| `PHASE1_RESULTS_DIR/master-list.json` | 전체 후보 메타데이터 — Phase 2 ~ 보고서까지 단일 진실 원천 | phase1-review가 판정 대상 목록으로 사용 |
-
----
-
 ### 그룹 에이전트 (병렬)
 
 `select_scanners.py`가 편성한 그룹당 1개 에이전트를 병렬 디스패치한다.
@@ -210,15 +191,6 @@ generic      0     0     2  Modal.svelte
 ---
 
 ## 3단계: Phase 1 리뷰
-
-**산출물**
-
-| 파일 | 내용 | 다음 단계에서 |
-|------|------|-------------|
-| `PHASE1_RESULTS_DIR/evaluation/<scanner>-eval.md` | 리뷰 평가본 — blind eval 결과, 5개 축 판정, 수정 권고, SOURCE_HASH | Phase 2 에이전트와 보고서가 원본 MD 대신 참조 |
-| `master-list.json` (`phase1_*` 필드 갱신) | phase1_validated, phase1_discarded_reason, safe_category | phase1_review_assert.py가 완료 여부 검증 |
-
----
 
 Phase 1 에이전트는 **Sink 패턴 매칭** 중심으로 분석한다. 리뷰는 **Source 역추적** 중심으로 독립 재판정해 부정확한 후보를 Phase 2 전에 정제한다.
 
@@ -359,13 +331,27 @@ FAIL: 주석 없음 / `accounted < files`
 
 ---
 
-## 관련 파일
+## 산출물 및 관련 파일
+
+### 단계별 산출물
+
+| 단계 | 파일 | 내용 | 다음 단계 역할 |
+|------|------|------|--------------|
+| semgrep 인덱싱 | `PATTERN_INDEX_DIR/<scanner>.json` | 룰 ID별 매치 위치 목록 | Phase 1 에이전트가 특정 룰 위치 조회 |
+| semgrep 인덱싱 | `PATTERN_INDEX_DIR/<scanner>.locindex.json` | file:line별 tier/rule_ids + 스캐너 메타 | Phase 1 에이전트가 분석 우선순위 결정 |
+| Phase 1 정적 분석 | `PHASE1_RESULTS_DIR/<scanner>.md` | 스캐너별 분석 결과 — 후보 섹션, 게이트 주석, MANIFEST | phase1-review가 원본으로 읽음 (수정 금지) |
+| Phase 1 정적 분석 | `PHASE1_RESULTS_DIR/ai-discovery.md` | AI 자율 탐색 후보 목록 | phase1_build_master_list.py가 집약 |
+| Phase 1 정적 분석 | `PHASE1_RESULTS_DIR/master-list.json` | 전체 후보 메타데이터 | Phase 2 ~ 보고서까지 단일 진실 원천 |
+| Phase 1 리뷰 | `PHASE1_RESULTS_DIR/evaluation/<scanner>-eval.md` | 리뷰 평가본 — 5개 축 판정, SOURCE_HASH | Phase 2 에이전트·보고서가 원본 MD 대신 참조 |
+| Phase 1 리뷰 | `master-list.json` (`phase1_*` 필드) | phase1_validated, safe_category, discarded_reason | phase1_review_assert.py가 완료 여부 검증 |
+
+### 스크립트 및 참조 파일
 
 | 파일 | 역할 |
 |------|------|
-| `tools/semgrep_index.py` | semgrep 실행 → locindex.json 생성 |
-| `tools/locindex_summary.py` | locindex.json → 파일 목록 요약 출력 |
-| `tools/phase1_build_master_list.py` | 후보 집약 + 구조 검증 |
-| `tools/phase1_review_blind_read.py` | blind eval 헬퍼 (판정 섹션 마스킹) |
-| `tools/phase1_review_assert.py` | 게이트 3종 검증 |
-| `sub-skills/scan-report-review/phase1-review.md` | 리뷰 에이전트 지시 |
+| `tools/semgrep_index.py` | semgrep 실행 → json + locindex.json 생성 |
+| `tools/locindex_summary.py` | locindex.json → 2,000줄 이내 파일 목록 요약 출력 |
+| `tools/phase1_build_master_list.py` | 후보 집약 + 구조 검증 → master-list.json |
+| `tools/phase1_review_blind_read.py` | blind eval 헬퍼 — 판정 섹션 마스킹 |
+| `tools/phase1_review_assert.py` | 게이트 3종 검증 — Phase 2 진입 차단 |
+| `sub-skills/scan-report-review/phase1-review.md` | 리뷰 에이전트 지시 (5개 축, blind eval 절차) |
