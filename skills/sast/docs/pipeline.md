@@ -153,8 +153,7 @@ noah-sast-report.md/.html   ← 최종 보고서 (Step 12)
 
 | 문서 | 내용 |
 |------|------|
-| `docs/semgrep-indexing.md` | semgrep 인덱싱 동작 상세 |
-| `docs/phase1-flow.md` | Phase 1 정적 분석 + 리뷰 + 게이트 3종 통합 흐름 |
+| `docs/phase1-flow.md` | semgrep 인덱싱 + Phase 1 정적 분석 + 리뷰 + 게이트 3종 통합 흐름 |
 | `docs/review-modes.md` | phase1/phase2/report-review 3모드 비교 |
 | `docs/resume.md` | 중단 후 재개 판별 규칙 |
 | `docs/single-source-of-truth.md` | 산출물별 writer/reader 상세 |

@@ -1,6 +1,6 @@
 # Phase 1 흐름
 
-Phase 1은 소스코드를 정적 분석하여 취약점 **후보**를 만들고, 리뷰를 통해 정제하는 단계다. 동적 테스트 없이 진행하며, 결과는 `master-list.json`으로 집약된다.
+소스코드를 정적 분석하여 취약점 **후보**를 만들고, 리뷰로 정제하는 단계다. semgrep 인덱싱 → 그룹 에이전트 분석 → AI 자율 탐색 → Phase 1 리뷰 순으로 진행되며, 결과는 `master-list.json`으로 집약된다.
 
 ---
 
@@ -8,63 +8,124 @@ Phase 1은 소스코드를 정적 분석하여 취약점 **후보**를 만들고
 
 ```mermaid
 flowchart TD
-    IDX["semgrep_index.py\n스캐너별 locindex.json 생성"]
-    SEL["select_scanners.py\n스캐너 선별 + 그룹 편성"]
+    SRC["소스코드"]
+
+    subgraph IDX ["semgrep 인덱싱"]
+        SEMGREP["semgrep_index.py\n룰 ID → tier 분류\n같은 file:line 병합 + tier 승격"]
+        JSON["<scanner>.json\n룰별 위치 목록"]
+        LOCI["<scanner>.locindex.json\n위치별 tier/rule_ids"]
+        SEMGREP --> JSON & LOCI
+    end
 
     subgraph P1 ["Phase 1 정적 분석"]
-        GRP["그룹 에이전트 x21 병렬\nlocindex 읽기 → 소스 Read → 후보 판정\n→ PHASE1_RESULTS_DIR/<scanner>.md"]
-        ML1["phase1_build_master_list.py\n구조 검증 + 후보 집약\n→ master-list.json 초안"]
+        SEL["select_scanners.py\n스캐너 선별 + 그룹 편성"]
+        GRP["그룹 에이전트 x21 병렬\nlocindex_summary.py → 소스 Read → 후보 판정\n→ PHASE1_RESULTS_DIR/<scanner>.md"]
+        ML1["phase1_build_master_list.py\n구조 검증 + 후보 집약"]
         AI["AI 자율 탐색 에이전트\n패턴 미탐 취약점 보완\n→ ai-discovery.md"]
-        ML2["phase1_build_master_list.py 재실행\nAI 결과 포함 → master-list.json 확정"]
-        GRP --> ML1 --> AI --> ML2
+        ML2["phase1_build_master_list.py 재실행\n→ master-list.json 확정"]
+        SEL --> GRP --> ML1 --> AI --> ML2
     end
 
     subgraph P1R ["Phase 1 리뷰"]
-        PICK["평가 대상 선별\nphase1_validated != true\n또는 reopen == true"]
+        PICK["평가 대상 선별\nphase1_validated != true"]
         BLIND["blind eval\n판정 섹션 마스킹 후 독립 판정"]
-        AX["5개 축 적용\n① 코드 정확성  ② Source→Sink 흐름\n③ 부재 주장 검증  ④ Source 도달성\n⑤ 플랫폼 방어"]
+        AX["5개 축 적용\n① 코드 정확성  ② Source→Sink 흐름\n③ 부재 주장  ④ Source 도달성  ⑤ 플랫폼 방어"]
         JUDGE{"판정"}
-        CONFIRM["CONFIRM\nphase1_validated: true"]
-        OVERRIDE["OVERRIDE\nphase1_validated: true\n+ eval MD 수정 권고"]
-        DISCARD["DISCARD\nstatus: safe\nsafe_category 기록"]
-        EVAL["evaluation/<scanner>-eval.md 작성\n(Phase 2 이후 참조 기준)"]
+        CONFIRM["CONFIRM"]
+        OVERRIDE["OVERRIDE\n수정 권고"]
+        DISCARD["DISCARD\nstatus: safe"]
+        EVAL["evaluation/<scanner>-eval.md\n(Phase 2 이후 참조 기준)"]
         PICK --> BLIND --> AX --> JUDGE
-        JUDGE -->|"도달 가능·오류 없음"| CONFIRM
-        JUDGE -->|"오류 있으나 후보 유지"| OVERRIDE
-        JUDGE -->|"도달 불가·플랫폼 방어"| DISCARD
+        JUDGE -->|도달 가능| CONFIRM
+        JUDGE -->|오류 있음| OVERRIDE
+        JUDGE -->|도달 불가| DISCARD
         CONFIRM & OVERRIDE & DISCARD --> EVAL
     end
 
-    GATE["phase1_review_assert.py\n게이트 3종 검증\nCOVERAGE / OBLIGATION / FILE-PRESENCE"]
-    DONE["master-list.json\nphase1_validated: true\n→ Phase 2 진입 가능"]
+    GATE["phase1_review_assert.py\n게이트 3종: COVERAGE / OBLIGATION / FILE-PRESENCE"]
+    DONE["master-list.json\nphase1_validated: true → Phase 2 가능"]
 
-    IDX --> SEL --> P1 --> PICK
+    SRC --> IDX --> SEL
+    ML2 --> PICK
     EVAL --> GATE
-    GATE -->|"exit 0"| DONE
-    GATE -->|"exit 1/7"| PICK
+    GATE -->|exit 0| DONE
+    GATE -->|exit 1/7| PICK
 ```
 
 ---
 
-## 정적 분석 단계
+## 1단계: semgrep 인덱싱
 
-### 1. semgrep 인덱싱
+### 왜 인덱싱이 필요한가
 
-`semgrep_index.py`가 모든 스캐너의 룰을 소스코드에 일괄 실행한다. 21개 그룹 에이전트가 병렬로 실행되므로 스캔을 1회만 수행해 인덱스로 저장한다.
+21개 그룹 에이전트가 병렬로 실행된다. 각 에이전트가 소스코드를 직접 스캔하면 같은 파일을 21번 스캔하는 낭비가 생기고, 에이전트마다 결과가 달라질 수 있다. **스캔을 1회만 실행해 인덱스로 저장**하고 각 에이전트가 인덱스를 읽는 구조다.
 
-**출력**: `<PATTERN_INDEX_DIR>/<scanner>.locindex.json`
+### 출력 파일 2종
 
-locindex는 같은 `file:line`에 여러 룰이 매치된 경우 1개 위치로 병합하고 tier를 승격한다.
+**`<scanner>.json`** — 룰 ID를 키로, 매칭된 위치 목록을 값으로 저장
 
-| tier | 의미 | 결정 기준 |
-|------|------|----------|
-| taint | dataflow로 source→sink 확정 | rule ID가 `-taint`로 끝남 |
-| ast | 언어 파서로 구문 매칭 | rule ID에 언어 prefix 있음 (`java`, `typescript` 등) |
-| generic | 범용 정규식 매칭, 노이즈 많음 | rule ID에 언어 prefix 없음 |
+```json
+{
+  "noah-javascript-xss-phase1-pattern": ["render.js:22", "profile.js:296"],
+  "noah-java-xss-taint":                ["ArticleController.java:313"]
+}
+```
+
+**`<scanner>.locindex.json`** — 같은 `file:line`에 여러 룰이 걸리면 1개로 병합. tier는 가장 높은 것으로 승격하고 `rule_ids`에 모두 보존
+
+```json
+{
+  "_scanner": {
+    "name": "xss-scanner",
+    "has_taint": true,
+    "tier_counts": { "taint": 379, "ast": 3310, "generic": 1049 }
+  },
+  "locations": {
+    "render.js:22": { "tier": "ast", "rule_ids": ["noah-javascript-xss-phase1-pattern"] },
+    "ArticleController.java:313": { "tier": "taint", "rule_ids": ["noah-java-xss-taint"] }
+  }
+}
+```
+
+| 파일 | 키 | 용도 |
+|------|----|------|
+| `<scanner>.json` | 룰 ID | 특정 룰의 매치 위치 조회 |
+| `<scanner>.locindex.json` | file:line | Phase 1 에이전트가 tier 순서로 분석할 파일 목록 파악 |
+
+### tier — 매칭 신뢰도
+
+룰 ID 이름으로 자동 결정된다.
+
+| tier | 결정 기준 | 의미 |
+|------|----------|------|
+| taint | rule ID가 `-taint`로 끝남 | dataflow로 source→sink 확정. 신뢰도 최고 |
+| ast | `-phase1-pattern`으로 끝나고 언어 prefix 있음, 또는 그 외 | 언어 파서로 구문 매칭. 위치는 정확하나 source·sanitizer 미확인 |
+| generic | `-phase1-pattern`으로 끝나고 언어 prefix 없음 | 범용 정규식. 노이즈 많음. 신뢰도 최저 |
+
+"언어 prefix"란 rule ID 두 번째 토큰이 `java`, `javascript`, `typescript`, `python`, `kotlin`, `go`, `ruby`, `php`, `csharp`, `scala` 중 하나인 경우다.
+
+### 주요 처리 세부사항
+
+- **UTF-8 미러**: EUC-KR 등 비-UTF8 파일을 임시 디렉토리에 UTF-8로 변환 후 스캔하고 경로를 원본으로 복원
+- **PHP 단일 스레드**: semgrep PHP 분석기는 병렬 스캔에서 비결정적이므로 PHP 전용 룰은 `-j 1`로 별도 실행
+- **코드 확장자 필터**: `.ts`, `.js`, `.java` 등 약 80종만 스캔 (`.png`, `.lock` 등 무관 파일 차단)
+- **스킬 디렉토리 자동 제외**: SAST 도구 자체 코드가 결과에 섞이지 않도록 자동 제외
+
+### exit code
+
+stdout에 `run_semgrep_index_exit=N`으로 출력한다.
+
+| exit | 의미 | 조치 |
+|------|------|------|
+| 0 | 모든 스캐너 정상 처리 | Phase 1 진행 |
+| 1 | semgrep CLI 부재 또는 경로 오류 | semgrep 설치 후 재실행 |
+| 2 | 부분 실패 — `_semgrep_failures.json` 참조 | 실패 스캐너는 빈 `{}` 인덱스, 나머지는 정상 진행 |
 
 ---
 
-### 2. 그룹 에이전트 (병렬)
+## 2단계: Phase 1 정적 분석
+
+### 그룹 에이전트 (병렬)
 
 `select_scanners.py`가 편성한 그룹당 1개 에이전트를 병렬 디스패치한다.
 
@@ -89,41 +150,53 @@ locindex는 같은 `file:line`에 여러 룰이 매치된 경우 1개 위치로 
 
 **결과 파일**: `<PHASE1_RESULTS_DIR>/<scanner>.md`
 
----
+### locindex_summary.py
 
-### 3. AI 자율 탐색
-
-패턴으로 잡히지 않는 취약점을 보완한다. 비즈니스 로직 결함, Race Condition, 인증 흐름 전체 경로 등 정적 패턴으로 표현되지 않는 취약점에 집중한다.
+`locindex.json`은 매칭 건수에 비례해 수만 줄이 되는 경우가 있다. Read 도구의 2,000줄 제한 때문에 에이전트가 직접 읽으면 JSON이 잘려 파싱 실패한다. `locindex_summary.py`가 파일 단위로 묶어 2,000줄 이내로 요약한다.
 
 ```
-1단계: 자유 탐색
+=== xss-scanner 매칭 파일 요약 ===
+총 4738건 → 실제 3824건 / 노이즈 제거 914건
+파일 수: 510개
+
+best_tier    t     a     g  파일명
+----------------------------------------------------------------------
+taint       39   140     0  ArticleController.java [SINK]
+ast          0     2     0  render.js [SINK]
+generic      0     0     2  Modal.svelte
+```
+
+### AI 자율 탐색
+
+패턴으로 잡히지 않는 취약점을 보완한다.
+
+```
+1단계: 자유 탐색 (인증 흐름, 비즈니스 로직, Race Condition 등)
 2단계: Phase 1 공백 영역 집중 (이상 없음 스캐너가 다루지 않은 영역)
 3단계: 미탐색 파일/디렉토리 집중
 ```
 
 **결과 파일**: `ai-discovery.md`
 
----
+### phase1_build_master_list.py
 
-### 4. phase1_build_master_list.py
-
-그룹 에이전트 + AI 탐색 완료 후 실행한다. 전체 후보를 집약하고 구조를 검증한다.
+그룹 에이전트 + AI 탐색 완료 후 전체 후보를 집약하고 구조를 검증한다.
 
 - MANIFEST `declared_count` == 실제 `## ID:` 헤더 수
 - 필수 섹션 존재 및 최소 길이
 - 동일 file:line 후보 중복 감지
 
-**출력**: `master-list.json` (이후 Phase 2 ~ 보고서까지의 단일 진실 원천)
+**출력**: `master-list.json` — Phase 2 ~ 보고서까지의 단일 진실 원천
 
 ---
 
-## 리뷰 단계
+## 3단계: Phase 1 리뷰
 
 Phase 1 에이전트는 **Sink 패턴 매칭** 중심으로 분석한다. 리뷰는 **Source 역추적** 중심으로 독립 재판정해 부정확한 후보를 Phase 2 전에 정제한다.
 
 ### blind eval
 
-리뷰 에이전트가 Phase 1의 결론을 먼저 읽으면 편향이 생긴다. `phase1_review_blind_read.py`가 판정 섹션(`### Decision`, `### Confidence`, `### 판정 요약`)을 마스킹하면, 리뷰 에이전트는 마스킹된 뷰만 보고 독립 판정한다.
+리뷰 에이전트가 Phase 1의 결론을 먼저 읽으면 편향이 생긴다. `phase1_review_blind_read.py`가 판정 섹션(`### Decision`, `### 판정 요약` 등)을 마스킹하면, 리뷰 에이전트는 마스킹된 뷰만 보고 독립 판정한다.
 
 ### 5개 판정 축
 
@@ -154,13 +227,13 @@ DISCARD 시 즉시 `status: safe`를 설정해 Phase 2 낭비를 방지한다.
 
 ### 출력: eval MD
 
-리뷰 에이전트는 Phase 1 원본 MD를 수정하지 않고 `evaluation/<scanner>-eval.md`를 새로 작성한다. Phase 2 에이전트와 보고서는 원본 MD 대신 이 eval MD를 참조한다.
+리뷰 에이전트는 Phase 1 원본 MD를 수정하지 않고 `evaluation/<scanner>-eval.md`를 새로 작성한다.
 
 ```
 PHASE1_RESULTS_DIR/
-  ssrf-scanner.md              ← Phase 1 원본 (수정 금지)
+  ssrf-scanner.md            ← Phase 1 원본 (수정 금지)
   evaluation/
-    ssrf-scanner-eval.md       ← 리뷰 평가본 (Phase 2 이후 참조 기준)
+    ssrf-scanner-eval.md     ← 리뷰 평가본 (Phase 2 이후 참조 기준)
 ```
 
 eval MD 상단의 `<!-- SOURCE_HASH: sha256:... -->`는 원본 MD의 해시다. 원본이 수정되면 해시가 달라져 eval MD가 "고아 상태"로 간주되고 `phase1_validated`가 false 처리된다.
@@ -171,7 +244,7 @@ eval MD 상단의 `<!-- SOURCE_HASH: sha256:... -->`는 원본 MD의 해시다. 
 
 리뷰 완료 후 Phase 2 진입 전에 실행한다. 에이전트가 "침묵 속에 건너뛰지 않았는가"를 숫자로 검증한다.
 
-에이전트가 생략하려는 3가지 방법과 이를 막는 게이트:
+에이전트가 생략하려는 방법과 이를 막는 게이트:
 
 | 생략 방법 | 게이트 | 게이트가 묻는 것 |
 |----------|--------|----------------|
@@ -251,7 +324,7 @@ FAIL: 주석 없음 / `accounted < files`
 
 게이트 3종은 숫자 정합성만 검증한다. 에이전트가 파일을 실제로 Read했는지, 판정이 올바른지는 검증하지 않는다.
 
-- `url_checker.ts`를 `accounted`에 포함시키고 `FALSE_POSITIVE`로 오판정해도 FILE-PRESENCE PASS
+- 파일을 `accounted`에 포함시키고 `FALSE_POSITIVE`로 오판정해도 FILE-PRESENCE PASS
 - OBLIGATION 없는 스캐너(ssrf 등)에서 checker 파일을 "방어 코드" 클래스로 오분류해도 게이트 없음
 
 이 한계는 phase1-review의 blind eval이 부분적으로 보완하나, phase1-review 자체도 동일한 편향을 가질 수 있다.
@@ -263,9 +336,8 @@ FAIL: 주석 없음 / `accounted < files`
 | 파일 | 역할 |
 |------|------|
 | `tools/semgrep_index.py` | semgrep 실행 → locindex.json 생성 |
-| `tools/locindex_summary.py` | locindex.json → 파일 목록 요약 |
+| `tools/locindex_summary.py` | locindex.json → 파일 목록 요약 출력 |
 | `tools/phase1_build_master_list.py` | 후보 집약 + 구조 검증 |
-| `tools/phase1_review_blind_read.py` | blind eval 헬퍼 |
+| `tools/phase1_review_blind_read.py` | blind eval 헬퍼 (판정 섹션 마스킹) |
 | `tools/phase1_review_assert.py` | 게이트 3종 검증 |
 | `sub-skills/scan-report-review/phase1-review.md` | 리뷰 에이전트 지시 |
-| `docs/semgrep-indexing.md` | semgrep 인덱싱 상세 |
