@@ -1,0 +1,250 @@
+# Phase 1 실행 흐름
+
+Phase 1은 소스코드를 읽어 취약점 **후보**를 만드는 단계다. 동적 테스트 없이 정적 분석만으로 진행하며, 결과는 `master-list.json`으로 집약된다.
+
+---
+
+## 전체 흐름
+
+```
+semgrep 인덱싱
+    │
+    ▼
+그룹 에이전트 (병렬, 스캐너당 결과 MD 작성)
+    │
+    ▼
+phase1_build_master_list.py  ◄── 구조 검증 + 후보 집약
+    │
+    ▼
+AI 자율 탐색 에이전트 (1개, 정적 분석 보완)
+    │
+    ▼
+phase1_build_master_list.py  ◄── 재실행 (AI 결과 포함)
+    │
+    ▼
+phase1-review 에이전트 (판정 품질 감사)
+    │
+    ▼
+phase1_review_assert.py  ◄── 게이트 3종 검증
+    │
+    ▼
+master-list.json (phase1_validated: true)
+```
+
+---
+
+## Step별 상세
+
+### 1. semgrep 인덱싱
+
+`semgrep_index.py`가 모든 스캐너의 룰을 소스코드에 일괄 실행한다.
+
+**입력**: `scanners/*/rules/` 디렉토리의 YAML 룰 파일  
+**출력**: `<PATTERN_INDEX_DIR>/<scanner>.json` + `<scanner>.locindex.json`
+
+locindex는 같은 `file:line`에 여러 룰이 매치된 경우 1개 위치로 병합하고, tier(taint > ast > generic)를 승격한다.
+
+```
+rule_id → tier 결정
+  noah-java-xss-taint         → taint
+  noah-xss-phase1-pattern     → ast
+  noah-xss-sink-pattern       → ast   (-sink 접미사: 고정밀 capability 룰)
+  noah-xss-phase1-generic     → generic
+
+같은 file:line에 taint + ast 매치 → taint tier로 승격, rule_ids 배열에 둘 다 보존
+```
+
+---
+
+### 2. 그룹 에이전트 (Phase 1 분석)
+
+`select_scanners.py`가 편성한 그룹당 1개 에이전트를 단일 메시지로 병렬 디스패치한다.
+
+**각 에이전트의 작업**:
+
+```
+① locindex_summary.py 실행
+     → 노이즈(vendor/, .min.js, .yaml 등) 제거
+     → 파일당 1줄 요약 (taint/ast/generic 건수)
+
+② phase1.md 읽기
+     → 스캐너별 Sink 의미론, Source 패턴, 판정 기준 숙지
+
+③ taint 매치부터 순서대로 소스 파일 Read
+     → Source → Sink 흐름 추적
+     → 후보 / FALSE_POSITIVE / NO_PATH 판정
+
+④ 결과 MD 작성
+     → 후보가 있으면 ## ID: 섹션 + MANIFEST 블록
+     → 이상 없음이면 MANIFEST declared_count: 0
+```
+
+**결과 파일**: `<PHASE1_RESULTS_DIR>/<scanner>.md`
+
+---
+
+### 3. phase1_build_master_list.py (1차 실행)
+
+모든 그룹 에이전트 완료 후 실행한다.
+
+**검증 항목**:
+- MANIFEST `declared_count` == 실제 `## ID:` 헤더 수
+- 필수 섹션 존재 및 최소 길이
+- 동일 file:line 후보 중복 감지 (DUPLICATE SINK 경고)
+
+**출력**: `master-list.json` (후보 목록 초안)
+
+---
+
+### 4. AI 자율 탐색 에이전트
+
+정적 패턴으로 잡히지 않는 취약점을 보완한다. 3단계 탐색을 내부적으로 수행한다.
+
+```
+1단계: 자유 탐색 (인증 흐름, 비즈니스 로직, Race Condition 등)
+    ↓
+2단계: Phase 1 공백 영역 집중
+       master-list.json을 다시 읽어 이상 없음 스캐너가 다루지 않은 영역 탐색
+    ↓
+3단계: 미탐색 파일/디렉토리 집중
+```
+
+**결과 파일**: `ai-discovery.md`  
+후보가 없어도 정상 (Phase 1 스캐너가 충분히 커버한 경우)
+
+---
+
+### 5. phase1_build_master_list.py (2차 실행)
+
+`ai-discovery.md`를 포함하여 전체 후보를 재집약한다. 이후 `master-list.json`이 Phase 2 ~ 보고서까지의 **단일 진실 원천**이 된다.
+
+---
+
+### 6. phase1-review 에이전트
+
+에이전트가 만든 결과 MD의 판정 품질을 독립적으로 감사한다.
+
+```
+blind eval 메커니즘:
+  phase1_review_blind_read.py 헬퍼가 각 후보의 소스 파일 해시를 기록
+  → 리뷰 에이전트가 소스를 새로 Read하여 독립 판정
+  → Phase 1 에이전트의 판정과 비교 → CONFIRM / OVERRIDE / DISCARD
+
+출력:
+  evaluation/<scanner>-eval.md  ← Phase 2 이후 참조본 (원본 MD 대체)
+  master-list.json 업데이트:
+    phase1_validated: true/false
+    phase1_discarded_reason
+    safe_category
+```
+
+---
+
+### 7. phase1_review_assert.py (게이트)
+
+phase1-review 완료 후 Step 8 진입 전에 실행한다. **3종 게이트**를 검사하며 하나라도 FAIL이면 Step 8로 진행할 수 없다.
+
+---
+
+## 게이트 3종
+
+세 게이트는 동일한 구조를 가진다: **에이전트가 선언한 숫자 == 실제 숫자**를 검증한다. 판단의 정확성은 검증하지 않는다 — 에이전트가 "침묵 속에 건너뛰지 않았는가"를 보장하는 것이 목적이다.
+
+```
+┌────────────┬────────────────────────────────────┬────────────────────────────────────────────────────┐
+│   게이트   │            MD 주석 형식             │              스크립트가 검증하는 것                │
+├────────────┼────────────────────────────────────┼────────────────────────────────────────────────────┤
+│ COVERAGE   │ matches=N accounted=N              │ 에이전트가 설명한 매치 수 == locindex 실제 총매치 수│
+├────────────┼────────────────────────────────────┼────────────────────────────────────────────────────┤
+│ OBLIGATION │ capability_matches=N dispositioned=N│ 에이전트가 처리한 capability 매치 수 == 실제 수    │
+├────────────┼────────────────────────────────────┼────────────────────────────────────────────────────┤
+│ §6-A-3     │ files=N accounted=N                │ 에이전트가 명시한 파일 수 == 실제 distinct 파일 수 │
+└────────────┴────────────────────────────────────┴────────────────────────────────────────────────────┘
+```
+
+### COVERAGE (§6-A-2)
+
+고볼륨 스캐너(200건 초과)에 적용. 에이전트가 전체 매치를 설명했는가를 검사한다.
+
+```markdown
+<!-- COVERAGE matches=1264 accounted=1264 method="ast 1100건: React fetch 클라이언트 클래스, 
+     taint 12건: 개별 확인 후 전부 FALSE_POSITIVE, generic 152건: 문서/설정 클래스" -->
+```
+
+`accounted < 실제 총매치` → FAIL. 에이전트가 설명 없이 매치를 누락했다는 뜻.
+
+### OBLIGATION (§2-D)
+
+`exclusion_policy: capability` 스캐너에만 적용. capability 매치(고정밀 sink 룰)는 클래스 일괄 제외 불가 — 1건씩 개별 disposition 의무.
+
+```markdown
+<!-- OBLIGATION ast_matches=17 dispositioned=17 
+     method="exec 계열 17건: 전부 고정 인자 or 로컬 CLI 도구 확인" -->
+```
+
+**capability란**: "이 패턴이 있으면 취약점 성립 요건(능력)이 코드에 존재한다"는 선언. xss-scanner의 `dangerouslySetInnerHTML`, command-injection-scanner의 `exec/spawn`이 대표 예. 현재 6개 스캐너(xss, dom-xss, command-injection, code-injection, ssti, deserialization)에 적용.
+
+OBLIGATION이 없는 스캐너(ssrf, sqli, open-redirect 등)는 클래스 단위 제외를 허용한다.
+
+### §6-A-3 (파일단위 disposition)
+
+`DECISION_DEFENSE_SCANNERS`에 해당하는 스캐너(ssrf, idor, file-upload 등 방어·판단 계열)에 적용. locindex에 매치된 모든 distinct 파일이 결과 MD에 명시됐는가를 검사한다.
+
+```markdown
+<!-- FILE-DISPOSITION files=248 accounted=248 
+     method="..." -->
+```
+
+파일명이 MD에 없으면 → FAIL.  
+파일명이 있으나 판정이 틀렸으면 → PASS (내용 정확성은 검증 범위 밖).
+
+> **이 한계가 의미하는 것**: 파일명을 적고 `FALSE_POSITIVE`로 오판정해도 게이트는 통과한다. 세 게이트 모두 "침묵을 막는 것"이 목적이며, 판단의 정확성은 phase1-review 에이전트가 담당한다.
+
+---
+
+## 게이트 적용 스캐너 매핑
+
+| 스캐너 | COVERAGE | OBLIGATION | §6-A-3 |
+|--------|---------|------------|--------|
+| xss-scanner | ✓ (고볼륨) | ✓ (capability) | — |
+| dom-xss-scanner | ✓ (고볼륨) | ✓ (capability) | — |
+| command-injection-scanner | — | ✓ (capability) | ✓ (defense) |
+| code-injection-scanner | — | ✓ (capability) | ✓ (defense) |
+| ssti-scanner | — | ✓ (capability) | ✓ (defense) |
+| deserialization-scanner | — | ✓ (capability) | ✓ (defense) |
+| ssrf-scanner | ✓ (고볼륨) | — | ✓ (defense) |
+| idor-scanner | ✓ (고볼륨) | — | ✓ (defense) |
+| file-upload-scanner | — | — | ✓ (defense) |
+| open-redirect-scanner | — | — | ✓ (defense) |
+| validation-logic-scanner | ✓ (고볼륨) | — | ✓ (defense) |
+| system-prompt-leakage-scanner | ✓ (고볼륨) | — | — |
+| unbounded-consumption-scanner | ✓ (고볼륨) | — | — |
+
+---
+
+## 게이트별 FAIL 시 조치
+
+| 게이트 | exit code | 조치 |
+|--------|-----------|------|
+| COVERAGE | 7 | 해당 스캐너 phase1-review 재호출, COVERAGE 주석 보완 |
+| OBLIGATION | 7 | 해당 스캐너 phase1-review 재호출, capability 매치 전수 disposition |
+| §6-A-3 | 7 | 해당 스캐너 phase1-review 재호출, 누락 파일 MD에 추가 |
+| SOURCE_HASH 불일치 | 1 | 원본 MD가 수정됨 — eval MD의 SOURCE_HASH 갱신 후 재실행 |
+| 평가 미완료 | 1 | phase1-review 재호출 (최대 2회) |
+
+---
+
+## 알려진 한계
+
+### 판단 정확성은 게이트 범위 밖
+
+세 게이트 모두 "숫자가 맞는가"를 검증한다. 에이전트가 파일을 실제로 Read했는지, 판정 근거가 올바른지는 검증하지 않는다. 예를 들어:
+
+- `kakao_link_checker.ts`를 목록에 올리고 `FALSE_POSITIVE`로 적으면 §6-A-3 PASS
+- OBLIGATION이 없는 스캐너(ssrf 등)에서 checker 파일을 "방어 코드" 클래스로 오분류해도 게이트 없음
+
+이 한계는 phase1-review의 blind eval이 부분적으로 보완하나, phase1-review 자체도 동일한 편향을 가질 수 있다.
+
+### OBLIGATION 미적용 스캐너의 방어 코드 오분류
+
+ssrf, sqli 등 `capability` 정책이 없는 스캐너에서 `*_checker.ts`, `*_validator.ts` 같은 방어 코드 파일은 "방어 코드 = FALSE_POSITIVE" 클래스로 제외되기 쉽다. 실제로는 방어 구현 자체에 결함이 있을 수 있다 (취약한 검증 로직, fail-open, IPv6 미처리 등). 이런 파일은 DECISION_DEFENSE_SCANNERS의 §6-A-3 게이트가 파일명 등재를 강제하나, 판정이 잘못돼도 통과한다.
