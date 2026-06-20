@@ -87,15 +87,15 @@ TAINT_SAFE_JUSTIFIED = {"false_positive", "defense_verified", "platform_default_
 SESSION_OVERRIDE_RULE_RE = re.compile(r'idor-session-identity-override')
 SESSION_OVERRIDE_WINDOW = 20  # 매치 라인과 후보 라인 간 허용 오프셋(메서드 본문 크기)
 
-# 파일 단위 disposition 감사 (§6-A-3): 결정/방어 계열 스캐너는 ast/generic 매치를
+# 파일 단위 disposition 감사 (FILE-PRESENCE): 결정/방어 계열 스캐너는 ast/generic 매치를
 # 클래스 일괄 제외로 뭉개지 못한다. 이 계열은 sink가 분석 범위 밖이거나 결함이 "오염 데이터
 # 도달"이 아니라 "방어 결정 자체의 오류"인 경우가 흔해 taint로 표현되지 않는다. 그러면 §6-A-2가
 # 일괄 제외를 허용하는 ast/generic 칸에 진짜 취약점이 숨고 파일명조차 MD에 안 남은 채 흡수된다.
 # 따라서 인덱스가 매치한 파일 수(files)와 에이전트가 개별 명시한 파일 수(accounted)가
-# FILE_DISPOSITION 주석으로 증빙돼야 한다. COVERAGE/OBLIGATION과 동일한 숫자 기반 강제 구조.
+# FILE_PRESENCE 주석으로 증빙돼야 한다. COVERAGE/OBLIGATION과 동일한 숫자 기반 강제 구조.
 # 게이트는 "이름조차 안 적고 묶어 사라지는 것"만 기계적으로 막는다.
-FILE_DISPOSITION_RE = re.compile(
-    r'<!--\s*FILE_DISPOSITION\s+files=(\d+)\s+accounted=(\d+)\s+method="(.*)"\s*-->',
+FILE_PRESENCE_RE = re.compile(
+    r'<!--\s*FILE_PRESENCE\s+files=(\d+)\s+accounted=(\d+)\s+method="(.*)"\s*-->',
     re.IGNORECASE,
 )
 DECISION_DEFENSE_SCANNERS = {
@@ -515,10 +515,10 @@ def _coverage_audit(index_dir: Path, phase1_dir: Path, analyzed: set[str]) -> li
 def _file_disposition_audit(
     index_dir: Path, phase1_dir: Path, analyzed: set[str]
 ) -> list[str]:
-    """결정/방어 스캐너: FILE_DISPOSITION 주석으로 파일 전수 명시를 증빙했는지 검증 (§6-A-3).
+    """결정/방어 스캐너: FILE_PRESENCE 주석으로 파일 전수 명시를 증빙했는지 검증 (FILE-PRESENCE).
 
     COVERAGE/OBLIGATION과 동일한 구조:
-      <!-- FILE_DISPOSITION files=<총파일수> accounted=<명시한파일수> method="..." -->
+      <!-- FILE_PRESENCE files=<총파일수> accounted=<명시한파일수> method="..." -->
     files = locindex distinct 파일 수 (스크립트가 직접 계산 — 에이전트 선언 불신).
     accounted = 에이전트가 개별 명시했다고 선언한 파일 수.
     accounted < files이면 조용한 누락 → FAIL.
@@ -540,23 +540,23 @@ def _file_disposition_audit(
         md = phase1_dir / f"{scanner}.md"
         if not md.is_file():
             violations.append(
-                f"{scanner}: 결정/방어 스캐너인데 결과 MD 부재 (§6-A-3)"
+                f"{scanner}: 결정/방어 스캐너인데 결과 MD 부재 (FILE-PRESENCE)"
             )
             continue
         md_text = md.read_text(encoding="utf-8", errors="replace")
-        m = FILE_DISPOSITION_RE.search(md_text)
+        m = FILE_PRESENCE_RE.search(md_text)
         if not m:
             violations.append(
-                f"{scanner}: FILE_DISPOSITION 주석 부재 (§6-A-3) — "
+                f"{scanner}: FILE_PRESENCE 주석 부재 (FILE-PRESENCE) — "
                 f"인덱스 매치 파일 {total_files}건. "
-                f'결과 MD에 `<!-- FILE_DISPOSITION files={total_files} accounted=<N> method="..." -->`'
+                f'결과 MD에 `<!-- FILE_PRESENCE files={total_files} accounted=<N> method="..." -->`'
                 f" 주석으로 전수 명시를 증빙하라."
             )
             continue
         accounted = int(m.group(2))
         if accounted < total_files and not INCOMPLETE_RE.search(md_text):
             violations.append(
-                f"{scanner}: FILE_DISPOSITION accounted={accounted} < "
+                f"{scanner}: FILE_PRESENCE accounted={accounted} < "
                 f"실제 파일={total_files}, [INCOMPLETE] 표기도 없음 — "
                 f"미명시 {total_files - accounted}건 (조용한 누락)"
             )
@@ -752,7 +752,7 @@ def main() -> int:
             return 7
         fd_violations = _file_disposition_audit(index_dir, phase1_dir, analyzed)
         if fd_violations:
-            print(f"FAIL: 파일단위 disposition 위반 {len(fd_violations)}건 (결정/방어 스캐너 §6-A-3):")
+            print(f"FAIL: 파일단위 disposition 위반 {len(fd_violations)}건 (결정/방어 스캐너 FILE-PRESENCE):")
             for v in fd_violations[:20]:
                 print(f"  {v}")
             print(
