@@ -87,6 +87,34 @@ TAINT_SAFE_JUSTIFIED = {"false_positive", "defense_verified", "platform_default_
 SESSION_OVERRIDE_RULE_RE = re.compile(r'idor-session-identity-override')
 SESSION_OVERRIDE_WINDOW = 20  # 매치 라인과 후보 라인 간 허용 오프셋(메서드 본문 크기)
 
+# 파일 단위 disposition 감사 (§6-A-3): 결정/방어 계열 스캐너는 ast/generic 매치를
+# 클래스 일괄 제외로 뭉개지 못한다. 이 계열은 sink가 분석 범위 밖이거나 결함이 "오염 데이터
+# 도달"이 아니라 "방어 결정 자체의 오류"인 경우가 흔해 taint로 표현되지 않는다. 그러면 §6-A-2가
+# 일괄 제외를 허용하는 ast/generic 칸에 진짜 취약점이 숨고 파일명조차 MD에 안 남은 채 흡수된다.
+# 따라서 인덱스가 매치한 *서버 결정 파일*은 결과 MD에 개별 명시(또는 후보 등록)돼야 한다.
+# 비용은 매치 수가 아니라 파일 수로 한정된다.
+DECISION_DEFENSE_SCANNERS = {
+    "ssrf-scanner", "open-redirect-scanner", "path-traversal-scanner",
+    "ssti-scanner", "idor-scanner", "business-logic-scanner",
+    "validation-logic-scanner", "host-header-scanner", "csrf-scanner",
+    "file-upload-scanner", "xxe-scanner", "command-injection-scanner",
+    "code-injection-scanner", "deserialization-scanner", "xpath-injection-scanner",
+    "ldap-injection-scanner", "prototype-pollution-scanner", "pdf-generation-scanner",
+}
+# 서버/결정 파일 narrowing(idea-4): 비용 배분용 *거친 경로 휴리스틱*이며 안전 판정용 패턴이 아니다.
+# 잘못 좁혀도 위험은 recall(누락)뿐 — 틀린 안전판정을 만들지 않는다.
+SERVER_FILE_RE = re.compile(
+    r'/(controller|service|router|checker|handler|middleware|guard)/'
+    r'|/server/|/pages/api/|/app/api/|/api/',
+    re.IGNORECASE,
+)
+NONSERVER_FILE_RE = re.compile(
+    r'\.(tsx|jsx|mdx|md|json|css|scss|html|py)$'
+    r'|spec\.ts$|test\.ts$|\.d\.ts$'              # 테스트·타입선언 (앞 문자 무관)
+    r'|/noah-8719/|/node_modules/|/__MACOSX/|/\.codex-tmp/',
+    re.IGNORECASE,
+)
+
 # 무인증 중첩 자원 등록 감사 (session-override와 공통 계약: IDOR FN 미등록 차단):
 # idor_inventory.py 인벤토리에서 인증 미경유(`[제외]`) + path-variable 2개 이상
 # (중첩 자원 `/{parent}/.../{child}`) 진입점이 [검증](안전)으로 닫히지도 master-list에 등록되지도
@@ -492,6 +520,64 @@ def _coverage_audit(index_dir: Path, phase1_dir: Path, analyzed: set[str]) -> li
     return violations
 
 
+def _is_server_decision_file(path: str) -> bool:
+    """비용 배분용 거친 경로 판별 (안전 판정용 아님). 서버 결정/핸들러 경로인가."""
+    if NONSERVER_FILE_RE.search(path):
+        return False
+    return bool(SERVER_FILE_RE.search(path))
+
+
+def _file_disposition_audit(
+    index_dir: Path, phase1_dir: Path, candidates: list, analyzed: set[str]
+) -> list[str]:
+    """결정/방어 스캐너: 인덱스가 매치한 서버 결정 파일이 결과 MD에 개별 명시됐는지 검증 (§6-A-3).
+
+    클래스 일괄 제외("각종 *_checker.ts 등")로 흡수돼 *파일명이 MD에 등장조차 안 하는* 경우를
+    차단한다. 매치 단위가 아니라 파일 단위라 비용은 파일 수로 한정. 명시는 강제하되 판정의 옳고
+    그름까지 보장하진 않는다(틀린 disposition은 별도 tripwire 영역).
+    """
+    cand_files: dict[str, set] = {}
+    for c in candidates:
+        s, f = c.get("scanner"), c.get("file")
+        if s and f:
+            cand_files.setdefault(s, set()).add(Path(str(f)).name)
+
+    violations: list[str] = []
+    for scanner in sorted(analyzed):
+        if scanner not in DECISION_DEFENSE_SCANNERS:
+            continue
+        locindex = index_dir / f"{scanner}.locindex.json"
+        if not locindex.is_file():
+            continue
+        try:
+            d = json.loads(locindex.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        files = {k.rsplit(":", 1)[0] for k in d.get("locations", {})}
+        server_files = sorted(f for f in files if _is_server_decision_file(f))
+        if not server_files:
+            continue
+        md = phase1_dir / f"{scanner}.md"
+        if not md.is_file():
+            continue
+        md_text = md.read_text(encoding="utf-8", errors="replace")
+        cset = cand_files.get(scanner, set())
+        missing = []
+        for f in server_files:
+            base = Path(f).name
+            stem = base.rsplit(".", 1)[0]
+            if base in md_text or stem in md_text or base in cset:
+                continue
+            missing.append(base)
+        if missing:
+            shown = ", ".join(missing[:10]) + (" ..." if len(missing) > 10 else "")
+            violations.append(
+                f"{scanner}: 서버 결정/방어 파일 {len(missing)}건이 결과 MD에 개별 명시 없이 "
+                f"클래스 흡수됨 (파일단위 disposition 위반 §6-A-3) — {shown}"
+            )
+    return violations
+
+
 def _file_sha256(path: Path) -> str:
     if not path.is_file():
         return ""
@@ -677,6 +763,19 @@ def main() -> int:
                 "객체 IDOR)는 소유권 미강제 시 BOLA/IDOR다. 이는 phase1.md §159 '인증 미경유 [미확인] "
                 "종결 금지'의 최소 강제선(floor)이다 — service Read로 [검증]/[부재] 확정 후 후보 "
                 "등록 또는 status=safe+safe_category 기재. ([제외] 행 전체의 §159 의무는 동일하게 유효.)"
+            )
+            return 7
+        fd_violations = _file_disposition_audit(index_dir, phase1_dir, candidates, analyzed)
+        if fd_violations:
+            print(f"FAIL: 파일단위 disposition 위반 {len(fd_violations)}건 (결정/방어 스캐너 §6-A-3):")
+            for v in fd_violations[:20]:
+                print(f"  {v}")
+            print(
+                "결정/방어 스캐너(ssrf·idor·authz류)는 ast/generic 매치를 '각종 *_checker.ts 등' "
+                "클래스로 뭉개지 못한다. taint=0이라 일괄 제외가 허용되는 칸에 결함-방어(불완전 "
+                "차단목록/DNS rebinding/fail-open)·교차레포 sink가 숨는다. 인덱스가 매치한 *서버 결정 "
+                "파일*은 각각 결과 MD에 파일명을 적고 개별 disposition(후보/안전/무관 + 근거)하라. "
+                "비용은 매치 수가 아니라 파일 수다."
             )
             return 7
 
