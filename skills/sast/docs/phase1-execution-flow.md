@@ -294,6 +294,25 @@ ssrf, open-redirect, path-traversal, ssti, idor, business-logic, validation-logi
 
 이 스캐너들은 방어 코드나 판단 로직을 분석하는 스캐너다. 취약점이 taint 흐름으로 표현되지 않는 경우가 많고, "방어 결정 자체가 틀린" 결함(fail-open, TOCTOU, 누락 케이스)이 ast/generic 매치 안에 숨어 있다.
 
+**왜 매치 수가 아니라 파일 수를 세는가**
+
+에이전트가 분석하는 단위는 파일이다. 같은 파일에서 매치가 수십 건 나와도 그 파일을 한 번 Read하면 전부 판단할 수 있다.
+
+```
+kakao_link_checker.ts:69  → SSRF 매치
+kakao_link_checker.ts:72  → SSRF 매치
+kakao_link_checker.ts:85  → SSRF 매치
+kakao_link_checker.ts:101 → SSRF 매치
+→ 에이전트가 이 파일 1개를 Read하면 4건 전부 판정 가능
+```
+
+따라서 "몇 건을 처리했나"보다 "몇 개 파일을 다뤘나"가 실질적인 커버리지 척도다. COVERAGE가 매치 건수를 세는 것과 역할이 구분된다.
+
+```
+COVERAGE     → 매치 건수 기준 — 설명 안 된 매치가 없는가
+FILE-PRESENCE → 파일 수 기준  — 처리 안 된 파일이 없는가
+```
+
 **결과 MD에 작성할 주석**:
 ```
 <!-- FILE_PRESENCE files=248 accounted=248
