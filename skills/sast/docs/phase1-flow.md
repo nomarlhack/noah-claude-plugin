@@ -335,15 +335,111 @@ FAIL: 주석 없음 / `accounted < files`
 
 ### 단계별 산출물
 
-| 단계 | 파일 | 내용 | 다음 단계 역할 |
-|------|------|------|--------------|
-| semgrep 인덱싱 | `PATTERN_INDEX_DIR/<scanner>.json` | 룰 ID별 매치 위치 목록 | Phase 1 에이전트가 특정 룰 위치 조회 |
-| semgrep 인덱싱 | `PATTERN_INDEX_DIR/<scanner>.locindex.json` | file:line별 tier/rule_ids + 스캐너 메타 | Phase 1 에이전트가 분석 우선순위 결정 |
-| Phase 1 정적 분석 | `PHASE1_RESULTS_DIR/<scanner>.md` | 스캐너별 분석 결과 — 후보 섹션, 게이트 주석, MANIFEST | phase1-review가 원본으로 읽음 (수정 금지) |
-| Phase 1 정적 분석 | `PHASE1_RESULTS_DIR/ai-discovery.md` | AI 자율 탐색 후보 목록 | phase1_build_master_list.py가 집약 |
-| Phase 1 정적 분석 | `PHASE1_RESULTS_DIR/master-list.json` | 전체 후보 메타데이터 | Phase 2 ~ 보고서까지 단일 진실 원천 |
-| Phase 1 리뷰 | `PHASE1_RESULTS_DIR/evaluation/<scanner>-eval.md` | 리뷰 평가본 — 5개 축 판정, SOURCE_HASH | Phase 2 에이전트·보고서가 원본 MD 대신 참조 |
-| Phase 1 리뷰 | `master-list.json` (`phase1_*` 필드) | phase1_validated, safe_category, discarded_reason | phase1_review_assert.py가 완료 여부 검증 |
+#### `<scanner>.json` — 룰별 위치 목록 (semgrep 인덱싱)
+
+룰 ID를 키로, 매칭된 위치 목록을 값으로 저장한다. Phase 1 에이전트가 특정 룰의 매치 위치를 조회할 때 사용한다.
+
+```json
+{
+  "noah-javascript-xss-phase1-pattern": ["render.js:22", "profile.js:296"],
+  "noah-java-xss-taint":                ["ArticleController.java:313"]
+}
+```
+
+---
+
+#### `<scanner>.locindex.json` — 위치별 매칭 정보 (semgrep 인덱싱)
+
+같은 `file:line`에 여러 룰이 걸리면 1개로 병합한다. tier는 가장 높은 것으로 승격하고 `rule_ids`에 모두 보존한다. Phase 1 에이전트가 `locindex_summary.py`를 통해 읽어 분석 우선순위를 결정한다.
+
+```json
+{
+  "_scanner": {
+    "name": "xss-scanner",
+    "has_taint": true,
+    "tier_counts": { "taint": 379, "ast": 3310, "generic": 1049 }
+  },
+  "locations": {
+    "render.js:22":             { "tier": "ast",   "rule_ids": ["noah-javascript-xss-phase1-pattern"] },
+    "ArticleController.java:313": { "tier": "taint", "rule_ids": ["noah-java-xss-taint"] }
+  }
+}
+```
+
+---
+
+#### `<scanner>.md` — 스캐너별 분석 결과 (Phase 1 정적 분석)
+
+그룹 에이전트가 작성하는 파일. 후보 섹션, 게이트 주석, MANIFEST 블록으로 구성된다. phase1-review가 원본으로 읽으며 **수정 금지**다.
+
+```
+# ssrf-scanner Phase 1 분석 결과
+
+이상 없음 — 분석 범위 내 SSRF 후보 없음.
+
+<!-- COVERAGE matches=1264 accounted=1264 method="..." -->
+<!-- FILE_PRESENCE files=248 accounted=248 method="..." -->
+
+## 파일 단위 Disposition
+...
+
+<!-- NOAH-SAST MANIFEST v1 -->
+  { "declared_count": 0, "candidates": [] }
+<!-- /NOAH-SAST MANIFEST -->
+```
+
+---
+
+#### `master-list.json` — 전체 후보 메타데이터 (Phase 1 정적 분석 → 리뷰)
+
+`phase1_build_master_list.py`가 모든 `<scanner>.md`와 `ai-discovery.md`를 집약하여 생성한다. Phase 2 ~ 보고서까지 **단일 진실 원천**이다.
+
+```json
+{
+  "candidates": [
+    {
+      "id": "SSRF-1",
+      "scanner": "ssrf-scanner",
+      "file": "src/service/url_checker.ts",
+      "line": 69,
+      "status": "candidate",
+      "phase1_validated": true,
+      "safe_category": null
+    }
+  ]
+}
+```
+
+phase1-review 완료 후 `phase1_validated`, `safe_category`, `phase1_discarded_reason` 필드가 갱신된다.
+
+---
+
+#### `evaluation/<scanner>-eval.md` — 리뷰 평가본 (Phase 1 리뷰)
+
+리뷰 에이전트가 Phase 1 원본 MD를 수정하지 않고 새로 작성하는 파일. Phase 2 에이전트와 보고서는 원본 MD 대신 이 파일을 참조한다.
+
+```
+<!-- SOURCE_HASH: sha256:9ac2921e70...2121a -->
+
+# ssrf-scanner Phase 1 평가본
+
+## SSRF-1: url_checker.ts DNS fail-open
+
+### Phase 1 원본 판정
+[Phase 1 MD에서 복사]
+
+### 평가자 독립 판정
+축 ④ Source 도달성: taint tier 확인 — dataflow 확정.
+축 ③ 부재 주장: catch 블록에 return true 실제 존재 확인.
+
+### Override 여부
+CONFIRM
+
+### phase1_quality_notes
+taint tier — dataflow 확정 (rule: noah-ts-ssrf-taint)
+```
+
+`SOURCE_HASH`는 원본 MD의 SHA-256 해시다. 원본이 수정되면 해시가 달라져 eval MD가 "고아 상태"로 처리된다.
 
 ### 스크립트 및 참조 파일
 
