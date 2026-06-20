@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """phase1_review_assert.py 파일 단위 disposition 감사(§6-A-3) 회귀 테스트.
 
-회귀 대상: 결정/방어 스캐너(ssrf 등)가 ast/generic 매치를 "각종 *_checker.ts 등"
-클래스로 일괄 흡수해, 인덱스가 매치한 서버 결정 파일의 파일명이 결과 MD에 등장조차
-하지 않던 FN(실측: SSRF 검증기 8형제 전원 누락). 인덱스 매치 서버 파일이 MD에
+회귀 대상: 결정/방어 스캐너가 ast/generic 매치를 클래스로 일괄 흡수해, 인덱스가 매치한
+서버 결정 파일의 파일명이 결과 MD에 등장조차 하지 않던 FN. 인덱스 매치 서버 파일이 MD에
 개별 명시되지 않으면 감사가 위반을 반환해야 한다.
+
+fixture 경로는 성질(서버 결정 경로 vs 클라이언트 컴포넌트)만 드러내는 합성값이다 —
+특정 코드베이스에 의존하지 않는다.
 """
 import importlib.util
 import json
@@ -18,13 +20,16 @@ _spec = importlib.util.spec_from_file_location("phase1_review_assert", _MOD_PATH
 pra = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pra)
 
-_SERVER_FILE = "kakao-developers-api-master/src/controller/admin-api/checker/kakao_link_checker.ts"
-_CLIENT_FILE = "kakao-developers-tools-master/src/app/webhook/Send.tsx"
+# 합성 fixture: 경로 성질만 표현 (실제 프로젝트 비의존)
+_SERVER_FILE = "src/controller/checker/url_validator.ts"   # /controller/ + /checker/, .ts → 서버 결정
+_CLIENT_FILE = "src/components/SubmitForm.tsx"             # .tsx 클라이언트 컴포넌트
 
 
 class TestServerDecisionFile(unittest.TestCase):
     def test_server_path_is_server(self):
         self.assertTrue(pra._is_server_decision_file(_SERVER_FILE))
+        self.assertTrue(pra._is_server_decision_file("api/service/payment_gate.ts"))
+        self.assertTrue(pra._is_server_decision_file("server/router/route.js"))
 
     def test_client_tsx_is_not_server(self):
         self.assertFalse(pra._is_server_decision_file(_CLIENT_FILE))
@@ -38,6 +43,9 @@ class TestServerDecisionFile(unittest.TestCase):
         self.assertFalse(
             pra._is_server_decision_file("x/noah-8719/skills/sast/tools/select_scanners.py")
         )
+
+    def test_non_server_path_is_not_server(self):
+        self.assertFalse(pra._is_server_decision_file("src/util/format.ts"))
 
 
 class TestFileDispositionAudit(unittest.TestCase):
@@ -53,16 +61,16 @@ class TestFileDispositionAudit(unittest.TestCase):
 
     def test_unnamed_server_file_flags_violation(self):
         idx, p1 = self._setup(
-            "ssrf-scanner", [_SERVER_FILE], "각종 *_checker.ts 등은 검증 로직이라 제외."
+            "ssrf-scanner", [_SERVER_FILE], "검증 로직 파일들은 클래스로 묶어 제외."
         )
         v = pra._file_disposition_audit(idx, p1, candidates=[], analyzed={"ssrf-scanner"})
         self.assertEqual(len(v), 1)
-        self.assertIn("kakao_link_checker", v[0])
+        self.assertIn("url_validator.ts", v[0])
 
     def test_named_server_file_passes(self):
         idx, p1 = self._setup(
             "ssrf-scanner", [_SERVER_FILE],
-            "kakao_link_checker.ts: checkResolvedIP fail-open [후보].",
+            "url_validator.ts: 예외 경로 기본값 allow [후보].",
         )
         v = pra._file_disposition_audit(idx, p1, candidates=[], analyzed={"ssrf-scanner"})
         self.assertEqual(v, [])
