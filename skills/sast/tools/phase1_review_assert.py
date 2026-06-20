@@ -91,9 +91,13 @@ SESSION_OVERRIDE_WINDOW = 20  # 매치 라인과 후보 라인 간 허용 오프
 # 클래스 일괄 제외로 뭉개지 못한다. 이 계열은 sink가 분석 범위 밖이거나 결함이 "오염 데이터
 # 도달"이 아니라 "방어 결정 자체의 오류"인 경우가 흔해 taint로 표현되지 않는다. 그러면 §6-A-2가
 # 일괄 제외를 허용하는 ast/generic 칸에 진짜 취약점이 숨고 파일명조차 MD에 안 남은 채 흡수된다.
-# 따라서 인덱스가 매치한 *모든 distinct 파일*이 결과 MD에 개별 명시(또는 후보 등록)돼야 한다.
-# 어떤 파일이 중요한지의 판단은 에이전트 몫이고, 게이트는 "이름조차 안 적고 묶어 사라지는 것"만
-# 기계적으로 막는다 — 경로/내용 패턴으로 분류·필터하지 않는다. 비용은 매치 수가 아니라 파일 수다.
+# 따라서 인덱스가 매치한 파일 수(files)와 에이전트가 개별 명시한 파일 수(accounted)가
+# FILE_DISPOSITION 주석으로 증빙돼야 한다. COVERAGE/OBLIGATION과 동일한 숫자 기반 강제 구조.
+# 게이트는 "이름조차 안 적고 묶어 사라지는 것"만 기계적으로 막는다.
+FILE_DISPOSITION_RE = re.compile(
+    r'<!--\s*FILE_DISPOSITION\s+files=(\d+)\s+accounted=(\d+)\s+method="(.*)"\s*-->',
+    re.IGNORECASE,
+)
 DECISION_DEFENSE_SCANNERS = {
     "ssrf-scanner", "open-redirect-scanner", "path-traversal-scanner",
     "ssti-scanner", "idor-scanner", "business-logic-scanner",
@@ -509,22 +513,16 @@ def _coverage_audit(index_dir: Path, phase1_dir: Path, analyzed: set[str]) -> li
 
 
 def _file_disposition_audit(
-    index_dir: Path, phase1_dir: Path, candidates: list, analyzed: set[str]
+    index_dir: Path, phase1_dir: Path, analyzed: set[str]
 ) -> list[str]:
-    """결정/방어 스캐너: 인덱스가 매치한 *모든* 파일이 결과 MD에 개별 명시됐는지 검증 (§6-A-3).
+    """결정/방어 스캐너: FILE_DISPOSITION 주석으로 파일 전수 명시를 증빙했는지 검증 (§6-A-3).
 
-    클래스 일괄 제외로 흡수돼 *파일명이 MD에 등장조차 안 하는* 경우만 차단한다. 어떤 파일이
-    중요한지의 판단(후보/안전/무관)은 에이전트 몫이며, 게이트는 경로/내용으로 분류·필터하지
-    않는다 — 단지 "이름조차 안 적고 묶는 것"을 막는다. 매치 단위가 아니라 파일 단위라 비용은
-    파일 수로 한정된다. (basename 매칭이라, 서로 다른 경로의 동명 파일은 하나만 명시돼도 통과할
-    수 있다 — recall 한계이며 틀린 안전판정은 만들지 않는다.)
+    COVERAGE/OBLIGATION과 동일한 구조:
+      <!-- FILE_DISPOSITION files=<총파일수> accounted=<명시한파일수> method="..." -->
+    files = locindex distinct 파일 수 (스크립트가 직접 계산 — 에이전트 선언 불신).
+    accounted = 에이전트가 개별 명시했다고 선언한 파일 수.
+    accounted < files이면 조용한 누락 → FAIL.
     """
-    cand_files: dict[str, set] = {}
-    for c in candidates:
-        s, f = c.get("scanner"), c.get("file")
-        if s and f:
-            cand_files.setdefault(s, set()).add(Path(str(f)).name)
-
     violations: list[str] = []
     for scanner in sorted(analyzed):
         if scanner not in DECISION_DEFENSE_SCANNERS:
@@ -536,25 +534,31 @@ def _file_disposition_audit(
             d = json.loads(locindex.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
-        files = sorted({k.rsplit(":", 1)[0] for k in d.get("locations", {})})
-        if not files:
+        total_files = len({k.rsplit(":", 1)[0] for k in d.get("locations", {})})
+        if total_files == 0:
             continue
         md = phase1_dir / f"{scanner}.md"
         if not md.is_file():
+            violations.append(
+                f"{scanner}: 결정/방어 스캐너인데 결과 MD 부재 (§6-A-3)"
+            )
             continue
         md_text = md.read_text(encoding="utf-8", errors="replace")
-        cset = cand_files.get(scanner, set())
-        missing = []
-        for f in files:
-            base = Path(f).name
-            if base in md_text or base in cset:
-                continue
-            missing.append(base)
-        if missing:
-            shown = ", ".join(missing[:10]) + (" ..." if len(missing) > 10 else "")
+        m = FILE_DISPOSITION_RE.search(md_text)
+        if not m:
             violations.append(
-                f"{scanner}: 인덱스 매치 파일 {len(missing)}건이 결과 MD에 개별 명시 없이 "
-                f"클래스 흡수됨 (파일단위 disposition 위반 §6-A-3) — {shown}"
+                f"{scanner}: FILE_DISPOSITION 주석 부재 (§6-A-3) — "
+                f"인덱스 매치 파일 {total_files}건. "
+                f'결과 MD에 `<!-- FILE_DISPOSITION files={total_files} accounted=<N> method="..." -->`'
+                f" 주석으로 전수 명시를 증빙하라."
+            )
+            continue
+        accounted = int(m.group(2))
+        if accounted < total_files and not INCOMPLETE_RE.search(md_text):
+            violations.append(
+                f"{scanner}: FILE_DISPOSITION accounted={accounted} < "
+                f"실제 파일={total_files}, [INCOMPLETE] 표기도 없음 — "
+                f"미명시 {total_files - accounted}건 (조용한 누락)"
             )
     return violations
 
@@ -746,7 +750,7 @@ def main() -> int:
                 "등록 또는 status=safe+safe_category 기재. ([제외] 행 전체의 §159 의무는 동일하게 유효.)"
             )
             return 7
-        fd_violations = _file_disposition_audit(index_dir, phase1_dir, candidates, analyzed)
+        fd_violations = _file_disposition_audit(index_dir, phase1_dir, analyzed)
         if fd_violations:
             print(f"FAIL: 파일단위 disposition 위반 {len(fd_violations)}건 (결정/방어 스캐너 §6-A-3):")
             for v in fd_violations[:20]:
