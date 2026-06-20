@@ -180,11 +180,20 @@ generic      0     0     2  Modal.svelte
 
 ### phase1_build_master_list.py
 
-그룹 에이전트 + AI 탐색 완료 후 전체 후보를 집약하고 구조를 검증한다.
+그룹 에이전트가 작성한 `<scanner>.md` 파일들은 각자 독립적인 마크다운 파일이다. 이 스크립트가 모든 파일을 읽어 후보를 하나의 JSON으로 집약한다. 쉽게 말해 **흩어진 스캐너 결과를 하나로 모으는 수집기**다.
 
-- MANIFEST `declared_count` == 실제 `## ID:` 헤더 수
+```
+ssrf-scanner.md     ┐
+xss-scanner.md      ├── phase1_build_master_list.py ──→ master-list.json
+idor-scanner.md     │
+ai-discovery.md     ┘
+```
+
+집약하면서 구조도 검증한다:
+
+- 각 결과 MD의 MANIFEST `declared_count` == 실제 `## ID:` 헤더 수
 - 필수 섹션 존재 및 최소 길이
-- 동일 file:line 후보 중복 감지
+- 동일 file:line을 서로 다른 스캐너가 중복 지적한 경우 DUPLICATE SINK 경고
 
 **출력**: `master-list.json` — Phase 2 ~ 보고서까지의 단일 진실 원천
 
