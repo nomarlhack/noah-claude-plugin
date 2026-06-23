@@ -225,11 +225,19 @@ a.vuln-link:hover{background:#fde047;border-bottom-color:#111}
 .badge{display:inline-block;padding:2px 9px;border-radius:0;font-size:11px;font-weight:700;letter-spacing:0.02em;white-space:nowrap;border:1.5px solid #111}
 .badge-confirmed{background:#fee2e2;color:#b91c1c}
 .badge-candidate{background:#ffedd5;color:#c2410c}
+.badge-safe{background:#dbeafe;color:#1e40af}
 .badge-rk-confirmed{background:#fee2e2;color:#b91c1c}
 .badge-rk-info{background:#fef9c3;color:#a16207}
 .badge-rk-env{background:#ccfbf1;color:#0f766e}
 .badge-rk-skip{background:#f1f1ee;color:#666}
 .badge-rk-neutral{background:#eceae4;color:#444}
+.badge-rk-dynamic{background:#ede9fe;color:#5b21b6}
+/* 인증경계 배지 — 외부망:붉은 계열, 내부망:파란 계열 */
+.badge-ab{display:inline-block;padding:1px 8px;border-radius:4px;font-size:.75em;font-weight:600;white-space:nowrap}
+.badge-ab-ext-na{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.badge-ab-ext-a{background:#fff1f2;color:#be123c;border:1px solid #fda4af}
+.badge-ab-int-na{background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd}
+.badge-ab-int-a{background:#f0f9ff;color:#0369a1;border:1px solid #7dd3fc}
 @media print{
   body{max-width:none;padding:16px;background:white;color:black;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   table,.card,details.scanner-block,details.vuln-block,details.chain-block,details.chain-card,.always-open,.overview-card,pre,.masthead{box-shadow:none;break-inside:avoid}
@@ -380,6 +388,7 @@ def split_table_cells(line):
 _remark_badges = {
     '동적 테스트 완료': 'badge-rk-confirmed',
     '동적 확인': 'badge-rk-confirmed',        # 구버전 호환
+    '동적확인': 'badge-rk-dynamic',           # 동적 확인(sandbox) — 보라색
     '정보 부족': 'badge-rk-info',
     '환경 제한 — 경로 미라우팅': 'badge-rk-env',
     '환경 제한 — 인증 정보 부족': 'badge-rk-env',
@@ -406,11 +415,23 @@ def do_flush_table():
         _tbl_cls = ' class="id-table"'
     else:
         _tbl_cls = ''
-    # '비고' 컬럼 인덱스 — 해당 컬럼의 비어있지 않은 셀은 모두 뱃지로 렌더한다.
+    # '비고' 컬럼 인덱스
     _remark_idx = None
     for _i, _h in enumerate(state['tbl_header']):
         if _h.strip() == '비고':
             _remark_idx = _i
+            break
+    # '인증경계' 컬럼 인덱스
+    _ab_idx = None
+    _ab_cls_map = {
+        '외부망.무인증': 'badge-ab badge-ab-ext-na',
+        '외부망.인증':   'badge-ab badge-ab-ext-a',
+        '내부망.무인증': 'badge-ab badge-ab-int-na',
+        '내부망.인증':   'badge-ab badge-ab-int-a',
+    }
+    for _i, _h in enumerate(state['tbl_header']):
+        if _h.strip() == '인증경계':
+            _ab_idx = _i
             break
     out.append(f'<table{_tbl_cls}>')
     if state['tbl_header']:
@@ -422,6 +443,8 @@ def do_flush_table():
             _txt = c.strip()
             if _ci == _remark_idx and _txt not in _remark_empty:
                 _cells.append(f'<td><span class="badge {_remark_badge_class(_txt)}">{inline(_txt)}</span></td>')
+            elif _ci == _ab_idx and _txt in _ab_cls_map:
+                _cells.append(f'<td><span class="{_ab_cls_map[_txt]}">{_txt}</span></td>')
             else:
                 _cells.append(f'<td>{inline(_txt)}</td>')
         out.append('<tr>' + ''.join(_cells) + '</tr>')
@@ -538,6 +561,11 @@ for line in lines:
                 out.append('<summary><h2>AI 자율 탐색 결과</h2></summary>')
                 out.append('<div class="scanner-body">')
                 state['scanner_results_open'] = True
+            elif title == '동적 테스트 확인 취약점':
+                out.append('<details class="scanner-block" open>')
+                out.append('<summary><h2>동적 테스트 확인 취약점</h2></summary>')
+                out.append('<div class="scanner-body">')
+                state['scanner_results_open'] = True
             elif title == '연계 시나리오':
                 out.append('<details class="chain-block" open>')
                 out.append('<summary><h2>연계 시나리오</h2></summary>')
@@ -565,6 +593,14 @@ for line in lines:
             num3_match = re.match(r'^(\d+)\.', title) if state['scanner_results_open'] else None
             if num3_match:
                 open_vuln_block(num3_match.group(1), title)
+                continue
+            # DYN-N: 형태 → 동적 테스트 섹션 취약점 블록 (summary 테이블 행 번호와 매핑)
+            dyn_match = re.match(r'^(DYN-(\d+)):', title) if state['scanner_results_open'] else None
+            if dyn_match:
+                # DYN-1→43, DYN-2→44, ... 매핑
+                dyn_num = int(dyn_match.group(2))
+                vuln_num = str(42 + dyn_num)
+                open_vuln_block(vuln_num, title)
                 continue
             # ### 이상없음 스캐너 이름 등 일반
             close_vuln()
@@ -667,18 +703,17 @@ def add_link(m):
     return f'<tr><td>{num}</td><td>{linked}</td>{rest}'
 
 html_out = re.sub(
-    # 상태 셀 뒤의 추가 셀(비고 등)은 do_flush_table 에서 이미 뱃지(<span>)로 변환될 수
-    # 있으므로 평문 셀([^<]*)이 아니라 '셀 안에 </td>가 없는' 패턴으로 받아야 한다.
-    # (평문만 허용하면 비고 뱃지 행에서 행 매칭이 실패해 바로가기 링크가 누락된다.)
-    r'<tr><td>(\d+)</td><td>((?:(?!</td>).)+)</td>(.*?<td>(?:확인됨|후보)</td>(?:<td>(?:(?!</td>).)*</td>)*</tr>)',
+    # 확인됨|후보|안전 모두 포함하도록 수정
+    r'<tr><td>(\d+)</td><td>((?:(?!</td>).)+)</td>(.*?<td>(?:확인됨|후보|안전)</td>(?:<td>(?:(?!</td>).)*</td>)*</tr>)',
     add_link,
     html_out,
     flags=re.DOTALL
 )
 
-# 상태값을 색상 뱃지로 변환
+# 상태값을 색상 뱃지로 변환 (안전 추가)
 html_out = html_out.replace('<td>확인됨</td>', '<td><span class="badge badge-confirmed">확인됨</span></td>')
 html_out = html_out.replace('<td>후보</td>', '<td><span class="badge badge-candidate">후보</span></td>')
+html_out = html_out.replace('<td>안전</td>', '<td><span class="badge badge-safe">안전</span></td>')
 
 # (비고 컬럼 뱃지화는 do_flush_table 에서 컬럼 단위로 처리하므로 후처리 불필요)
 
