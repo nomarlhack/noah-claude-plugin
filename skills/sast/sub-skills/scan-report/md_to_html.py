@@ -19,7 +19,9 @@ from assemble_report import build_table_from_details
 # 기존 요약 테이블에 비고 컬럼이 있으면 ID→비고 맵을 보존하여 재생성 시 유지한다.
 # (build_table_from_details는 상세 섹션에서 재생성하므로 비고를 자체 복원하지 못함)
 _existing_remark = {}
+_existing_auth_boundary = {}
 _tbl0 = re.search(r'## 취약점 요약 테이블\s*\n\s*\n((?:\|.*\n)+)', _md_text)
+_VALID_AB = {'외부망.무인증', '외부망.인증', '내부망.무인증', '내부망.인증'}
 if _tbl0:
     _hdr = _tbl0.group(1).splitlines()[0]
     if '비고' in _hdr:
@@ -28,7 +30,15 @@ if _tbl0:
             # | # | ID | 제목 | 스캐너 | 상태 | 비고 | → cells[1]=#, cells[2]=ID, cells[6]=비고
             if len(_cells) >= 8 and re.match(r'^\d+$', _cells[1]):
                 _existing_remark[_cells[2]] = _cells[6]
-_md_text = build_table_from_details(_md_text, None, _existing_remark or None)
+    if '인증경계' in _hdr:
+        # | # | ID | 제목 | 상태 | 인증경계 | → cells[1]=#, cells[2]=ID, cells[5]=인증경계
+        for _row in _tbl0.group(1).splitlines():
+            _cells = [c.strip() for c in _row.split('|')]
+            if len(_cells) >= 6 and re.match(r'^\d+$', _cells[1]):
+                _ab_val = _cells[5] if len(_cells) > 5 else ''
+                if _ab_val in _VALID_AB:
+                    _existing_auth_boundary[_cells[2]] = _ab_val
+_md_text = build_table_from_details(_md_text, None, _existing_remark or None, _existing_auth_boundary or None)
 
 # 총괄 요약의 확인됨/후보 건수도 요약 테이블에서 재집계
 def _sync_dashboard(md):

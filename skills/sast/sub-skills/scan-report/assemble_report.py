@@ -333,7 +333,7 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
             vulns.append((current_vuln_title, current_id, current_type, current_scanner, current_status))
 
     for line in lines:
-        if line.startswith('## 스캐너별 실행 결과') or line.startswith('## AI 자율 탐색 결과'):
+        if line.startswith('## 스캐너별 실행 결과') or line.startswith('## AI 자율 탐색 결과') or line.startswith('## 동적 테스트 확인 취약점'):
             in_scanner_section = True
             continue
         if line.startswith('## ') and in_scanner_section:

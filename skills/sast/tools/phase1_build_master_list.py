@@ -148,20 +148,28 @@ def _load_auth_boundary_routes(phase1_dir: Path):
         _AB_ROUTES.append((path, identity, is_external))
 
 
+def _normalize_path(p: str) -> str:
+    """{id}, {id:\\d+} 등 path variable을 * 로 정규화하고 /** /* 접미사 제거."""
+    p = re.sub(r'\{[^}]+\}', '*', p)   # {id}, {orderId:\d+} → *
+    p = re.sub(r'/\*+$', '', p)         # /** 또는 /* 접미사 제거
+    p = p.rstrip('/')                   # trailing slash 제거
+    return p
+
+
 def _derive_auth_boundary(url_path: str) -> str:
     """url_path를 auth-boundary.json routes와 매칭하여 인증경계 4분류 반환."""
     if not _AB_ROUTES or not url_path:
         return ""
-    # AntPathMatcher 스타일 단순 매칭 — ** 포함 패턴 우선
+    norm_candidate = _normalize_path(url_path)
     best_score = -1
     best_is_ext = False
     best_identity = ""
     for route_path, identity, is_ext in _AB_ROUTES:
-        # 매칭: 후보 url_path가 route 패턴으로 시작하거나 정확 일치
-        rp_clean = route_path.rstrip("/**").rstrip("/*")
+        rp_clean = _normalize_path(route_path)
         if not rp_clean:
             continue
-        if url_path.startswith(rp_clean) or rp_clean.startswith(url_path.split("{")[0]):
+        # 후보 경로가 route prefix로 시작하거나, route가 후보 prefix로 시작하면 매칭
+        if norm_candidate.startswith(rp_clean) or rp_clean.startswith(norm_candidate):
             score = len(rp_clean)
             if score > best_score:
                 best_score = score
