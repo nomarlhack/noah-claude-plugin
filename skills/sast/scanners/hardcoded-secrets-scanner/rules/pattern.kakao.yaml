@@ -72,6 +72,49 @@ rules:
       impact: HIGH
 
   # ─────────────────────────────────────────────────────────────
+  # Case 3: Kerberos keytab 파일을 classpath/소스에 포함
+  #   keytab 파일은 비밀번호 없이 Kerberos 티켓을 발급할 수 있는 자격증명 파일이다.
+  #   소스코드에서 .keytab 경로를 하드코딩하거나(빌드 시 classpath 포함),
+  #   keytab 파일 자체가 resources/ 아래에 있으면 Git에 영구 기록되어
+  #   내부망 Hadoop 클러스터에 무제한 접근이 가능해진다.
+  # ─────────────────────────────────────────────────────────────
+  - id: noah-kerberos-keytab-in-source
+    severity: ERROR
+    languages: [generic]
+    message: |
+      Kerberos keytab 파일 경로가 소스코드에 하드코딩되어 있습니다.
+      keytab은 비밀번호 없이 Kerberos 인증 티켓을 발급할 수 있는 자격증명 파일로,
+      Git 저장소에 포함되면 접근자가 내부 Hadoop/HDFS 클러스터에 무제한 접근할 수 있습니다.
+      keytab을 Vault 또는 Kubernetes Secret으로 이관하고 런타임에 주입하세요.
+    pattern-either:
+      # .keytab 파일 경로 문자열 참조 (소스코드/설정 파일)
+      - pattern-regex: '[''"][^''"]*\.keytab[''"]'
+      # keytabFile = ... 변수 할당 패턴
+      - pattern-regex: '(?i)keytab[_-]?file\s*[=:]\s*[''"][^''"\s]+'
+      # Hadoop Configuration에 keytab 경로 세팅
+      - pattern-regex: '(?i)hadoop\.kerberos\.keytab'
+      - pattern-regex: '(?i)yarn\.nodemanager\.keytab'
+      - pattern-regex: '(?i)dfs\.datanode\.keytab'
+    paths:
+      include:
+        - '*.kt'
+        - '*.java'
+        - '*.yaml'
+        - '*.yml'
+        - '*.properties'
+        - '*.xml'
+        - '*.conf'
+        - '*.py'
+    metadata:
+      category: security
+      cwe:
+        - 'CWE-798: Use of Hard-coded Credentials'
+        - 'CWE-522: Insufficiently Protected Credentials'
+      confidence: HIGH
+      likelihood: HIGH
+      impact: HIGH
+
+  # ─────────────────────────────────────────────────────────────
   # Case 1-b: 빌드 시 클라이언트 번들에 인라인되는 "공개 환경변수"에 비밀값
   #   Next.js NEXT_PUBLIC_*, Vite VITE_*, CRA REACT_APP_*, Nuxt NUXT_PUBLIC_*,
   #   Expo EXPO_PUBLIC_*, Gatsby GATSBY_* 는 빌드 시 클라이언트로 인라인된다.
