@@ -311,14 +311,13 @@ def build_chain_section(ca):
     return '\n'.join(lines)
 
 
-def build_table_from_details(report_text, master_list_ids=None, id_to_remark=None):
+def build_table_from_details(report_text, master_list_ids=None, id_to_remark=None, id_to_auth_boundary=None):
     """상세 섹션을 파싱하여 취약점 요약 테이블을 자동 생성한다.
 
-    master_list_ids: master-list.json의 candidates[].id 집합 (set). 제공되면
-    상세 섹션 내 ``**ID**:`` 값의 유효성을 교차검증하고, 매칭되지 않는 ID는
-    ``—`` 폴백으로 처리한다. 미제공 시 ID 값을 그대로 수용 (기존 호출부 호환).
-    id_to_remark: id -> 비고 문자열 맵 (선택). 제공되면 '상태' 우측에 '비고'
-    컬럼을 추가하여 후보 유지 사유(환경 제한/정보 부족 등)·확인 구분을 표시한다."""
+    master_list_ids: master-list.json의 candidates[].id 집합 (set).
+    id_to_remark: id -> 비고 문자열 맵 (선택).
+    id_to_auth_boundary: id -> 인증경계 문자열 맵 (선택). 제공되면 '상태' 우측에
+    '인증경계' 컬럼을 추가한다 (외부망.무인증/외부망.인증/내부망.무인증/내부망.인증)."""
     lines = report_text.split('\n')
 
     in_scanner_section = False
@@ -416,11 +415,33 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
         title = m.group(2)
         result = result[:m.start()] + f'{hashes} {actual_num}. {title}' + result[m.end():]
 
-    # 요약 테이블 생성 (ID 칼럼 추가, id_to_remark 제공 시 비고 칼럼 추가)
+    # 요약 테이블 생성 (ID 칼럼 추가, id_to_auth_boundary 제공 시 인증경계 컬럼 추가)
     # 스캐너 컬럼 표시용: -scanner 접미사 제거 (xss-scanner / sqli-scanner → xss / sqli)
     def _scanner_disp(sc):
         return ' / '.join(re.sub(r'-scanner$', '', p.strip()) for p in str(sc).split('/'))
-    if id_to_remark is not None:
+
+    _has_ab = id_to_auth_boundary is not None
+    _has_remark = id_to_remark is not None
+
+    if _has_ab and _has_remark:
+        table_lines = [
+            '| # | ID | 제목 | 상태 | 인증경계 |',
+            '|---|-----|------|------|:--------:|',
+        ]
+        for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
+            vid_cell = vid if vid else '—'
+            ab = id_to_auth_boundary.get(vid, '') if vid else ''
+            table_lines.append(f'| {idx} | {vid_cell} | {title} | {status} | {ab} |')
+    elif _has_ab:
+        table_lines = [
+            '| # | ID | 제목 | 상태 | 인증경계 |',
+            '|---|-----|------|------|:--------:|',
+        ]
+        for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
+            vid_cell = vid if vid else '—'
+            ab = id_to_auth_boundary.get(vid, '') if vid else ''
+            table_lines.append(f'| {idx} | {vid_cell} | {title} | {status} | {ab} |')
+    elif _has_remark:
         table_lines = [
             '| 순번 | ID | 취약점 제목 | 스캐너 | 상태 | 비고 |',
             '|---|-----|------------|--------|------|------|',
@@ -533,6 +554,7 @@ if __name__ == '__main__':
     # 교차검증한다. 미제공 시 build_table_from_details는 ID 값을 그대로 수용.
     master_list_ids = None
     id_to_remark = None
+    id_to_auth_boundary = None
     if args.master_list and os.path.isfile(args.master_list):
         try:
             with open(args.master_list, encoding='utf-8') as f:
@@ -541,9 +563,11 @@ if __name__ == '__main__':
                 c.get('id') for c in _ml_data.get('candidates', [])
                 if c.get('id')
             }
-            # id -> 비고(후보 유지 사유/확인 구분) 맵. status=confirmed면 동적 확인,
-            # candidate면 tag(환경 제한/정보 부족/동적 분석 생략 등)를 비고로 사용.
+            # id -> 비고 맵
             id_to_remark = {}
+            # id -> 인증경계 맵
+            id_to_auth_boundary = {}
+            _VALID_AB = {'외부망.무인증', '외부망.인증', '내부망.무인증', '내부망.인증'}
             for c in _ml_data.get('candidates', []):
                 cid = c.get('id')
                 if not cid:
@@ -553,16 +577,23 @@ if __name__ == '__main__':
                 if st == 'confirmed':
                     id_to_remark[cid] = '동적 테스트 완료'
                 elif st == 'candidate':
-                    # tag가 없거나 None이면 '동적 분석 생략'을 기본값으로 사용
                     id_to_remark[cid] = tag if tag else '동적 분석 생략'
                 else:
                     id_to_remark[cid] = '—'
+                # auth_boundary 필드가 유효한 값이면 인증경계 맵에 추가
+                ab = c.get('auth_boundary', '')
+                if ab in _VALID_AB:
+                    id_to_auth_boundary[cid] = ab
+            # 인증경계 값이 하나도 없으면 None으로 폴백 (이전 보고서 호환)
+            if not id_to_auth_boundary:
+                id_to_auth_boundary = None
         except (json.JSONDecodeError, IOError) as e:
             print(f"WARNING: master-list.json 로드 실패, ID 검증 스킵: {e}", file=sys.stderr)
             master_list_ids = None
             id_to_remark = None
+            id_to_auth_boundary = None
 
-    full_report = build_table_from_details(full_report, master_list_ids, id_to_remark)
+    full_report = build_table_from_details(full_report, master_list_ids, id_to_remark, id_to_auth_boundary)
 
     # skeleton과 output이 같은 경로이면 비멱등 조립 위험 차단
     if os.path.abspath(args.skeleton) == os.path.abspath(args.output):

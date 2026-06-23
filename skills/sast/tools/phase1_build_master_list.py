@@ -48,6 +48,9 @@ args = parser.parse_args()
 phase1_dir = Path(args.phase1_dir)
 out_path = Path(args.output_json)
 
+# auth-boundary.json 로드 (인증경계 파생용) — sentinel 검증 전에 미리 로드
+_load_auth_boundary_routes(phase1_dir)
+
 # === [v11 강제 게이트] auth-boundary.json sentinel 검증 ===
 # Step 3-1 lint(auth-boundary.lint-passed sentinel)를 통과하지 않으면 진입 차단.
 # select_scanners.py와 동일 검증 — 이중 안전망.
@@ -107,6 +110,76 @@ if args.merge and out_path.is_file():
         existing_by_id = {}
         manual_additions = {}
 
+# === 인증경계(auth_boundary) 파생 ===
+# auth-boundary.json의 routes[]를 분석하여 각 후보의 url_path 기반으로
+# 외부망.무인증 / 외부망.인증 / 내부망.무인증 / 내부망.인증 4분류를 파생한다.
+_AUTH_BOUNDARY_DATA = None
+_AB_ROUTES = []  # [(surface_key, identity_source, is_external)]
+
+def _load_auth_boundary_routes(phase1_dir: Path):
+    global _AUTH_BOUNDARY_DATA, _AB_ROUTES
+    ab_path = phase1_dir / "auth-boundary.json"
+    if not ab_path.is_file():
+        return
+    try:
+        _AUTH_BOUNDARY_DATA = json.loads(ab_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    if not isinstance(_AUTH_BOUNDARY_DATA, dict):
+        return
+
+    # 외부망 게이트웨이 판별: host_pattern에 공개 도메인 패턴이 있으면 외부망
+    external_gw_ids = set()
+    for gw in _AUTH_BOUNDARY_DATA.get("gateways", []):
+        hp = gw.get("host_pattern", "")
+        gid = gw.get("id", "")
+        # 카카오 내부망(.onkakao.net) 전용이 아닌 패턴 = 외부망
+        # gift-link.kakao.com, *.kakao.com 등은 외부망
+        # *.gift-affiliate-management 등 내부 서비스 이름만 있으면 내부망
+        if any(x in hp for x in ["kakao.com", "kakao.net", "gift-link", "gift-affiliate-monitor",
+                                   "gift-affiliate-front-api", "gift-affiliate-integration"]):
+            external_gw_ids.add(gid)
+
+    for route in _AUTH_BOUNDARY_DATA.get("routes", []):
+        surface = route.get("surface_key", "")
+        identity = route.get("identity_source", "")
+        gw_id = route.get("gateway_id", "")
+        is_external = (gw_id in external_gw_ids) if gw_id else False
+        # 경로 패턴 추출 (METHOD prefix 제거)
+        path = re.sub(r"^[A-Z*]+ ", "", surface).strip()
+        _AB_ROUTES.append((path, identity, is_external))
+
+
+def _derive_auth_boundary(url_path: str) -> str:
+    """url_path를 auth-boundary.json routes와 매칭하여 인증경계 4분류 반환."""
+    if not _AB_ROUTES or not url_path:
+        return ""
+    # AntPathMatcher 스타일 단순 매칭 — ** 포함 패턴 우선
+    best_score = -1
+    best_is_ext = False
+    best_identity = ""
+    for route_path, identity, is_ext in _AB_ROUTES:
+        # 매칭: 후보 url_path가 route 패턴으로 시작하거나 정확 일치
+        rp_clean = route_path.rstrip("/**").rstrip("/*")
+        if not rp_clean:
+            continue
+        if url_path.startswith(rp_clean) or rp_clean.startswith(url_path.split("{")[0]):
+            score = len(rp_clean)
+            if score > best_score:
+                best_score = score
+                best_is_ext = is_ext
+                best_identity = identity
+
+    if best_score < 0:
+        return ""
+
+    is_auth = best_identity not in ("없음(익명)", "")
+    if best_is_ext:
+        return "외부망.인증" if is_auth else "외부망.무인증"
+    else:
+        return "내부망.인증" if is_auth else "내부망.무인증"
+
+
 def _same_path(a, b):
     """경로 포맷(절대/상대) 무관 동일 파일 판정: 한쪽이 다른 쪽의 경로-suffix(컴포넌트 경계)면 동일.
 
@@ -141,6 +214,7 @@ def _build_candidate_dict(cid, scanner, cand, md, existing_by_id, prereq_group=N
             "conflicts": [],
         },
         "safe_category": None,
+        "auth_boundary": _derive_auth_boundary(cand.get("url_path", "")),
     }
     preserved = existing_by_id.get(cid)
     if preserved:
