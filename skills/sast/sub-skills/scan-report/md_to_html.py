@@ -1,4 +1,4 @@
-import html as html_mod, re, sys, os
+import html as html_mod, re, sys, os, json, glob
 
 _base = os.getcwd()
 _skill_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,18 +20,34 @@ from assemble_report import build_table_from_details
 # (build_table_from_details는 상세 섹션에서 재생성하므로 비고를 자체 복원하지 못함)
 _existing_remark = {}
 _existing_auth_boundary = {}
-_tbl0 = re.search(r'## 취약점 요약 테이블\s*\n\s*\n((?:\|.*\n)+)', _md_text)
 _VALID_AB = {'외부망.무인증', '외부망.인증', '내부망.무인증', '내부망.인증'}
+
+# master-list.json에서 auth_boundary 우선 로드 (가장 신뢰할 수 있는 원천)
+_ml_candidates = glob.glob(os.path.join(_base, '**/master-list.json'), recursive=True)
+if not _ml_candidates:
+    _ml_candidates = glob.glob('/tmp/phase1_results_*/master-list.json')
+for _ml_path in sorted(_ml_candidates, key=os.path.getmtime, reverse=True)[:1]:
+    try:
+        _ml_data = json.loads(open(_ml_path, encoding='utf-8').read())
+        for _c in _ml_data.get('candidates', []):
+            _cid = _c.get('id')
+            _ab = _c.get('auth_boundary', '')
+            if _cid and _ab in _VALID_AB:
+                _existing_auth_boundary[_cid] = _ab
+    except (json.JSONDecodeError, OSError):
+        pass
+
+# 기존 요약 테이블에서 비고·인증경계 맵 보존 (master-list 없는 경우 폴백)
+_tbl0 = re.search(r'## 취약점 요약 테이블[ \t]*\n(?:[ \t]*\n|>.*\n)*((?:\|.*\n)+)', _md_text)
 if _tbl0:
     _hdr = _tbl0.group(1).splitlines()[0]
     if '비고' in _hdr:
         for _row in _tbl0.group(1).splitlines():
             _cells = [c.strip() for c in _row.split('|')]
-            # | # | ID | 제목 | 스캐너 | 상태 | 비고 | → cells[1]=#, cells[2]=ID, cells[6]=비고
             if len(_cells) >= 8 and re.match(r'^\d+$', _cells[1]):
                 _existing_remark[_cells[2]] = _cells[6]
-    if '인증경계' in _hdr:
-        # | # | ID | 제목 | 상태 | 인증경계 | → cells[1]=#, cells[2]=ID, cells[5]=인증경계
+    if '인증경계' in _hdr and not _existing_auth_boundary:
+        # master-list에서 못 읽었을 때만 기존 테이블에서 복원
         for _row in _tbl0.group(1).splitlines():
             _cells = [c.strip() for c in _row.split('|')]
             if len(_cells) >= 6 and re.match(r'^\d+$', _cells[1]):
@@ -42,7 +58,7 @@ _md_text = build_table_from_details(_md_text, None, _existing_remark or None, _e
 
 # 총괄 요약의 확인됨/후보 건수도 요약 테이블에서 재집계
 def _sync_dashboard(md):
-    tbl = re.search(r'## 취약점 요약 테이블\s*\n\s*\n((?:\|.*\n)+)', md)
+    tbl = re.search(r'## 취약점 요약 테이블[ \t]*\n(?:[ \t]*\n|>.*\n)*((?:\|.*\n)+)', md)
     if not tbl:
         return md
     rows = tbl.group(1)
