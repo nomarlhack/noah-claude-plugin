@@ -457,6 +457,7 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
         r'(## 취약점 요약 테이블[ \t]*\n'
         r'(?:[ \t]*\n)*'                              # 빈 줄
         r'(?:<!--[\s\S]*?-->[ \t]*\n(?:[ \t]*\n)*)?'  # 선택적 HTML 주석 + 빈 줄
+        r'(?:>[ \t]*[^\n]*\n(?:[ \t]*\n)*)*'          # 선택적 blockquote 안내문 + 빈 줄
         r')'
         r'(\|[^\n]+\n'
         r'\|[^\n]+\n'
