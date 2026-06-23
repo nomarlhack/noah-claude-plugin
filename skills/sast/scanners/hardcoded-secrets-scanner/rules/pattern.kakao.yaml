@@ -87,16 +87,6 @@ rules:
       Git 저장소에 포함되면 접근자가 내부 Hadoop/HDFS 클러스터에 무제한 접근할 수 있습니다.
       keytab을 Vault 또는 Kubernetes Secret으로 이관하고 런타임에 주입하세요.
     pattern-regex: '[''"][^''"]*\.keytab[''"]'
-    paths:
-      include:
-        - '*.kt'
-        - '*.java'
-        - '*.yaml'
-        - '*.yml'
-        - '*.properties'
-        - '*.xml'
-        - '*.conf'
-        - '*.py'
     metadata:
       category: security
       cwe:
