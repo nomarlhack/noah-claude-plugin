@@ -423,16 +423,7 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
     _has_ab = id_to_auth_boundary is not None
     _has_remark = id_to_remark is not None
 
-    if _has_ab and _has_remark:
-        table_lines = [
-            '| # | ID | 제목 | 상태 | 인증경계 |',
-            '|---|-----|------|------|:--------:|',
-        ]
-        for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
-            vid_cell = vid if vid else '—'
-            ab = id_to_auth_boundary.get(vid, '') if vid else ''
-            table_lines.append(f'| {idx} | {vid_cell} | {title} | {status} | {ab} |')
-    elif _has_ab:
+    if _has_ab:
         table_lines = [
             '| # | ID | 제목 | 상태 | 인증경계 |',
             '|---|-----|------|------|:--------:|',

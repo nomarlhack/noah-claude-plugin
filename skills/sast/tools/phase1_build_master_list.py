@@ -48,9 +48,6 @@ args = parser.parse_args()
 phase1_dir = Path(args.phase1_dir)
 out_path = Path(args.output_json)
 
-# auth-boundary.json 로드 (인증경계 파생용) — sentinel 검증 전에 미리 로드
-_load_auth_boundary_routes(phase1_dir)
-
 # === [v11 강제 게이트] auth-boundary.json sentinel 검증 ===
 # Step 3-1 lint(auth-boundary.lint-passed sentinel)를 통과하지 않으면 진입 차단.
 # select_scanners.py와 동일 검증 — 이중 안전망.
@@ -83,6 +80,7 @@ except ImportError:
 EVAL_FIELDS = {
     "status", "tag", "evidence_summary", "verified_defense", "rederivation_performed",
     "safe_category", "phase1_validated", "phase1_discarded_reason", "phase1_eval_state",
+    "auth_boundary",  # 메타데이터 필드 — auth-boundary.json 없는 --merge 시 기존 값 보존
 }
 existing_by_id = {}
 # 게이트/외부 추가 후보(소스 MD에 없음)는 재빌드 시 통째로 보존한다. `manual_addition: true`
@@ -368,6 +366,9 @@ warnings = []
 candidates = []
 candidate_bodies = {}  # cid -> prose 본문 (진입점 묶음 검사용)
 clean_scanners = []
+
+# auth-boundary.json 로드 (인증경계 파생용) — 함수 정의 이후 호출
+_load_auth_boundary_routes(phase1_dir)
 skipped_scanners = []
 
 EXCLUDE_STEMS = {"chain-analysis"}  # Phase 1 manifest 형식이 아닌 파일 제외
