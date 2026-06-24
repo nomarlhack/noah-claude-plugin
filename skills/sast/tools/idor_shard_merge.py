@@ -58,8 +58,15 @@ def _parse_shard_manifest(body: str, shard_n: int) -> tuple[dict | None, str]:
 
 
 def _extract_candidate_section(body: str, cid: str) -> str:
-    """body에서 ## <cid>: 헤더로 시작하는 섹션을 추출한다."""
-    pattern = re.compile(rf'^(##\s+{re.escape(cid)}\s*:.*?)(?=^##\s+IDOR-|\Z)', re.MULTILINE | re.DOTALL)
+    """body에서 ## <cid>: 헤더로 시작하는 섹션을 추출한다.
+
+    MANIFEST 블록 또는 다음 ## IDOR- 헤더까지를 섹션으로 취급한다.
+    섹션에 MANIFEST 블록이 포함되면 MANIFEST 시작 직전까지만 추출한다.
+    """
+    pattern = re.compile(
+        rf'^(##\s+{re.escape(cid)}\s*:.*?)(?=^##\s+IDOR-|<!--\s*NOAH-SAST MANIFEST|\Z)',
+        re.MULTILINE | re.DOTALL,
+    )
     m = pattern.search(body)
     return m.group(1).rstrip() if m else ""
 
@@ -193,17 +200,19 @@ def merge(idor_md_path: Path, shard_dir: Path) -> int:
             # MANIFEST 블록이 없으면 파일 끝에 추가
             idor_md_text = idor_md_text.rstrip() + "\n\n" + insert_sections + "\n"
 
-        # idor-scanner.md의 MANIFEST JSON에서 declared_count와 candidates 배열 갱신
+        # idor-scanner.md의 MANIFEST JSON에서 declared_count와 candidates 배열 갱신.
+        # 마지막 MANIFEST 블록을 갱신한다 — 삽입된 샤드 result.md의 MANIFEST 블록들이
+        # 먼저 나오므로 findall로 모두 찾은 뒤 마지막 것만 업데이트한다.
         def _update_idor_manifest(text: str, new_cands: list[tuple[int, dict, str]]) -> str:
-            m = _MANIFEST_RE.search(text)
-            if not m:
+            all_matches = list(_MANIFEST_RE.finditer(text))
+            if not all_matches:
                 return text
+            m = all_matches[-1]  # 마지막 MANIFEST = idor-scanner.md 원본
             try:
                 data = json.loads(m.group(1))
             except json.JSONDecodeError:
                 return text
             for _, cand, _ in new_cands:
-                # 기존 candidates에 없으면 추가
                 existing_cids = {c.get("id") for c in data.get("candidates", [])}
                 if cand.get("id") not in existing_cids:
                     data.setdefault("candidates", []).append(cand)
