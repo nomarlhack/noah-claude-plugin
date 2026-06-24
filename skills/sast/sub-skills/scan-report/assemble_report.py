@@ -466,14 +466,24 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
     )
     if tbl_section:
         result = result[:tbl_section.start(2)] + new_table + '\n' + result[tbl_section.end(2):]
-    else:
-        # 취약점은 파싱됐으나 치환 대상 테이블을 못 찾은 경우 — 조용한 실패 방지(헤딩 철자/위치 오류 신호)
-        sys.stderr.write(
-            "[assemble_report] WARNING: 취약점 요약 테이블 자동 생성 실패 — "
-            "'## 취약점 요약 테이블' 헤딩 직후의 placeholder 테이블(| ... |)을 찾지 못했습니다 "
-            f"(파싱된 취약점 {len(vulns)}건). 스켈레톤의 헤딩 철자('테이블' 포함)와 "
-            "헤딩-테이블 사이 형식을 확인하세요.\n"
+    elif vulns:
+        # 스켈레톤에 '## 취약점 요약 테이블' 헤딩이 없거나 placeholder 테이블이 없는 경우 —
+        # '## 스캐너별 실행 결과' 또는 '## AI 자율 탐색 결과' 직전에 섹션을 자동 삽입한다.
+        insert_heading = re.search(
+            r'\n(## (?:스캐너별 실행 결과|AI 자율 탐색 결과))',
+            result
         )
+        if insert_heading:
+            insert_pos = insert_heading.start(0)
+            result = (
+                result[:insert_pos]
+                + '\n\n## 취약점 요약 테이블\n\n'
+                + new_table
+                + '\n'
+                + result[insert_pos:]
+            )
+        else:
+            result += '\n\n## 취약점 요약 테이블\n\n' + new_table + '\n'
 
     return result
 
