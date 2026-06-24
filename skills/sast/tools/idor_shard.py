@@ -23,6 +23,11 @@ service 계층까지 따라가 모든 엔드포인트의 소유권 게이트를 
 사용:
   python3 idor_shard.py <inventory.md> --shards K --out-dir <dir>
   python3 idor_shard.py <inventory.md> --rows-per-shard N --out-dir <dir>   # K 자동계산
+
+ID 채번 범위:
+  각 샤드는 고유 id_start를 받는다 (샤드 n의 범위: id_start ~ id_start+99).
+  이 범위가 manifest에 기록되어 샤드 에이전트가 해당 범위 안에서만 ID를 사용하도록 강제한다.
+  병합은 idor_shard_merge.py 가 수행한다(에이전트 책임 아님).
 """
 from __future__ import annotations
 
@@ -115,6 +120,9 @@ def main() -> int:
     ap.add_argument("--rows-per-shard", type=int, default=60, help="샤드당 목표 행 수(K 자동계산)")
     ap.add_argument("--out-dir", required=True, help="샤드 파일 출력 디렉토리")
     ap.add_argument("--max-shards", type=int, default=18, help="K 자동계산 상한")
+    ap.add_argument("--idor-source", default=None,
+                    help="idor-scanner.md 경로 (인벤토리가 외부 파일일 때 기존 ID 범위 추출용. "
+                         "미지정 시 inventory 파일에서 추출)")
     args = ap.parse_args()
 
     text = Path(args.inventory).read_text(encoding="utf-8")
@@ -135,14 +143,31 @@ def main() -> int:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # ID 범위: 샤드 n은 IDOR-(id_start) ~ IDOR-(id_start+99) 사용
+    # id_start는 기존 idor-scanner.md의 최대 ID 번호 다음부터 시작.
+    # 인벤토리가 외부 파일인 경우 --idor-source로 idor-scanner.md를 별도 지정해야 한다.
+    existing_max = 0
+    id_source_path = Path(args.idor_source) if args.idor_source else Path(args.inventory)
+    try:
+        src_text = id_source_path.read_text(encoding="utf-8")
+        for m2 in re.finditer(r'##\s+IDOR-(\d+):', src_text):
+            existing_max = max(existing_max, int(m2.group(1)))
+    except Exception:
+        pass
+    ID_RANGE = 100  # 샤드당 최대 후보 수
+
     manifest = {"total_files": len(sections), "total_rows": total_rows,
-                "shards": len(shards), "files": []}
+                "shards": len(shards), "id_range": ID_RANGE,
+                "existing_max_id": existing_max, "files": []}
     for n, sh in enumerate(shards, 1):
         p = out_dir / f"idor_shard_{n}.md"
+        id_start = existing_max + (n - 1) * ID_RANGE + 1
+        id_end = id_start + ID_RANGE - 1
         p.write_text(render_shard(preamble, sh, n, len(shards)), encoding="utf-8")
         rows = sum(s["rows"] for s in sh)
         manifest["files"].append({"shard": n, "path": str(p), "files": len(sh),
-                                  "rows": rows, "excluded": sum(s["excluded"] for s in sh)})
+                                  "rows": rows, "excluded": sum(s["excluded"] for s in sh),
+                                  "id_start": id_start, "id_end": id_end})
     (out_dir / "idor_shards_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -151,7 +176,7 @@ def main() -> int:
     status = "OK" if split_rows == total_rows else f"FAIL(행 손실 {total_rows}→{split_rows})"
     print(f"샤드 {len(shards)}개 생성: {out_dir} (총 {len(sections)}파일/{total_rows}행, 무손실={status})")
     for f in manifest["files"]:
-        print(f"  샤드{f['shard']}: {f['files']}파일 {f['rows']}행([제외]{f['excluded']})")
+        print(f"  샤드{f['shard']}: {f['files']}파일 {f['rows']}행([제외]{f['excluded']}) ID범위=IDOR-{f['id_start']}~IDOR-{f['id_end']}")
     return 0 if split_rows == total_rows else 2
 
 

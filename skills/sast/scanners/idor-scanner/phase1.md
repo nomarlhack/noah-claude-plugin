@@ -159,8 +159,8 @@ python3 <NOAH_SAST_DIR>/tools/idor_shard.py <인벤토리.md> --rows-per-shard 6
 ```
 
 - 출력: `idor_shard_{1..K}.md`(각 샤드 = 동일 헤더 + 자기 파일 섹션) + `idor_shards_manifest.json`. 파일 원자성·무손실·부하 균형 보장.
-- 샤드당 서브에이전트 1개: 자기 샤드의 모든 `#### <파일>`을 위 "검토 단위는 파일" 규칙대로 전수 처리(후보 등록 + 인벤토리 행 `[검증]`/`[부재]` 확정).
-- 병합(파일 원자성 → 샤드 간 중복 없음): 각 샤드의 후보 섹션·manifest·인벤토리 행을 **`idor-scanner.md`(소스)에 결합**한 뒤 `phase1_build_master_list.py --merge`로 재빌드. **파생본(master-list.json)이 아니라 소스 MD에 써야** 재빌드에 소멸하지 않는다.
+- 샤드당 서브에이전트 1개: 자기 샤드의 모든 `#### <파일>`을 위 "검토 단위는 파일" 규칙대로 전수 처리(후보 등록 + 인벤토리 행 `[검증]`/`[부재]` 확정). **에이전트는 `idor-scanner.md`를 직접 수정하지 않는다** — 결과를 `idor_shard_<n>_result.md`에만 저장한다. 후보 ID는 프롬프트로 전달받은 채번 범위(`IDOR-{id_start}`~`IDOR-{id_end}`) 안에서만 사용한다.
+- 병합 (스크립트 책임): 에이전트가 직접 `idor-scanner.md`를 수정하지 않는다. 메인 에이전트가 `idor_shard_merge.py`를 실행하면 스크립트가 모든 샤드 result.md를 읽어 `idor-scanner.md`에 자동 병합한다. 병합 후 `phase1_build_master_list.py --merge --idor-shards-merged`로 완전성을 검증한다.
 - **[필수] 샤드 반환은 아래 고정 템플릿 2줄만** (후보·인벤토리·게이트 근거·코드는 `idor_shard_<n>_result.md`에만 쓴다. 반환은 메인 컨텍스트에 누적됨. 메인은 병합 시 `result.md`를 직접 읽는다). 산문·표·후보 열거 금지:
 
   ```

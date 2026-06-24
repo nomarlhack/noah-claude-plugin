@@ -293,14 +293,27 @@ IDOR_SENTINEL_NAME = "idor-scanner.shard-merged"
 _IDOR_RESULT_MIN_BYTES = 200
 
 
+_SHARD_MANIFEST_RE = re.compile(
+    r'<!--\s*NOAH-SAST MANIFEST v1\s*-->\s*```json\s*(\{.*?\})\s*```\s*<!--\s*/NOAH-SAST MANIFEST\s*-->',
+    re.DOTALL,
+)
+_IDOR_ID_RE = re.compile(r'^IDOR-\d+$')
+_IDOR_HEADER_RE = re.compile(r'^##\s+(IDOR-\d+)\s*:', re.MULTILINE)
+_MIN_CANDIDATE_BODY_BYTES = 200
+
+
 def _validate_idor_shard_artifacts(shard_dir: Path, idor_md: Path):
     """idor 샤딩 deep-read 산출물을 검증한다. 게이트 해제(sentinel 발급)의 유일한 정당 경로.
 
     검증 항목 (하나라도 실패하면 게이트 해제 불가):
       1. SHARD_DIR/idor_shards_manifest.json 존재 + K(shards) 파싱.
-      2. 각 샤드의 결과 파일 idor_shard_<n>_result.md 가 존재하고 비어있지 않으며(>200B)
-         NOAH-SAST MANIFEST 마커를 포함(실제 후보 산출 증거).
-      3. idor-scanner.md(소스)에서 [INCOMPLETE 마커가 실제로 해소됨(샤드 결과 병합 증거).
+      1-a. shards 카운트 vs files 배열 길이 일치.
+      2. 각 샤드 result.md 존재 + >200B + MANIFEST JSON 실제 파싱 성공.
+      3. 각 샤드 result.md 후보 ID가 IDOR-\\d+ 형식인지.
+      4. 샤드 간 ID 중복 없는지.
+      5. 각 샤드 후보 ID가 idor-scanner.md에 ## <ID>: 헤더 + 최소 본문(200B)으로 존재
+         (idor_shard_merge.py가 병합을 수행했음을 확인).
+      6. idor-scanner.md에 [INCOMPLETE] 마커 없음.
 
     반환: (ok: bool, detail: str, evidence: dict)
     """
@@ -311,33 +324,112 @@ def _validate_idor_shard_artifacts(shard_dir: Path, idor_md: Path):
         man = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
         return False, f"샤드 manifest 파싱 실패: {e}", {}
-    shards = man.get("shards") or len(man.get("files", []))
-    if not shards:
+
+    declared_shards = man.get("shards") or len(man.get("files", []))
+    if not declared_shards:
         return False, "샤드 manifest에 shards 수가 없음", {}
+    shard_files = man.get("files", [])
+    # 1-a: shards 카운트 vs files 배열 길이 일치
+    if len(shard_files) != declared_shards:
+        return False, (
+            f"샤드 manifest의 shards={declared_shards}와 files 배열 길이={len(shard_files)} 불일치 "
+            f"— 일부 샤드가 manifest에서 누락됨"
+        ), {}
+
+    idor_md_text = idor_md.read_text(encoding="utf-8", errors="ignore") if idor_md.is_file() else ""
+    existing_ids_in_source: set[str] = set(_IDOR_HEADER_RE.findall(idor_md_text))
+
     validated = []
-    for entry in man.get("files", []):
+    seen_ids: dict[str, int] = {}  # id -> shard_n (샤드 간 중복 탐지)
+    all_shard_candidate_ids: list[str] = []
+
+    for entry in shard_files:
         n = entry.get("shard")
+        id_start = entry.get("id_start")
+        id_end = entry.get("id_end")
         shard_path = Path(entry.get("path", ""))
         result_path = shard_path.with_name(shard_path.stem + "_result.md")
+
         if not result_path.is_file():
             return False, f"샤드 {n} 결과 파일 없음: {result_path}", {}
         body = result_path.read_text(encoding="utf-8", errors="ignore")
         if len(body.encode("utf-8")) < _IDOR_RESULT_MIN_BYTES:
             return False, f"샤드 {n} 결과 파일이 비정상적으로 작음({result_path})", {}
-        if "NOAH-SAST" not in body or "MANIFEST" not in body:
-            return False, f"샤드 {n} 결과 파일에 manifest 마커 없음({result_path})", {}
+
+        # MANIFEST JSON 실제 파싱 (단순 문자열 포함 검사 대체)
+        mj = _SHARD_MANIFEST_RE.search(body)
+        if not mj:
+            return False, f"샤드 {n} 결과 파일에 유효한 MANIFEST JSON 블록 없음({result_path})", {}
+        try:
+            shard_meta = json.loads(mj.group(1))
+        except json.JSONDecodeError as e:
+            return False, f"샤드 {n} MANIFEST JSON 파싱 실패: {e}", {}
+
+        for cand in shard_meta.get("candidates", []):
+            cid = cand.get("id", "")
+            if not _IDOR_ID_RE.match(cid):
+                return False, f"샤드 {n}: ID '{cid}'가 IDOR-\\d+ 형식 위반", {}
+            num = int(cid.split("-")[1])
+            if id_start is not None and id_end is not None:
+                if not (id_start <= num <= id_end):
+                    return False, (
+                        f"샤드 {n}: ID '{cid}'가 할당 범위 IDOR-{id_start}~IDOR-{id_end} 밖 "
+                        f"— idor_shard.py 재실행 필요"
+                    ), {}
+            if cid in seen_ids:
+                return False, (
+                    f"ID '{cid}'가 샤드 {seen_ids[cid]}와 샤드 {n}에서 중복 "
+                    f"— idor_shard_merge.py를 먼저 실행하라"
+                ), {}
+            seen_ids[cid] = n
+            all_shard_candidate_ids.append(cid)
+
         validated.append(str(result_path))
-    if len(validated) != len(man.get("files", [])):
+
+    if len(validated) != len(shard_files):
         return False, "검증된 결과 파일 수가 샤드 수와 불일치", {}
-    if idor_md.is_file() and "[INCOMPLETE" in idor_md.read_text(encoding="utf-8", errors="ignore"):
+
+    # 5: 각 샤드 후보 ID가 idor-scanner.md에 헤더 + 최소 본문으로 존재하는지 확인
+    # (idor_shard_merge.py가 실제로 병합했음을 검증)
+    missing_merge: list[str] = []
+    thin_merge: list[str] = []
+    for cid in all_shard_candidate_ids:
+        if f"## {cid}:" not in idor_md_text:
+            missing_merge.append(cid)
+            continue
+        # 본문 최소 길이: 헤더부터 다음 ## 또는 끝까지 추출
+        pat = re.compile(
+            rf'^(##\s+{re.escape(cid)}\s*:.*?)(?=^##\s+IDOR-|\Z)',
+            re.MULTILINE | re.DOTALL,
+        )
+        m2 = pat.search(idor_md_text)
+        section = m2.group(1) if m2 else ""
+        if len(section.encode("utf-8")) < _MIN_CANDIDATE_BODY_BYTES:
+            thin_merge.append(cid)
+
+    if missing_merge:
         return False, (
-            "idor-scanner.md에 [INCOMPLETE] 마커가 여전히 존재 — 샤드 결과를 소스 MD에 병합해 "
-            "미완 항목을 해소한 뒤 다시 실행하라"
+            f"샤드 후보 {missing_merge}가 idor-scanner.md에 병합되지 않음 "
+            f"— python3 <NOAH_SAST_DIR>/tools/idor_shard_merge.py <idor_scanner_md> <shard_dir> 실행 필요"
         ), {}
-    return True, f"{shards}개 샤드 결과 검증 통과", {
-        "shards": shards,
+    if thin_merge:
+        return False, (
+            f"샤드 후보 {thin_merge}의 idor-scanner.md 내 섹션이 너무 짧음 (껍데기 헤더 의심) "
+            f"— idor_shard_merge.py 재실행 또는 수동 확인 필요"
+        ), {}
+
+    # 6: [INCOMPLETE] 마커 해소
+    if idor_md.is_file() and "[INCOMPLETE" in idor_md_text:
+        return False, (
+            "idor-scanner.md에 [INCOMPLETE] 마커가 여전히 존재 "
+            f"— idor_shard_merge.py 실행 후 마커 해소 여부 확인"
+        ), {}
+
+    return True, f"{declared_shards}개 샤드 결과 검증 통과 (신규 후보 {len(all_shard_candidate_ids)}건 병합 확인)", {
+        "shards": declared_shards,
         "shard_dir": str(shard_dir),
         "result_files": validated,
+        "merged_candidate_ids": all_shard_candidate_ids,
     }
 
 
@@ -596,8 +688,15 @@ def _idor_sentinel_is_valid(sentinel: Path, idor_md: Path) -> bool:
     result_files = meta.get("result_files") or []
     if not result_files or not all(Path(p).is_file() for p in result_files):
         return False  # 산출물이 사라졌으면 무효
-    if idor_md.is_file() and "[INCOMPLETE" in idor_md.read_text(encoding="utf-8", errors="ignore"):
-        return False  # 병합이 되돌려졌으면 무효
+    if idor_md.is_file():
+        idor_text = idor_md.read_text(encoding="utf-8", errors="ignore")
+        if "[INCOMPLETE" in idor_text:
+            return False  # 병합이 되돌려졌으면 무효
+        # 병합 확인: sentinel에 기록된 merged_candidate_ids가 여전히 idor-scanner.md에 존재하는지
+        merged_ids = meta.get("merged_candidate_ids") or []
+        for cid in merged_ids:
+            if f"## {cid}:" not in idor_text:
+                return False  # 병합된 후보가 사라졌으면 무효
     return True
 
 
