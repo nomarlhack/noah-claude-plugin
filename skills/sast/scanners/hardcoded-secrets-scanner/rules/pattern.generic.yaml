@@ -32,19 +32,18 @@ rules:
       - pattern-regex: '(?i)password\s*[=:]\s*[''"][^${\s]{8,}[''"]'
       # OAuth client secret
       - pattern-regex: '(?i)(client[_-]?secret|oauth[_-]?secret)\s*[=:]\s*[''"][a-zA-Z0-9_\-]{16,}[''"]'
-      # ── YAML 비따옴표 형식 (key: value — 따옴표 없이 값이 오는 YAML/Properties) ──
-      # password: <plaintext> — Spring 환경변수 참조(${...}/$(...)는 제외), 주석 줄 제외
-      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*password\s*:\s*(?![\$\{\s#])([^\s#]{6,})'
-      # token: <vault-token> — Vault hvs.* 형식 포함, 환경변수 참조 제외
-      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*token\s*:\s*(?![\$\{\s#])([a-zA-Z0-9._\-/+=]{16,})'
-      # role-id / secret-id — Vault AppRole 자격증명
-      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*(role[-_]id|secret[-_]id)\s*:\s*(?![\$\{\s#])([a-zA-Z0-9_\-]{8,})'
-      # accessKey / secretAccessKey — CDN 서명 키 (Kage 등)
-      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*(access[_-]?key|secret[_-]?access[_-]?key)\s*:\s*(?![\$\{\s#])([a-zA-Z0-9_\-/+=]{16,})'
-      # apiKey (camelCase) — Iceland, Harvester 등 내부 서비스 키, your- 접두사 제외
-      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*apikey\s*:\s*(?![\$\{\s#])(?!your-)([a-zA-Z0-9_\-/+=]{16,})'
-      # Kotlin/Java val token = "..." — VaultLoader.kt 형식
-      - pattern-regex: '(?i)\bval\s+token\s*=\s*[''"`]([a-zA-Z0-9._\-/+=]{20,})[''"`]'
+      # ── 범용 비따옴표 형식 ─────────────────────────────────────────────────
+      # YAML / Properties / 환경설정 파일의 key: value 형식 (따옴표 없음)
+      # 지원 키 이름: password, token, secret, api_key, apiKey, access_key,
+      #   accessKey, secretAccessKey, role-id, secret-id, credentials,
+      #   aws_access_key, aws_secret_key, bearer 등 주요 시크릿 키워드
+      # 제외: 주석(#), 환경변수 참조(${...}/$(...)}, 5자 이하, placeholder 값
+      #       (your-, example-, changeme, REPLACE, test-, dummy, null, xxxx 등)
+      # 점 구분 복합 키(spring.security.token)도 지원
+      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*(?:[a-zA-Z0-9._\-]*\.)?(password|passwd|pwd|secret[_\-]?key|secret[_\-]?access[_\-]?key|client[_\-]?secret|shared[_\-]?secret|api[_\-]?key|apikey|access[_\-]?key|access[_\-]?token|auth[_\-]?token|auth[_\-]?key|private[_\-]?key|signing[_\-]?key|encryption[_\-]?key|aws[_\-]access[_\-]key|aws[_\-]secret[_\-]?key|aws[_\-]session[_\-]token|gcp[_\-]key|service[_\-]account[_\-]key|token|secret|role[-_]id|secret[-_]id|credentials?|bearer)\s*[=:]\s*(?![\$\{\s#])(?!your[-_])(?!example[-_]?)(?!<[^>]{1,50}>)(?!REPLACE)(?!CHANGEME|changeme)(?!TODO|todo)(?!DUMMY|dummy)(?!FAKE|fake)(?!TEST[_\-]|test[_\-])(?!SAMPLE|sample)(?!x{4,})(?!none|null|empty)(?!true|false)([^\s#''\"]{6,})'
+      # 변수 할당 형식 — 따옴표 있는 값 (Kotlin val, Java final, Python, JS const 등)
+      # val/var/const/let/final 등 키워드 뒤에 시크릿 변수명과 문자열 리터럴
+      - pattern-regex: '(?i)(?:^|[^a-zA-Z0-9_])(password|passwd|pwd|secret[_\-]?key|secret[_\-]?access[_\-]?key|client[_\-]?secret|api[_\-]?key|apikey|access[_\-]?key|access[_\-]?token|auth[_\-]?token|private[_\-]?key|signing[_\-]?key|aws[_\-]access[_\-]key|aws[_\-]secret[_\-]?key|token|secret|credentials?|bearer)\s*[=:]\s*[''"`](?!your[-_])(?!example[-_]?)(?!<[^>]{1,50}>)(?!REPLACE)(?!CHANGEME|changeme)(?!TEST[_\-]|test[_\-])(?!DUMMY|dummy)(?!x{4,})([a-zA-Z0-9._\-/+=!@#$%^&*:]{12,})[''"`]'
       # Android 안전하지 않은 저장 모드 (world-readable/writeable = 타 앱 노출)
       - pattern-regex: 'MODE_WORLD_READABLE'
       - pattern-regex: 'MODE_WORLD_WRITEABLE'
