@@ -38,7 +38,10 @@ from pathlib import Path
 
 # Spring Web 매핑 어노테이션 (HTTP verb + path)
 MAPPING_RE = re.compile(
-    r'@(Get|Post|Put|Delete|Patch|Request)Mapping\s*\(\s*(?:value\s*=\s*)?"([^"]*)"'
+    # 경로 리터럴 형식 2종 지원:
+    # 1) 인라인 문자열: @GetMapping("/path") 또는 @GetMapping(value = "/path")
+    # 2) 배열 형식:    @GetMapping(value = ["/path"]) — Kotlin 배열 리터럴
+    r'@(Get|Post|Put|Delete|Patch|Request)Mapping\s*\(\s*(?:value\s*=\s*)?\[?"([^"]*)"'
 )
 # 매핑 어노테이션이 path 없이 클래스/메서드 레벨로 붙는 경우(컨트롤러 prefix 처리용).
 MAPPING_NOARG_RE = re.compile(r'@(Get|Post|Put|Delete|Patch|Request)Mapping\b')
@@ -270,6 +273,24 @@ def _scan_controller_file(path: Path) -> list[dict]:
     # 파일을 메서드 단위로 분할: 매핑 어노테이션을 앵커로 사용
     for i, ln in enumerate(lines):
         m = MAPPING_RE.search(ln)
+        # MAPPING_RE는 단일 줄 인라인 경로만 매치한다.
+        # 다중 줄 형식(@GetMapping(\n  value = ["path"],\n  produces = [...]\n))은
+        # 어노테이션 이름만 현재 줄에 있고 경로는 다음 줄에 있으므로 미매치.
+        # 이 경우 다음 최대 6줄을 합쳐 재시도하고, 어노테이션이 닫히는 줄(')' 단독)을
+        # 찾아 그 다음부터 시그니처 탐색을 시작한다.
+        annotation_end_offset = 0  # 다중 줄 어노테이션의 ')' 닫힘 줄 오프셋
+        if not m and MAPPING_NOARG_RE.search(ln):
+            lookahead = " ".join(lines[i:min(len(lines), i + 6)])
+            m = MAPPING_RE.search(lookahead)
+            if m:
+                # 어노테이션 닫히는 줄 찾기: ')' 단독 또는 어노테이션 내 ')'로 끝나는 줄
+                for k in range(1, 7):
+                    if i + k >= len(lines):
+                        break
+                    stripped_k = lines[i + k].strip()
+                    if stripped_k.startswith(")") or stripped_k == ")":
+                        annotation_end_offset = k
+                        break
         if not m:
             continue
         if _is_comment_line(ln):  # 주석 처리된 매핑은 가짜 진입점
@@ -280,13 +301,14 @@ def _scan_controller_file(path: Path) -> list[dict]:
         cls_window = "\n".join(lines[i:min(len(lines), i + 3)])
         if re.search(r'\bclass\s+\w+', cls_window):
             continue
-        # 메서드 시그니처가 매핑 아래 즉시(0~6줄) 와야 함. 클래스 레벨/다른 어노테이션 사이는 스킵.
-        method_window = lines[i + 1:min(len(lines), i + 8)]
+        # 메서드 시그니처 탐색 시작점: 다중 줄 어노테이션이면 ')' 닫힘 다음부터 탐색.
+        sig_search_start = i + 1 + annotation_end_offset
+        method_window = lines[sig_search_start:min(len(lines), sig_search_start + 8)]
         sig_start = None
         for j, ml in enumerate(method_window):
             # 시그니처 시작: METHOD_HEAD_RE 매치 또는 다른 매핑 아닌 어노테이션 라인은 건너뛰고 메서드 도달
             if METHOD_HEAD_RE.search(ml):
-                sig_start = i + 1 + j
+                sig_start = sig_search_start + j
                 break
             # 같은 메서드의 다른 어노테이션(@Valid 등)은 통과
             stripped = ml.strip()
