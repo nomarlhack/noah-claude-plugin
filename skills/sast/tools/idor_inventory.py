@@ -38,10 +38,11 @@ from pathlib import Path
 
 # Spring Web 매핑 어노테이션 (HTTP verb + path)
 MAPPING_RE = re.compile(
-    # 경로 리터럴 형식 2종 지원:
+    # 경로 리터럴 형식 3종 지원:
     # 1) 인라인 문자열: @GetMapping("/path") 또는 @GetMapping(value = "/path")
-    # 2) 배열 형식:    @GetMapping(value = ["/path"]) — Kotlin 배열 리터럴
-    r'@(Get|Post|Put|Delete|Patch|Request)Mapping\s*\(\s*(?:value\s*=\s*)?\[?"([^"]*)"'
+    # 2) Kotlin 배열:  @GetMapping(value = ["/path"])
+    # 3) Java 배열:    @GetMapping(value = {"/path"})  — 중괄호 형식
+    r'@(Get|Post|Put|Delete|Patch|Request)Mapping\s*\(\s*(?:value\s*=\s*)?[\[{]?"([^"]*)"'
 )
 # 매핑 어노테이션이 path 없이 클래스/메서드 레벨로 붙는 경우(컨트롤러 prefix 처리용).
 MAPPING_NOARG_RE = re.compile(r'@(Get|Post|Put|Delete|Patch|Request)Mapping\b')
@@ -255,10 +256,22 @@ def _scan_controller_file(path: Path) -> list[dict]:
     class_prefixes: list[str] = [""]
     for i, ln in enumerate(lines[:60]):
         if CONTROLLER_RE.search(ln):
-            # 클래스 선언 위쪽 5줄 + 아래 5줄 윈도우에서 클래스레벨 @RequestMapping 검색
+            # 클래스 선언 줄을 찾아 그 이전 줄들만 @RequestMapping 검색 대상으로 한다.
+            # (class 선언 이후 줄에는 메서드 어노테이션이 위치하므로 검색 범위에서 제외)
+            # @RestController ~ class 사이에 다중 줄 @RequestMapping이 있을 수 있어
+            # 넉넉하게 15줄 앞을 검색한다.
+            class_line = None
+            for ahead in range(i, min(len(lines), i + 15)):
+                if re.search(r'\bclass\s+\w+', lines[ahead]):
+                    class_line = ahead
+                    break
+            if class_line is None:
+                # class 선언을 못 찾으면(이론상 없음) 기존 범위 fallback
+                class_line = min(len(lines), i + 5)
+            # @RequestMapping 검색 범위: @RestController 위 5줄 ~ class 선언 줄 직전까지
             ws = max(0, i - 5)
-            we = min(len(lines), i + 5)
-            for cl in lines[ws:we]:
+            we = class_line  # class 선언 줄은 포함하지 않음
+            for ci, cl in enumerate(lines[ws:we]):
                 # 인자 형식 불문(@RequestMapping("/a","/b") / value={...} / {...} / noarg)
                 # 클래스 레벨 @RequestMapping을 인식하고 경로 리터럴을 헬퍼로 추출.
                 cm = MAPPING_NOARG_RE.search(cl)
@@ -266,6 +279,25 @@ def _scan_controller_file(path: Path) -> list[dict]:
                     lits = _mapping_path_literals(cl)
                     if lits:
                         class_prefixes = lits
+                    else:
+                        # 다중 줄 @RequestMapping: 어노테이션이 닫히는 ')' 까지 수집 후 재시도.
+                        abs_start = ws + ci
+                        ann_lines: list[str] = []
+                        depth = 0
+                        for al in lines[abs_start:min(len(lines), abs_start + 10)]:
+                            ann_lines.append(al)
+                            for ch in al:
+                                if ch == "(":
+                                    depth += 1
+                                elif ch == ")":
+                                    depth -= 1
+                                    if depth == 0:
+                                        break
+                            if depth == 0 and len(ann_lines) > 1:
+                                break
+                        multi_lits = _mapping_path_literals(" ".join(ann_lines))
+                        if multi_lits:
+                            class_prefixes = multi_lits
                     break
             break
 
