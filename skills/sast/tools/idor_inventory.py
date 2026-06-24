@@ -273,24 +273,25 @@ def _scan_controller_file(path: Path) -> list[dict]:
     # 파일을 메서드 단위로 분할: 매핑 어노테이션을 앵커로 사용
     for i, ln in enumerate(lines):
         m = MAPPING_RE.search(ln)
-        # MAPPING_RE는 단일 줄 인라인 경로만 매치한다.
-        # 다중 줄 형식(@GetMapping(\n  value = ["path"],\n  produces = [...]\n))은
-        # 어노테이션 이름만 현재 줄에 있고 경로는 다음 줄에 있으므로 미매치.
-        # 이 경우 다음 최대 6줄을 합쳐 재시도하고, 어노테이션이 닫히는 줄(')' 단독)을
-        # 찾아 그 다음부터 시그니처 탐색을 시작한다.
-        annotation_end_offset = 0  # 다중 줄 어노테이션의 ')' 닫힘 줄 오프셋
+        # 단일 줄 매치 실패 시: 괄호 깊이 추적으로 어노테이션 전체를 수집한 뒤 재시도.
+        # 줄 수 제한 없이 어노테이션이 닫히는 ')' 까지 수집하므로 몇 줄이 걸쳐도 처리됨.
+        annotation_end_offset = 0
         if not m and MAPPING_NOARG_RE.search(ln):
-            lookahead = " ".join(lines[i:min(len(lines), i + 6)])
-            m = MAPPING_RE.search(lookahead)
-            if m:
-                # 어노테이션 닫히는 줄 찾기: ')' 단독 또는 어노테이션 내 ')'로 끝나는 줄
-                for k in range(1, 7):
-                    if i + k >= len(lines):
-                        break
-                    stripped_k = lines[i + k].strip()
-                    if stripped_k.startswith(")") or stripped_k == ")":
-                        annotation_end_offset = k
-                        break
+            ann_lines = []
+            depth = 0
+            for k, al in enumerate(lines[i:]):
+                ann_lines.append(al)
+                for ch in al:
+                    if ch == "(":
+                        depth += 1
+                    elif ch == ")":
+                        depth -= 1
+                        if depth == 0:
+                            annotation_end_offset = k
+                            break
+                if depth == 0 and k > 0:
+                    break
+            m = MAPPING_RE.search(" ".join(ann_lines))
         if not m:
             continue
         if _is_comment_line(ln):  # 주석 처리된 매핑은 가짜 진입점
@@ -301,7 +302,7 @@ def _scan_controller_file(path: Path) -> list[dict]:
         cls_window = "\n".join(lines[i:min(len(lines), i + 3)])
         if re.search(r'\bclass\s+\w+', cls_window):
             continue
-        # 메서드 시그니처 탐색 시작점: 다중 줄 어노테이션이면 ')' 닫힘 다음부터 탐색.
+        # 메서드 시그니처 탐색 시작점: 다중 줄 어노테이션이면 어노테이션 끝 다음부터 탐색.
         sig_search_start = i + 1 + annotation_end_offset
         method_window = lines[sig_search_start:min(len(lines), sig_search_start + 8)]
         sig_start = None
