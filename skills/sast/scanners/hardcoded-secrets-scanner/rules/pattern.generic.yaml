@@ -28,10 +28,23 @@ rules:
       - pattern-regex: '(?i)(jwt[_-]?secret|token[_-]?secret|signing[_-]?key)\s*[=:]\s*[''"][^${\s]{8,}[''"]'
       # Private Key PEM 블록
       - pattern-regex: '-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----'
-      # 일반 password 할당 (높은 FP 위험 → 신중하게 사용)
+      # 일반 password 할당 (따옴표 있는 형식)
       - pattern-regex: '(?i)password\s*[=:]\s*[''"][^${\s]{8,}[''"]'
       # OAuth client secret
       - pattern-regex: '(?i)(client[_-]?secret|oauth[_-]?secret)\s*[=:]\s*[''"][a-zA-Z0-9_\-]{16,}[''"]'
+      # ── YAML 비따옴표 형식 (key: value — 따옴표 없이 값이 오는 YAML/Properties) ──
+      # password: <plaintext> — Spring 환경변수 참조(${...}/$(...)는 제외), 주석 줄 제외
+      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*password\s*:\s*(?![\$\{\s#])([^\s#]{6,})'
+      # token: <vault-token> — Vault hvs.* 형식 포함, 환경변수 참조 제외
+      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*token\s*:\s*(?![\$\{\s#])([a-zA-Z0-9._\-/+=]{16,})'
+      # role-id / secret-id — Vault AppRole 자격증명
+      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*(role[-_]id|secret[-_]id)\s*:\s*(?![\$\{\s#])([a-zA-Z0-9_\-]{8,})'
+      # accessKey / secretAccessKey — CDN 서명 키 (Kage 등)
+      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*(access[_-]?key|secret[_-]?access[_-]?key)\s*:\s*(?![\$\{\s#])([a-zA-Z0-9_\-/+=]{16,})'
+      # apiKey (camelCase) — Iceland, Harvester 등 내부 서비스 키, your- 접두사 제외
+      - pattern-regex: '(?i)^(?![ \t]*#)[ \t]*apikey\s*:\s*(?![\$\{\s#])(?!your-)([a-zA-Z0-9_\-/+=]{16,})'
+      # Kotlin/Java val token = "..." — VaultLoader.kt 형식
+      - pattern-regex: '(?i)\bval\s+token\s*=\s*[''"`]([a-zA-Z0-9._\-/+=]{20,})[''"`]'
       # Android 안전하지 않은 저장 모드 (world-readable/writeable = 타 앱 노출)
       - pattern-regex: 'MODE_WORLD_READABLE'
       - pattern-regex: 'MODE_WORLD_WRITEABLE'
