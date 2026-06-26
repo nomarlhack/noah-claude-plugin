@@ -688,6 +688,13 @@ def main() -> int:
             return 5
 
     # 4) 커버리지 감사 (§6-A-2) + 의무 감사 (§2-D): --index-dir 제공 시에만.
+    if not args.index_dir:
+        print(
+            "WARNING: --index-dir 미제공 — 커버리지·FN방지·taint-safe 감사가 생략됩니다.\n"
+            "  다음 명령으로 전체 감사를 실행하세요:\n"
+            "    python3 phase1_review_assert.py <master_list> <phase1_dir> --index-dir <PATTERN_INDEX_DIR>",
+            file=sys.stderr,
+        )
     if args.index_dir:
         index_dir = Path(args.index_dir)
         skills_root = Path(__file__).resolve().parent.parent

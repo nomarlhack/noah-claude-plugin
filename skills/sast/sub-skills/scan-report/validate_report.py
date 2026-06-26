@@ -387,6 +387,35 @@ if _method_m and _env_m2:
 # --json-output: 구조화 로그 덤프
 if json_output_arg:
     try:
+        # === 추가 경고 검사 ===
+
+        # (e) 총괄 요약 테이블 단위 접미사 검증 (#10)
+        # "확인됨", "후보", "이상 없음" 행의 건수에 'N건'/'N개' 접미사가 없으면
+        # md_to_html.py 대시보드가 0으로 표시됨
+        _summary_tbl_m = re.search(r'## 총괄 요약.*?(?=## |\Z)', md_content, re.DOTALL)
+        if _summary_tbl_m:
+            for _row in _summary_tbl_m.group(0).split('\n'):
+                if '|' in _row and re.search(r'\|\s*\d+\s*\|', _row):
+                    # 숫자만 있고 '건'/'개' 없는 셀 탐지
+                    _bare_num = re.search(r'\|\s*(\d+)\s*\|', _row)
+                    if _bare_num:
+                        warnings.append(
+                            f"총괄 요약 테이블 건수에 단위 접미사(N건/N개) 없음 — "
+                            f"대시보드가 0으로 표시될 수 있습니다: {_row.strip()[:80]}"
+                        )
+
+        # (f) 진입 경계 플레이스홀더 검출 (#8)
+        # **진입 경계**: 필드에 템플릿 값이 그대로 남아있으면 경고
+        _ab_ph_re = re.compile(
+            r'\*\*진입 경계\*\*:\s*(?:\[진입 도메인\]|\[base path\]|진입 도메인\s*\]|미기재)'
+        )
+        _ab_ph_count = len(_ab_ph_re.findall(md_content))
+        if _ab_ph_count > 0:
+            warnings.append(
+                f"**진입 경계**: 필드에 템플릿 플레이스홀더가 {_ab_ph_count}건 남아있습니다. "
+                f"auth-boundary.json의 해당 표면 값으로 채우세요."
+            )
+
         import json as _json
         _jout = {
             'errors': errors,

@@ -50,6 +50,8 @@ manifest JSON 필드:
 - `declared_count`: 파일 내 후보 수 (정수). `## <ID>:` 헤더 수와 반드시 일치.
 - `candidates`: 후보 배열. 각 요소: `id`, `title`, `file`(경로), `line`(정수), `url_path`, `source`, `sink`, `test_prereq`(없으면 null).
 
+**[필수] `url_path` 반드시 채울 것**: `url_path`는 `phase1_build_master_list.py`가 인증경계(`auth_boundary`)를 자동 파생하는 유일한 입력이다. 비워두면 보고서 취약점 요약 테이블의 인증경계 열이 공백으로 렌더링된다. 컨트롤러 매핑(`@RequestMapping`, `@GetMapping` 등)에서 확정한 HTTP 경로를 `METHOD /path/template` 형식으로 기재한다 (예: `GET /jude/link/{linkId}/preview`, `POST /chatbot/writeFeed`). URL 경로를 확인할 수 없을 때만 `null`을 허용한다.
+
 **후보 ID 규약**: 각 스캐너의 `phase1.md` frontmatter에 선언된 `id_prefix` 값을 사용하여 `<id_prefix>-1, <id_prefix>-2, ...` 형식으로 순서대로 부여한다. 예: `id_prefix: XSS`이면 `XSS-1, XSS-2, ...`. 스스로 prefix를 추론하지 않는다. 불일치 시 `phase1_build_master_list.py`가 ERROR로 차단.
 
 **카테고리 헤더 규약**: 스캐너 정의 문서(`phase1.md`)에서 취약점 유형을 구분할 때 `### V-1`, `### D-1` 같은 **숫자+하이픈 형식을 사용하지 않는다**. 카테고리 이름(UPPER_SNAKE_CASE)을 그대로 헤더로 쓴다. 숫자+하이픈 형식은 후보 ID 전용으로 예약되어 있어 혼동을 일으킨다.

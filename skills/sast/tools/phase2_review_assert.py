@@ -175,6 +175,17 @@ def main() -> int:
     # 4. master-list.json의 mtime이 Phase 2 파일보다 나중인가
     master_mtime = os.path.getmtime(master_list_path)
     phase2_files = list(Path(phase1_results_dir).glob("*-phase2.md"))
+    # Phase 2 파일이 0건이고 candidate 후보가 존재하면 경고 (Phase 2 미실행 징후)
+    if not phase2_files:
+        candidate_count = sum(1 for c in candidates if c.get("status") == "candidate")
+        confirmed_count = sum(1 for c in candidates if c.get("status") == "confirmed")
+        if candidate_count > 0 or confirmed_count > 0:
+            print(
+                f"WARNING: *-phase2.md 파일이 0건 — Phase 2 동적 분석이 실행되지 않았거나\n"
+                f"  '동적 분석 생략' 태그로 처리되지 않은 것으로 보입니다.\n"
+                f"  (candidate={candidate_count}건, confirmed={confirmed_count}건)",
+                file=sys.stderr,
+            )
     if phase2_files:
         latest_phase2 = max(os.path.getmtime(p) for p in phase2_files)
         if master_mtime < latest_phase2:

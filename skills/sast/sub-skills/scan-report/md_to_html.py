@@ -169,10 +169,14 @@ h3{color:#111;margin-top:18px;font-size:1.02em;font-weight:700}
 h3.scanner-heading,.chain-card>h3,details.vuln-block>summary h3{color:#7c3aed}
 h4{color:#222;margin-top:16px;font-size:0.94em;font-weight:700}
 h5{color:#333;margin-top:12px;font-size:0.9em;font-weight:600}
-table{border-collapse:collapse;width:100%;margin:20px 0;background:white;border:2px solid #111;box-shadow:4px 4px 0 #111}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;margin:20px 0}
+table{border-collapse:collapse;width:100%;min-width:0;background:white;border:2px solid #111;box-shadow:4px 4px 0 #111;margin:0}
 th{background:#111;color:#fff;padding:12px 16px;text-align:center;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em}
 td{padding:11px 16px;border-bottom:1px solid #d8d8d2;font-size:13px;color:#1a1a1a;word-break:keep-all;overflow-wrap:break-word}
 th{word-break:keep-all}
+/* 컬럼 수 6개 이상인 넓은 테이블: 셀 내 긴 텍스트 강제 줄바꿈 */
+.wide-table td{word-break:break-all;overflow-wrap:anywhere;font-size:12px}
+.wide-table th{font-size:11px;padding:10px 10px}
 .summary-table td{text-align:center;vertical-align:middle}
 .summary-table td:nth-child(3){text-align:left}
 .summary-table td:nth-child(2){white-space:nowrap}
@@ -435,10 +439,14 @@ def do_flush_table():
     #  - '순번' → 취약점 요약 테이블(셀 가운데 정렬)
     #  - 'ID'   → ID 컬럼을 가진 테이블(안전 판정 등, 첫 컬럼 줄바꿈 방지)
     _hdr0 = state['tbl_header'][0].strip() if state['tbl_header'] else ''
+    _col_count = len(state['tbl_header'])
     if _hdr0 == '순번':
         _tbl_cls = ' class="summary-table"'
     elif _hdr0 == 'ID':
         _tbl_cls = ' class="id-table"'
+    elif _col_count >= 6:
+        # 컬럼이 6개 이상인 넓은 테이블 (인증경계 경로 표 등): wide-table 클래스 적용
+        _tbl_cls = ' class="wide-table"'
     else:
         _tbl_cls = ''
     # '비고' 컬럼 인덱스
@@ -459,7 +467,7 @@ def do_flush_table():
         if _h.strip() == '인증경계':
             _ab_idx = _i
             break
-    out.append(f'<table{_tbl_cls}>')
+    out.append(f'<div class="table-wrap"><table{_tbl_cls}>')
     if state['tbl_header']:
         out.append('<thead><tr>' + ''.join(f'<th>{inline(c.strip())}</th>' for c in state['tbl_header']) + '</tr></thead>')
     out.append('<tbody>')
@@ -474,7 +482,7 @@ def do_flush_table():
             else:
                 _cells.append(f'<td>{inline(_txt)}</td>')
         out.append('<tr>' + ''.join(_cells) + '</tr>')
-    out.append('</tbody></table>')
+    out.append('</tbody></table></div>')
     state['in_table'] = False
     state['tbl_header'] = []
     state['tbl_rows'] = []

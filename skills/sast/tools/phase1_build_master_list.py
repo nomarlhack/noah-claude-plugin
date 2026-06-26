@@ -156,34 +156,76 @@ def _normalize_path(p: str) -> str:
     return p
 
 
-def _derive_auth_boundary(url_path: str) -> str:
-    """url_path를 auth-boundary.json routes와 매칭하여 인증경계 4분류 반환."""
-    if not _AB_ROUTES or not url_path:
-        return ""
-    norm_candidate = _normalize_path(url_path)
-    best_score = -1
-    best_is_ext = False
-    best_identity = ""
-    for route_path, identity, is_ext in _AB_ROUTES:
-        rp_clean = _normalize_path(route_path)
-        if not rp_clean:
-            continue
-        # 후보 경로가 route prefix로 시작하거나, route가 후보 prefix로 시작하면 매칭
-        if norm_candidate.startswith(rp_clean) or rp_clean.startswith(norm_candidate):
-            score = len(rp_clean)
-            if score > best_score:
-                best_score = score
-                best_is_ext = is_ext
-                best_identity = identity
+def _derive_auth_boundary_from_file(file_path: str) -> str:
+    """file_path 기반 폴백: url_path가 없을 때 소스 파일 경로로 인증경계를 파생한다.
 
-    if best_score < 0:
-        return ""
+    규칙:
+    - loco-web-jude-dkos: 공개 웹서버 → 외부망.무인증
+    - loco-bo-jude-admin: 어드민 패널 → 내부망.인증
+    - lazenca + GroupAlarm/GroupAction/RoomChatbot/SecureImage: talk-user 헤더 → 내부망.인증
+    - lazenca 나머지: 내부망 무인증
+    - jude-misc-api: KakaotalkGateway 인증 → 내부망.인증
+    - loco-api-jude + gift/kids/profile/moim: 인증 있음 → 내부망.인증
+    - loco-api-jude 나머지(/jude/**): 무인증 → 내부망.무인증
+    - 하드코딩 시크릿 계열: 코드에서 직접 노출 → 내부망.무인증
+    - 기타: 내부망.무인증 (보수적 기본값)
+    """
+    f = file_path or ""
+    if "loco-web-jude-dkos" in f:
+        return "외부망.무인증"
+    if "loco-bo-jude-admin" in f:
+        return "내부망.인증"
+    if "lazenca" in f:
+        # GroupAlarm, GroupAction 등은 talk-user 헤더 인증 경유
+        for kw in ("GroupAlarm", "GroupAction", "RoomChatbot", "SecureImage",
+                   "GroupChat", "GroupSubscription"):
+            if kw in f:
+                return "내부망.인증"
+        return "내부망.무인증"
+    if "jude-misc-api" in f:
+        return "내부망.인증"
+    if "loco-api-jude" in f or "loco-bo-jude" in f or "loco-bo-common" in f:
+        # gift/kids/profile/moim 계열은 oauthToken 또는 serviceId 인증
+        for kw in ("gift", "Gift", "kids", "Kids", "profile", "Profile",
+                   "moim", "Moim", "Schedule", "Poll"):
+            if kw in f:
+                return "내부망.인증"
+        return "내부망.무인증"
+    return "내부망.무인증"
 
-    is_auth = best_identity not in ("없음(익명)", "")
-    if best_is_ext:
-        return "외부망.인증" if is_auth else "외부망.무인증"
-    else:
-        return "내부망.인증" if is_auth else "내부망.무인증"
+
+def _derive_auth_boundary(url_path: str, file_path: str = "") -> str:
+    """url_path를 auth-boundary.json routes와 매칭하여 인증경계 4분류 반환.
+
+    url_path가 없거나 routes 매칭에 실패하면 file_path 기반 폴백을 사용한다.
+    이를 통해 스캐너 에이전트가 url_path를 채우지 않아도 인증경계가 자동 파생된다.
+    """
+    if _AB_ROUTES and url_path:
+        norm_candidate = _normalize_path(url_path)
+        best_score = -1
+        best_is_ext = False
+        best_identity = ""
+        for route_path, identity, is_ext in _AB_ROUTES:
+            rp_clean = _normalize_path(route_path)
+            if not rp_clean:
+                continue
+            # 후보 경로가 route prefix로 시작하거나, route가 후보 prefix로 시작하면 매칭
+            if norm_candidate.startswith(rp_clean) or rp_clean.startswith(norm_candidate):
+                score = len(rp_clean)
+                if score > best_score:
+                    best_score = score
+                    best_is_ext = is_ext
+                    best_identity = identity
+
+        if best_score >= 0:
+            is_auth = best_identity not in ("없음(익명)", "")
+            if best_is_ext:
+                return "외부망.인증" if is_auth else "외부망.무인증"
+            else:
+                return "내부망.인증" if is_auth else "내부망.무인증"
+
+    # routes 매칭 실패 또는 url_path 없음 → file_path 기반 폴백
+    return _derive_auth_boundary_from_file(file_path)
 
 
 def _same_path(a, b):
@@ -220,7 +262,7 @@ def _build_candidate_dict(cid, scanner, cand, md, existing_by_id, prereq_group=N
             "conflicts": [],
         },
         "safe_category": None,
-        "auth_boundary": _derive_auth_boundary(cand.get("url_path", "")),
+        "auth_boundary": _derive_auth_boundary(cand.get("url_path", ""), cand.get("file", "")),
     }
     preserved = existing_by_id.get(cid)
     if preserved:
@@ -596,6 +638,24 @@ for md in md_files:
                 prereq_group=scanner_prereq_group,
             )
         )
+
+    # manifest 필드 품질 경고 (WARNING — 차단하지 않고 알림만)
+    for cand in cands:
+        cid = cand.get("id", "?")
+        # url_path 형식 검증: "METHOD /path" 포맷이어야 함
+        up = cand.get("url_path", "")
+        if up and not re.match(r'^[A-Z*]+\s+/', up) and not up.startswith('/'):
+            warnings.append(
+                f"{scanner}/{cid}: INVALID_URL_PATH — url_path='{up[:60]}' 는 "
+                f"'METHOD /경로' 또는 '/경로' 형식이 아닙니다. "
+                f"컨트롤러 @RequestMapping에서 실제 경로를 확인하세요."
+            )
+        # source/sink 비어있을 때 경고
+        if not cand.get("source") and not cand.get("sink"):
+            warnings.append(
+                f"{scanner}/{cid}: EMPTY_MANIFEST_FIELD — source/sink가 모두 비어 있습니다. "
+                f"phase1.md의 Source→Sink Flow를 manifest에 요약하세요."
+            )
 
     # prose에는 있으나 manifest에 없는 ID
     manifest_ids = {c.get("id") for c in cands}
