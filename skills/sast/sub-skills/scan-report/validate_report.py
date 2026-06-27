@@ -237,7 +237,17 @@ if master_list_path and os.path.exists(master_list_path) and md_content:
             sec_num = sm.group(1)
             sec_title = sm.group(2).strip()
             sec_body = sm.group(3)
+            # 올바른 형식: 줄 시작이 **ID**: (공백 없음)
             id_lines = re.findall(r'^\*\*ID\*\*:\s*(.+?)\s*$', sec_body, re.MULTILINE)
+            # 잘못된 형식: - **ID**: (리스트 접두사) — Fail 조건 (요약 테이블 링크 깨짐)
+            list_id_lines = re.findall(r'^-\s+\*\*ID\*\*:\s*(.+?)\s*$', sec_body, re.MULTILINE)
+            if list_id_lines and not id_lines:
+                errors.append(
+                    f"상세 섹션 #{sec_num} ({sec_title[:50]}): **ID** 필드가 `- **ID**:` 리스트 형식 — "
+                    f"줄 시작을 `**ID**:`로 수정 (vuln-format.md 참조). "
+                    f"요약 테이블 링크 '—' 깨짐의 원인."
+                )
+                id_lines = list_id_lines  # 값은 복구해 계속 처리 (에러 집계 후 보고)
             if len(id_lines) == 0:
                 _detail_ids.append((sec_num, sec_title, None))
             elif len(id_lines) > 1:
