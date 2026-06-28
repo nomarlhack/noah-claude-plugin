@@ -54,7 +54,8 @@ def trunc(text: str, n: int = 20) -> str:
 # ---------------------------------------------------------------------------
 
 def build_overview(
-    project_root: str, scan_date: str, test_env: str, stack: str, master_list: dict
+    project_root: str, scan_date: str, test_env: str, stack: str, master_list: dict,
+    no_issue_count: int = 0, not_applied_count: int = 0,
 ) -> str:
     target = os.path.basename(project_root.rstrip("/\\"))
     candidates = master_list.get("candidates", [])
@@ -67,13 +68,16 @@ def build_overview(
         f"**대상**: {target}",
         f"**스캔 일시**: {scan_date}",
         "**스캔 방식**: 소스코드 분석 + 동적 테스트",
-        f"**테스트 환경**: {test_env}",
+        # 빈 test_env → '해당 없음' (빈 값이면 lint가 다음 줄을 값으로 오인)
+        f"**테스트 환경**: {test_env.strip() or '해당 없음'}",
         f"**스택**: {stack}",
         "",
-        # 수치 플레이스홀더 — inject_summary_table()이 master-list.json 기반으로 교체
+        # 수치 — inject_summary_table()이 master-list.json 기반으로 최종 교체
         f"**확인됨**: {confirmed}건",
         f"**후보**: {candidate}건",
         f"**안전 (정적·동적 검증 완료)**: {safe}건",
+        f"**이상 없음 스캐너**: {no_issue_count}개",
+        f"**미적용 스캐너**: {not_applied_count}개",
         "",
         "---",
     ]
@@ -389,14 +393,7 @@ def main() -> None:
     if isinstance(auth_boundary, list):
         auth_boundary = {"routes": auth_boundary}
 
-    # Build sections
-    overview = build_overview(
-        args.project_root,
-        args.scan_date,
-        args.test_env,
-        args.stack,
-        master_list,
-    )
+    # Build sections (overview는 이상없음/미적용 수치 계산 후 재생성)
     auth_section = build_auth_boundary(auth_boundary)
     chain_placeholder = "<!-- CHAIN_SECTION_HERE -->"
     scanner_section = build_scanner_placeholders()
@@ -404,6 +401,12 @@ def main() -> None:
     no_issue_section, no_issue_count = build_no_issue_table(args.phase1_dir, master_list)
     not_applied_section, not_applied_count = build_not_applied_table(
         args.phase1_dir, args.select_scanners_output
+    )
+
+    # 이상없음/미적용 수치 확보 후 overview 재생성
+    overview = build_overview(
+        args.project_root, args.scan_date, args.test_env, args.stack, master_list,
+        no_issue_count=no_issue_count, not_applied_count=not_applied_count,
     )
 
     gw_count = len(auth_boundary.get("gateways", []))
