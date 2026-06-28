@@ -67,6 +67,7 @@
     "conflicts": []
   },
   "safe_category": null | "no_external_path" | "defense_verified" | "not_applicable" | "false_positive" | "platform_default_defense" | "architectural_rationale_only",
+  "auth_boundary": "외부망.무인증" | "외부망.인증" | "내부망.무인증" | "내부망.인증",  // [READ-ONLY] phase1_build_master_list.py가 url_path/file_path에서 자동 파생. 어떤 모드도 이 필드를 Write하지 않는다. JSON 재직렬화 시 기존 값을 그대로 유지해야 한다.
   "manual_addition": true   // (선택) 게이트(FN 방지)·외부 증거로 추가돼 소스 MD에 없는 후보. phase1_build_master_list.py --merge가 재빌드 시 통째로 보존한다(미설정 고아는 보존 안 됨).
 }
 ```

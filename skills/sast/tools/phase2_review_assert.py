@@ -229,6 +229,29 @@ def main() -> int:
         print("_contracts.md §4 제약 위반. Phase 2 에이전트가 status를 할당하면 안 됨 (phase2-review 전용).")
         return 1
 
+    # 4-C. auth_boundary 필드 보존 검증 — exit 1 (기계 강제 필드 훼손 차단)
+    #      phase2-review는 auth_boundary writer 권한 없음(_contracts.md §1).
+    #      훼손(빈 문자열·null·enum 외 값)은 보고서 요약 테이블 인증경계 컬럼 공백으로 이어진다.
+    _VALID_AB = {'외부망.무인증', '외부망.인증', '내부망.무인증', '내부망.인증'}
+    ab_corrupted = [
+        c["id"] for c in candidates
+        if c.get("auth_boundary", "") not in _VALID_AB
+    ]
+    if ab_corrupted:
+        print(
+            f"FAIL: {len(ab_corrupted)}개 후보의 auth_boundary 훼손 "
+            f"(유효값: {sorted(_VALID_AB)}): "
+            f"{ab_corrupted[:10]}"
+            f"{' …' if len(ab_corrupted) > 10 else ''}"
+        )
+        print(
+            "원인: phase2-review 에이전트가 master-list.json 재직렬화 시 auth_boundary를 "
+            "빈 값으로 교체했을 가능성이 높습니다. "
+            "phase1_build_master_list.py --merge 재실행으로 복구하거나 "
+            "phase2-review를 재호출하세요."
+        )
+        return 1
+
     # 5. reopen_pending 체크 — exit 4
     #    phase2-review가 §10-A 교차 검증에서 모순 발견 후 reopen=true 세팅한 후보가 있으면
     #    phase1-review 재호출 필요.

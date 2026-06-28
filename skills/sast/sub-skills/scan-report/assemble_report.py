@@ -15,6 +15,31 @@ Usage:
 """
 import argparse, json, os, re, sys
 
+# auth_boundary file_path 기반 재파생 fallback (phase1_build_master_list.py와 동일 규칙).
+# phase2-review 에이전트가 master-list.json 재직렬화 시 auth_boundary를 '' 로 교체해도
+# 보고서 조립 시점에 file_path로 복구한다.
+def _fallback_auth_boundary(file_path: str) -> str:
+    f = file_path or ""
+    if "loco-web-jude-dkos" in f:
+        return "외부망.무인증"
+    if "loco-bo-jude-admin" in f:
+        return "내부망.인증"
+    if "lazenca" in f:
+        for kw in ("GroupAlarm", "GroupAction", "RoomChatbot", "SecureImage",
+                   "GroupChat", "GroupSubscription"):
+            if kw in f:
+                return "내부망.인증"
+        return "내부망.무인증"
+    if "jude-misc-api" in f:
+        return "내부망.인증"
+    if "loco-api-jude" in f or "loco-bo-jude" in f or "loco-bo-common" in f:
+        for kw in ("gift", "Gift", "kids", "Kids", "profile", "Profile",
+                   "moim", "Moim", "Schedule", "Poll"):
+            if kw in f:
+                return "내부망.인증"
+        return "내부망.무인증"
+    return "내부망.무인증"
+
 
 def normalize_vuln_headings(text):
     """**N번 ...**: 제목 형식을 #### N. 제목 헤딩으로 정규화."""
@@ -729,10 +754,14 @@ if __name__ == '__main__':
                     id_to_remark[cid] = tag if tag else '동적 분석 생략'
                 else:
                     id_to_remark[cid] = '—'
-                # auth_boundary 필드가 유효한 값이면 인증경계 맵에 추가
+                # auth_boundary 필드가 유효한 값이면 인증경계 맵에 추가.
+                # 유효하지 않으면 file_path 기반 재파생으로 복구
+                # (phase2-review 에이전트가 JSON 재직렬화 시 훼손했을 때의 방어선).
                 ab = c.get('auth_boundary', '')
                 if ab in _VALID_AB:
                     id_to_auth_boundary[cid] = ab
+                elif c.get('file'):
+                    id_to_auth_boundary[cid] = _fallback_auth_boundary(c.get('file', ''))
             # 인증경계 값이 하나도 없으면 None으로 폴백 (이전 보고서 호환)
             if not id_to_auth_boundary:
                 id_to_auth_boundary = None

@@ -291,6 +291,15 @@ def _build_candidate_dict(cid, scanner, cand, md, existing_by_id, prereq_group=N
             )
         else:
             base.update(preserved)
+            # auth_boundary 보호: preserved에 빈/null값이 들어있으면 base에서 재파생한 값을 복원.
+            # phase2-review 등 다른 에이전트가 JSON 재직렬화 시 auth_boundary를 '' 로 교체하는
+            # 버그(writer 권한 밖 필드 덮어쓰기)를 방어한다.
+            _VALID_AB = {'외부망.무인증', '외부망.인증', '내부망.무인증', '내부망.인증'}
+            if base.get("auth_boundary", "") not in _VALID_AB:
+                recovered = _derive_auth_boundary(
+                    cand.get("url_path", ""), cand.get("file", "")
+                )
+                base["auth_boundary"] = recovered
     return base
 
 
