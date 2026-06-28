@@ -29,87 +29,91 @@ noah-sast에서 호출되며, `<NOAH_SAST_DIR>`은 이미 결정된 상태이다
 
 ## 보고서 생성 프로세스
 
-### Step 1: 스켈레톤 작성 (메인 에이전트)
+### Step 1: 스켈레톤 자동 생성 (`generate_skeleton.py`)
 
-메인 에이전트가 보고서의 뼈대를 작성한다. 이 단계에서는 취약점 상세를 작성하지 않는다. 통합 보고서 구조 예시는 `vuln-format.md`의 "통합 보고서 구조" 섹션 참조.
+> **[변경]** 메인 에이전트가 스켈레톤을 직접 작성하지 않는다. `generate_skeleton.py`가 master-list.json·auth-boundary.json·Phase 1 결과 디렉토리에서 스켈레톤을 100% 기계적으로 생성한다. AI가 구조를 잘못 작성해서 개요 카드·대시보드·인증경계 표가 깨지는 문제를 원천 차단한다.
 
-작성 항목:
-- 보고서 헤더 (개요): `vuln-format.md`의 "통합 보고서 구조" 형식을 따른다. **[필수] `# 제목` 바로 다음에 `## 개요` 헤딩을 작성하고, `**대상**`·`**스캔 일시**`·`**스캔 방식**`·`**테스트 환경**`·`**스택**` 5개 필드를 반드시 `## 개요` 섹션 내부에만 넣는다.** h1 제목 직후 평문으로 메타 필드를 쓰고 나중에 `## 개요`를 따로 두는 구조(분리 작성)는 `md_to_html.py` 개요 카드 렌더링 실패를 유발한다. `assemble_report.py`가 skeleton 검증 단계에서 이 구조를 감지하고 차단한다. 헤더 영역 안에 `###` 소제목을 두지 않는다. (`###`는 `md_to_html.py`에서 스캐너 헤딩 스타일이 적용될 수 있으므로 헤더 영역에서 사용 금지.)
-- 총괄 요약 테이블
-- 인증 경계 표 + mermaid 흐름도 (`vuln-format.md`의 `## 인증 경계` 형식. `AUTH_BOUNDARY` 기반으로 메인 에이전트가 직접 렌더. 게이트웨이 표·클라이언트 표·경로 표 세 표를 모두 포함하되 빈 표는 생략. **흐름도 게이팅 (v11):** `len(routes) >= 2` OR `len(clients) >= 2` OR `len(gateways) >= 2`인 경우에만 작성 — 단일 표면이라도 다중 클라이언트면 흐름도 필수, 그 외엔 빈 흐름도 금지. 흐름도는 실선=`도달성=확정`·점선=`동적 확인 필요`/실패 모드. `vuln-format.md`의 monolith/single-gateway/multi-gateway/routing-gateway 4종 예시 참조. **[필수] 게이트웨이 뒤 ≠ 인증됨**: 게이트웨이는 라우팅/엣지일 뿐 인증하지 않으므로, 게이트웨이 노드 라벨에 라우팅 역할을 명시하고, 인증은 백엔드 표면에서 경로별로 강제됨을 표현한다 — 표면을 `인증 필요`/`permitAll`로 구분(`classDef` 색 분리)하고, `identity_source="없음(익명)"` 또는 `client_ids=[]`인 익명/permitAll 경로(`/open/**`·`/actuator/**` 등)는 익명 클라이언트 노드에서 점선으로 연결해 누락하지 않는다. **[필수] mermaid 노드·서브그래프 라벨은 슬래시(`/`), 콜론(`:`), 괄호(`()`), 파이프(`|`), `<br/>` 등 특수문자가 포함되면 반드시 큰따옴표로 감싼다** (예: `S1["/api 표면"]`) — `[/text]`는 mermaid 11.x에서 평행사변형 도형 문법(`[/text/]`)으로 오인되어 syntax error 발생. `validate_report.py`가 위반 시 경고 출력. 안전 기본값: **모든 라벨을 따옴표로 감싸는 것을 기본 정책**으로 한다.)
-- 취약점 요약 테이블 (전체 항목의 제목/유형/스캐너/상태만)
-- 이상 없음 스캐너 점검 항목 요약 테이블
-- 미적용 스캐너 목록
-- 부가 발견
+메인 에이전트가 다음 명령을 실행한다:
 
-**[필수] 총괄 요약 테이블의 건수에는 단위 접미사를 반드시 포함한다.** `md_to_html.py`가 이 접미사로 대시보드 수치를 파싱한다. 접미사가 누락되면 대시보드가 전부 0으로 표시된다.
-- 확인됨/후보: `N건` (예: `0건`, `8건`)
-- 이상 없음 스캐너/미적용 스캐너: `N개` (예: `16개`, `17개`)
+```bash
+python3 <NOAH_SAST_DIR>/sub-skills/scan-report/generate_skeleton.py \
+  --master-list <PHASE1_RESULTS_DIR>/master-list.json \
+  --auth-boundary <PHASE1_RESULTS_DIR>/auth-boundary.json \
+  --phase1-dir <PHASE1_RESULTS_DIR> \
+  --project-root <PROJECT_ROOT> \
+  --scan-date <SCAN_DATE> \
+  --stack "<STACK>" \
+  --test-env "<SANDBOX_DOMAINS_쉼표구분>" \
+  --output /tmp/skeleton.md
+```
 
-**[필수] 스켈레톤에 아래 플레이스홀더를 반드시 포함한다. `## 미적용 스캐너 목록`은 모든 플레이스홀더 뒤에 위치해야 한다.**
-- `<!-- CHAIN_SECTION_HERE -->` — 연계 시나리오 섹션 (assemble_report.py가 chain_analysis 데이터에서 자동 생성)
-- `<!-- SCANNER_SECTIONS_HERE -->` — 스캐너별 실행 결과 섹션
-- `## AI 자율 탐색 결과` 헤딩 + `<!-- AI_DISCOVERY_SECTION_HERE -->` — AI 자율 탐색 결과 섹션 (`## 스캐너별 실행 결과` 뒤, `## 미적용 스캐너 목록` 앞에 위치). 헤딩과 플레이스홀더를 함께 포함해야 `assemble_report.py`가 후보 0건 시 정리 가능
-- `<!-- SAFE_SECTION_HERE -->` — 안전 판정 4분류 섹션 (`이상 없음 스캐너 점검 항목 요약` 앞, `## AI 자율 탐색 결과` 뒤에 위치). `assemble_report.py`가 master-list.json의 `status=safe` 후보를 4분류(외부 접근 경로 없음 / 방어 계층 작동 확인 / 취약점 성립 조건 미충족 / 정적 분석 오탐)로 자동 생성한다. **스켈레톤에는 `## 안전 판정 항목` 헤딩이나 소분류를 직접 작성하지 않는다.** 자동 생성 결과를 그대로 삽입한다. 상세 규약은 `vuln-format.md`의 "safe 판정 4분류" 섹션 참조.
+**생성 내용** (AI 개입 없음):
+- `## 개요` 헤딩 + 5개 메타 필드 (올바른 위치 보장)
+- 인증 경계 게이트웨이·클라이언트·경로 표 (auth-boundary.json 직접 파싱)
+- mermaid 흐름도 (routes/clients/gateways >= 2 시 자동 생성, 특수문자 이스케이프 보장)
+- 4개 플레이스홀더 (`<!-- CHAIN_SECTION_HERE -->` 등)
+- 이상 없음 스캐너 표 (Phase 1 결과에서 자동 집계)
+- 미적용 스캐너 표 (scanners/ 디렉토리 - expected 스캐너 차집합)
+- 총괄 수치는 assemble_report.py의 inject_summary_table()이 이후 단계에서 채움
 
-**[필수] 스켈레톤에 `## 연계 시나리오`를 직접 작성하지 않는다.** 연계 시나리오 섹션은 연계 분석 JSON 파일을 `assemble_report.py`의 `--chain` 인자로 전달하면 스크립트가 고정된 형식으로 자동 렌더링한다. 메타 설명, 단독 위험도 등 불필요한 내용이 구조적으로 끼어들 수 없다.
+**`--stack` 인수**: Step 3에서 파악한 프로젝트 스택. 예:
+```
+"언어 :: Kotlin 2.1.21, Java 17 ;; 웹 :: Spring MVC, Spring Boot 3.2.5 ;; 스토리지 :: MongoDB, Redis"
+```
 
-**참고: 취약점 요약 테이블은 `assemble_report.py`가 상세 섹션에서 자동 생성한다 (단일 진실 원천).** 스켈레톤에 작성한 요약 테이블은 형식만 유지하면 되고, 최종 보고서에서는 상세 섹션의 `#### N. 제목`, `**유형**:`, `**상태**:` 필드와 `### Scanner` 헤딩에서 파싱한 데이터로 자동 대체된다. 스켈레톤에 `## 취약점 요약 테이블` 헤딩이 없어도 `assemble_report.py`가 `## 스캐너별 실행 결과` 직전에 자동 삽입하므로, 헤딩 누락이 보고서 누락으로 이어지지 않는다. 단, 스켈레톤 명시 작성을 권장한다 — 헤딩이 있으면 위치를 정확히 제어할 수 있다.
+**`--test-env` 인수**: Step 8-1에서 확인된 sandbox 도메인 목록(쉼표 구분). `SANDBOX_DOMAINS`에서 추출. 없으면 빈 문자열.
 
-### Step 2: 스캐너별 상세 섹션 분할 작성 (서브에이전트)
+생성 완료 후 `/tmp/skeleton.md` 내용을 간단히 확인(`head -20`)하여 이상 없으면 Step 2로 진행한다.
 
-발견이 있는(확인됨 또는 후보) 스캐너별로 서브에이전트를 병렬 실행하여, 해당 스캐너의 MD 상세 섹션을 작성한다.
+**[필수] `## 연계 시나리오`를 스켈레톤에 직접 추가하지 않는다.** assemble_report.py의 `--chain` 인자로 자동 렌더링된다.
+
+### Step 2: 스캐너별 상세 섹션 — JSON 제출 + 스크립트 렌더 (서브에이전트)
+
+> **[변경]** 서브에이전트가 자유 형식 MD 텍스트를 반환하지 않는다. **구조화된 JSON을 Write 도구로 임시 파일에 저장**하고, `render_vuln_section.py`가 확정된 MD로 렌더링한다. AI가 헤딩 레벨, 필드 순서, 형식을 잘못 작성하는 문제를 원천 차단한다.
 
 **서브에이전트 프롬프트에 반드시 포함할 내용:**
 
-1. 해당 스캐너의 취약점 데이터 전체 (파일 경로, 코드 스니펫, Source→Sink, 동적 테스트 증거). **Phase 1 결과는 `<PHASE1_RESULTS_DIR>/evaluation/<scanner-name>-eval.md`(phase1-review 평가본)을 전달**하고 서브에이전트가 Read하도록 지시한다. eval MD의 Override 여부(CONFIRM/OVERRIDE/DISCARD), 수정 권고, phase1_quality_notes가 보고서에 반영되도록 한다. **Phase 1 원본(`<PHASE1_RESULTS_DIR>/<scanner-name>.md`) 직접 참조 금지** (`sub-skills/scan-report-review/_contracts.md §6` C1 lint). eval MD가 부재하면 원본 MD를 fallback으로 사용.
-   - **[필수] 동적 테스트 증거(POC 리터럴)는 `<PHASE1_RESULTS_DIR>/<scanner-name>-phase2.md` 경로를 함께 전달**하고 서브에이전트가 Read하도록 지시한다. 이 파일의 `evidence.commands[]`(실제 실행한 curl)·`evidence.responses[]`(실제 응답)가 POC의 단일 진실 원천이다. **동적 실행된 항목(evidence.commands 존재)의 "재현 방법 및 POC"는 이 리터럴을 그대로 인용(verbatim)**하며, 세션 쿠키·URL·파라미터·페이로드·응답을 플레이스홀더로 치환하거나 재작성하지 않는다. phase2.md가 부재한 항목(정적 후보)만 소스코드 기반 구체 curl로 기재한다.
-   - **[필수] 이 스캐너 후보들의 `AUTH_BOUNDARY` 슬라이스를 프롬프트에 함께 전달 (v11 슬라이싱):**
-     1. 메인 에이전트가 이 스캐너의 후보 진입 경계 필드를 모아 surface_key 집합(`{"POST /papi/...", ...}`)을 만든다.
-     2. `auth-boundary.json`을 Read하여 (a) 해당 surface_key와 M5 매칭(METHOD 정확 + `{...}`·`**`→`*` 정규화 + trailing `/` 제거)되는 `routes[]` 행만, (b) 그 행이 참조하는 `gateway_id`와 `client_ids[]`에 해당하는 `gateways[]`·`clients[]` 행만 슬라이스한다.
-     3. 슬라이스된 부분(가벼운 JSON)을 서브에이전트 프롬프트에 동봉한다. **전체 `auth-boundary.json` 동봉 금지 — 후보×스캐너 곱으로 토큰 폭증.**
-     4. 서브에이전트는 각 후보 본문에 슬라이스의 `gateway_id`·`client_ids`·`failure_modes`·`credential_chain`을 자연어로 인라인 (예: "이 진입은 `oahu-gateway` Bearer 인증을 거쳐 도달. `credential_mismatch` 실패 모드가 있어 잘못된 자격증명 시 500"). 단순 ID 나열 금지 — 의미를 풀어 설명.
-     5. POC curl 호스트: 매칭된 게이트웨이의 `host_pattern`이 단일 호스트로 확정되고 `도달성=확정`이면 그 호스트를 인라인. 그 외(`동적 확인 필요`·와일드카드·미상)는 `<TARGET_HOST>` 플레이스홀더.
-2. 다음 한 줄 지시: **"`<NOAH_SAST_DIR>/sub-skills/scan-report/vuln-format.md`를 Read 도구로 읽고, 그 안의 '확인됨 형식' / '후보 형식' / '이상 없음 형식' 템플릿을 그대로 따라 MD 텍스트를 작성하라."** 메인 에이전트는 템플릿 본문을 인라인으로 복사하지 않는다.
-3. 다음 필수 준수 사항:
+1. `<NOAH_SAST_DIR>/sub-skills/scan-report/vuln_section_prompt_template.md`를 Read 도구로 읽고 그 안의 JSON 반환 지침을 따른다. (MD 텍스트 반환 금지 — JSON만 반환)
+2. 해당 스캐너의 취약점 데이터:
+   - Phase 1 결과: `<PHASE1_RESULTS_DIR>/evaluation/<scanner-name>-eval.md` (phase1-review 평가본, 부재 시 원본 MD fallback)
+   - Phase 2 증거: `<PHASE1_RESULTS_DIR>/<scanner-name>-phase2.md` — `evidence.commands[]`(실행한 curl)·`evidence.responses[]`(실제 응답)를 JSON의 `poc.steps` content에 verbatim 인용
+   - AUTH_BOUNDARY 슬라이스: 이 스캐너 후보들의 surface_key에 매칭되는 routes/gateways/clients 행만 동봉 (전체 auth-boundary.json 금지)
+3. JSON 필드 작성 규칙 (vuln_section_prompt_template.md 참조):
+   - `status`: "확인됨" 또는 "후보"만 사용. 심각도(HIGH/MEDIUM/LOW) 금지.
+   - `entry_boundary`: AUTH_BOUNDARY 슬라이스에서 자연어로 기술. `도달성=확정`이면 실제 호스트, 아니면 `<TARGET_HOST>` 플레이스홀더.
+   - `poc.steps`: 최소 3단계. Step 2 content에 curl 코드블록 필수. 동적 실행된 경우 phase2.md evidence.commands[] verbatim 인용.
 
-> **필수 준수 사항:**
-> - 보고서 파일(.md, .html)을 직접 생성하지 않는다. MD 텍스트를 반환만 한다.
-> - 확인됨과 후보 모두 동일한 상세도로 작성한다. 어떤 섹션도 축약하거나 생략할 수 없다.
-> - 모든 취약점에 "재현 방법 및 POC" 섹션을 포함한다. Step 1~3 구조 + curl 명령어 필수.
-> - 각 상세 섹션 `#### N. 제목` 헤딩 **바로 다음 줄**에 `**ID**: <master-list.candidates[].id>`를 포함한다. 프롬프트로 전달된 master-list id를 그대로 사용하며, 한 섹션에 `**ID**:` 라인은 정확히 1회만 존재한다.
-> - **동적 테스트를 실행한 항목(상태 무관, phase2.md `evidence.commands` 존재)**: 플레이스홀더 사용 금지. phase2.md의 실제 실행값(세션 쿠키, URL, 파라미터, 페이로드, 응답)을 **그대로(verbatim) 인용**한다. 무인증이라 쿠키가 불필요했던 후보도 실제 실행한 curl·응답을 그대로 기재한다(상태가 "후보"여도 동적 실행값이면 실값 필수).
-> - **정적 후보(동적 미실행, phase2.md 부재)**: 소스코드에서 파악한 엔드포인트, HTTP 메서드, 파라미터명, 페이로드를 구체적 curl 명령어로 기재한다. 플레이스홀더는 **환경상 직접 획득 불가한 값**(피해자 OTP, 외부 콜백 URL 등)에 한해 허용한다. 세션 쿠키는 sandbox에서 획득 가능하므로 동적 실행 항목에선 플레이스홀더 대상이 아니다.
-> - **POC curl 명령어의 호스트**: 프롬프트로 전달된 `SANDBOX_DOMAINS` 값 중 하나 또는 `<TARGET_HOST>` 플레이스홀더만 사용한다. 그 외 임의 호스트(예: `https://api.example.com` 같은 실제 프로덕션 도메인 직접 기술)는 금지한다. `SANDBOX_DOMAINS`가 빈 값인 경우에는 모든 POC 호스트를 `<TARGET_HOST>`로 통일한다. 이 호스트 값은 보고서 개요의 `**테스트 환경**` 필드와 일치해야 하며 `validate_report.py`의 URL 일관성 검증 기준이 된다. **각 후보의 호스트는 `AUTH_BOUNDARY`에서 그 후보 표면의 진입 도메인으로 채우되(표면이 1개여도 동일하게 적용), 그 표면의 `도달성=확정`인 경우에만 실제 도메인을 인라인하고 `동적 확인 필요`·진입 도메인 `미상`이면 `<TARGET_HOST>` 플레이스홀더를 쓴다. `도달성=확정`인 진입 도메인은 모두 개요 `**테스트 환경**` 필드에 포함해 `validate_report.py` 호스트 검증과 정합시킨다(추정 도메인을 정답처럼 박지 않는다).**
-> - 심각도(HIGH/MEDIUM/LOW)를 표시하지 않는다. 상태는 "확인됨" 또는 "후보"만 사용한다.
-> - 반환하는 MD 텍스트의 첫 줄은 `### [스캐너명] Scanner`로 시작한다.
+**서브에이전트 작업 흐름:**
 
-> **참고:** 관련 스캐너를 묶어서 하나의 서브에이전트에 할당할 수 있으나, 하나의 서브에이전트가 담당하는 취약점은 **최대 10건**으로 제한한다. 10건을 초과하면 분할한다.
+```
+1. vuln_section_prompt_template.md Read
+2. eval MD + phase2.md Read
+3. JSON 구성 (구조화된 취약점 데이터)
+4. Write 도구로 /tmp/sr_<scanner>.json 저장 (MD 아닌 JSON)
+5. 저장 완료 경로 반환
+```
+
+**메인 에이전트가 각 JSON을 수신 후 실행:**
+
+```bash
+python3 <NOAH_SAST_DIR>/sub-skills/scan-report/render_vuln_section.py \
+  /tmp/sr_xss.json /tmp/sr_ssrf.json \
+  --output /tmp/sr_rendered.md
+```
+
+여러 스캐너를 한 번에 렌더링하면 자동으로 합쳐진다. `--validate-only`로 schema 검증만 먼저 수행 가능.
+
+**관련 스캐너 묶음 분할**: 하나의 서브에이전트가 담당하는 취약점은 **최대 10건**. 초과 시 분할.
 
 **AI 자율 탐색 결과 섹션:**
 
-AI 자율 탐색에서 후보가 발견된 경우, 별도 서브에이전트로 AI 자율 탐색 상세 섹션을 작성한다. 서브에이전트 프롬프트에 다음을 포함한다:
+scanner를 `"ai-discovery"`로 설정한 동일한 JSON 형식을 사용한다. `vuln_section_prompt_template.md`의 지침을 그대로 따르되, 모든 status는 "후보"만 사용.
 
-1. `<PHASE1_RESULTS_DIR>/evaluation/ai-discovery-eval.md`(phase1-review이 생성한 AI 자율 탐색 평가본)를 우선 전달. 부재 시 `<PHASE1_RESULTS_DIR>/ai-discovery.md` 원본을 fallback으로 사용 (서브에이전트가 Read하도록 지시). **ai-discovery-eval.md는 §12-H C1 lint의 화이트리스트이므로 예외 처리된다.**
-2. 다음 한 줄 지시: **"`<NOAH_SAST_DIR>/sub-skills/scan-report/vuln-format.md`를 Read 도구로 읽고, 그 안의 '후보 형식' 템플릿을 그대로 따라 MD 텍스트를 작성하라."**
-3. 스캐너 서브에이전트와 동일한 필수 준수 사항:
+결과를 `/tmp/sr_ai.json`으로 저장하고 `render_vuln_section.py --output /tmp/ai_section.md`로 렌더링 후, `assemble_report.py`의 `--ai` 인자로 전달.
 
-> **필수 준수 사항:**
-> - 보고서 파일(.md, .html)을 직접 생성하지 않는다. MD 텍스트를 반환만 한다.
-> - 모든 취약점에 "재현 방법 및 POC" 섹션을 포함한다. Step 1~3 구조 + curl 명령어 필수.
-> - 각 상세 섹션 `#### N. 제목` 헤딩 **바로 다음 줄**에 `**ID**: <master-list.candidates[].id>`를 포함한다(예: `AI-1`). 한 섹션에 `**ID**:` 라인은 정확히 1회만 존재한다.
-> - "후보" 항목: 소스코드에서 파악한 엔드포인트, HTTP 메서드, 파라미터명, 페이로드를 구체적 curl 명령어로 기재한다. 직접 획득 불가한 값(세션 쿠키 등)만 플레이스홀더 허용.
-> - **POC curl 명령어의 호스트**: 프롬프트로 전달된 `SANDBOX_DOMAINS` 값 중 하나 또는 `<TARGET_HOST>` 플레이스홀더만 사용한다. 그 외 임의 호스트 사용 금지.
-> - 심각도(HIGH/MEDIUM/LOW)를 표시하지 않는다. 상태는 "후보"만 사용한다.
-> - 반환하는 MD 텍스트의 첫 줄은 `### AI 자율 탐색`으로 시작한다. 각 취약점 헤딩은 `#### N. 제목` 형식을 사용한다.
+**서브에이전트 실패 시 fallback:**
 
-이 결과를 임시 파일(예: `/tmp/ai_section.md`)로 저장하고, `assemble_report.py`의 `--ai` 인자로 전달하여 `<!-- AI_DISCOVERY_SECTION_HERE -->` 위치에 삽입한다.
-
-**서브에이전트 에러 핸들링:**
-
-서브에이전트가 실패(API 에러, 타임아웃 등)한 경우:
-1. 메인 에이전트가 해당 섹션을 직접 작성한다. (재시도/분할 없이 즉시 fallback)
-2. 어떤 경우에도 서브에이전트 실패로 인해 취약점 항목이 보고서에서 누락되어서는 안 된다.
+JSON 제출이 실패하면 MD 텍스트를 직접 Write 도구로 저장 (기존 방식). render_vuln_section.py 호출 없이 MD 파일을 그대로 `--sections` 인자로 사용.
 
 ### Step 3: MD 보고서 조립
 
@@ -117,10 +121,10 @@ AI 자율 탐색에서 후보가 발견된 경우, 별도 서브에이전트로 
 
 **조립 절차:**
 
-1. Step 1에서 작성한 스켈레톤을 Write 도구로 임시 파일에 저장한다 (예: `/tmp/skeleton.md`).
-2. Step 2에서 각 서브에이전트의 반환 텍스트를 Write 도구로 개별 임시 파일에 저장한다 (예: `/tmp/sr_001_xss.md`, `/tmp/sr_002_ssrf.md`).
+1. Step 1에서 `generate_skeleton.py`가 생성한 `/tmp/skeleton.md`를 사용한다 (별도 Write 불필요).
+2. Step 2에서 `render_vuln_section.py`가 렌더링한 MD 파일들 (예: `/tmp/sr_rendered.md`)을 사용한다.
 3. 연계 분석을 수행한 경우, `chain_analysis` 데이터를 JSON 파일로 저장한다 (예: `/tmp/chain.json`).
-4. AI 자율 탐색 결과가 있으면 Write 도구로 임시 파일에 저장한다 (예: `/tmp/ai_section.md`).
+4. AI 자율 탐색 결과 MD (`/tmp/ai_section.md`, render_vuln_section.py 출력).
 5. `assemble_report.py`를 파일 경로 인자로 실행한다:
 
 ```bash
