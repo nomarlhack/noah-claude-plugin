@@ -53,8 +53,14 @@ def trunc(text: str, n: int = 20) -> str:
 # Section builders
 # ---------------------------------------------------------------------------
 
-def build_overview(project_root: str, scan_date: str, test_env: str, stack: str) -> str:
+def build_overview(
+    project_root: str, scan_date: str, test_env: str, stack: str, master_list: dict
+) -> str:
     target = os.path.basename(project_root.rstrip("/\\"))
+    candidates = master_list.get("candidates", [])
+    confirmed = sum(1 for c in candidates if c.get("status") == "confirmed")
+    candidate = sum(1 for c in candidates if c.get("status") == "candidate")
+    safe = sum(1 for c in candidates if c.get("status") == "safe")
     lines = [
         "## 개요",
         "",
@@ -63,6 +69,11 @@ def build_overview(project_root: str, scan_date: str, test_env: str, stack: str)
         "**스캔 방식**: 소스코드 분석 + 동적 테스트",
         f"**테스트 환경**: {test_env}",
         f"**스택**: {stack}",
+        "",
+        # 수치 플레이스홀더 — inject_summary_table()이 master-list.json 기반으로 교체
+        f"**확인됨**: {confirmed}건",
+        f"**후보**: {candidate}건",
+        f"**안전 (정적·동적 검증 완료)**: {safe}건",
         "",
         "---",
     ]
@@ -384,6 +395,7 @@ def main() -> None:
         args.scan_date,
         args.test_env,
         args.stack,
+        master_list,
     )
     auth_section = build_auth_boundary(auth_boundary)
     chain_placeholder = "<!-- CHAIN_SECTION_HERE -->"
