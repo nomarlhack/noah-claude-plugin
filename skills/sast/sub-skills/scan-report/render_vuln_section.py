@@ -30,13 +30,45 @@ def load_schema() -> dict:
         return json.load(f)
 
 
+_VALID_STATUS = {"확인됨", "후보"}
+
+
+def _basic_validate(data: dict, filepath: str) -> list[str]:
+    """jsonschema 없을 때 실행할 기본 구조 검증. 위반 메시지 목록 반환."""
+    errors = []
+    if not isinstance(data.get("scanner"), str):
+        errors.append(f"[scanner] 필드가 없거나 문자열이 아님")
+    vulns = data.get("vulnerabilities", [])
+    if not isinstance(vulns, list):
+        errors.append(f"[vulnerabilities] 배열이 아님")
+        return errors
+    for i, v in enumerate(vulns):
+        prefix = f"[vulnerabilities[{i}]]"
+        for req in ("id", "title", "type", "status", "location",
+                    "entry_boundary", "source", "sink", "cause", "remediation"):
+            if not v.get(req):
+                errors.append(f"{prefix}.{req} 필수 필드 누락 또는 빈 값")
+        status = v.get("status", "")
+        if status not in _VALID_STATUS:
+            errors.append(
+                f"{prefix}.status='{status}' 허용되지 않음 "
+                f"(허용: {sorted(_VALID_STATUS)}). 심각도(HIGH/MEDIUM/LOW) 사용 금지."
+            )
+        poc = v.get("poc")
+        if not poc or not isinstance(poc.get("steps"), list) or len(poc["steps"]) == 0:
+            errors.append(f"{prefix}.poc.steps 비어있거나 없음 (최소 1단계 필요)")
+    return errors
+
+
 def validate_data(data: dict, filepath: str) -> bool:
     """Return True if valid (or validation skipped). Print and return False on error."""
     if not _JSONSCHEMA_AVAILABLE:
-        print(
-            f"WARNING: jsonschema not installed — skipping schema validation for {filepath}",
-            file=sys.stderr,
-        )
+        # jsonschema 없으면 기본 검증으로 대체 (enum 위반 등 주요 항목 포함)
+        basic_errors = _basic_validate(data, filepath)
+        if basic_errors:
+            for msg in basic_errors:
+                print(f"SCHEMA_ERROR: {filepath}: {msg}", file=sys.stderr)
+            return False
         return True
 
     schema = load_schema()
@@ -73,40 +105,56 @@ def scanner_display_name(scanner: str) -> str:
 # ---------------------------------------------------------------------------
 
 def render_poc_steps(steps: list) -> str:
+    if not steps:
+        return "_POC 정보 없음_"
     lines = []
     for step in steps:
-        lines.append(f"##### {step['title']}")
+        lines.append(f"##### {step.get('title', 'Step')}")
         lines.append("")
-        lines.append(step["content"])
+        lines.append(step.get("content", ""))
         lines.append("")
     return "\n".join(lines).rstrip()
+
+
+def _get(v: dict, key: str, default: str = "") -> str:
+    """dict에서 값을 꺼내되, 없거나 None이면 default 반환."""
+    val = v.get(key)
+    return str(val) if val is not None else default
+
+
+def _get_poc_steps(v: dict) -> list:
+    """poc.steps 안전 추출."""
+    poc = v.get("poc")
+    if not poc:
+        return []
+    return poc.get("steps", [])
 
 
 def render_vuln_confirmed(n: int, v: dict) -> str:
     """Render a single '확인됨' vulnerability block."""
     blocks = []
 
-    blocks.append(f"#### {n}. {v['title']}")
+    blocks.append(f"#### {n}. {_get(v, 'title', '(제목 없음)')}")
     blocks.append("")
-    blocks.append(f"**ID**: {v['id']}")
-    blocks.append(f"**유형**: {v['type']}")
+    blocks.append(f"**ID**: {_get(v, 'id')}")
+    blocks.append(f"**유형**: {_get(v, 'type')}")
     blocks.append(f"**상태**: 확인됨")
-    blocks.append(f"**위치**: `{v['location']}`")
-    blocks.append(f"**진입 경계**: {v['entry_boundary']}")
-    blocks.append(f"**Source**: {v['source']}")
-    blocks.append(f"**Sink**: {v['sink']}")
+    blocks.append(f"**위치**: `{_get(v, 'location')}`")
+    blocks.append(f"**진입 경계**: {_get(v, 'entry_boundary')}")
+    blocks.append(f"**Source**: {_get(v, 'source')}")
+    blocks.append(f"**Sink**: {_get(v, 'sink')}")
     blocks.append("")
     blocks.append("#### 원인 분석")
     blocks.append("")
-    blocks.append(v["cause"])
+    blocks.append(_get(v, "cause", "_원인 분석 없음_"))
     blocks.append("")
     blocks.append("#### 재현 방법 및 POC")
     blocks.append("")
-    blocks.append(render_poc_steps(v["poc"]["steps"]))
+    blocks.append(render_poc_steps(_get_poc_steps(v)))
     blocks.append("")
     blocks.append("#### 권장 조치")
     blocks.append("")
-    blocks.append(v["remediation"])
+    blocks.append(_get(v, "remediation", "_권장 조치 없음_"))
 
     return "\n".join(blocks)
 
@@ -115,28 +163,28 @@ def render_vuln_candidate(n: int, v: dict) -> str:
     """Render a single '후보' vulnerability block."""
     blocks = []
 
-    blocks.append(f"#### {n}. {v['title']}")
+    blocks.append(f"#### {n}. {_get(v, 'title', '(제목 없음)')}")
     blocks.append("")
-    blocks.append(f"**ID**: {v['id']}")
-    blocks.append(f"**유형**: {v['type']}")
+    blocks.append(f"**ID**: {_get(v, 'id')}")
+    blocks.append(f"**유형**: {_get(v, 'type')}")
     blocks.append(f"**상태**: 후보 (추가 검증 필요)")
-    blocks.append(f"**위치**: `{v['location']}`")
-    blocks.append(f"**진입 경계**: {v['entry_boundary']}")
-    unconfirmed = v.get("unconfirmed_reason", "")
+    blocks.append(f"**위치**: `{_get(v, 'location')}`")
+    blocks.append(f"**진입 경계**: {_get(v, 'entry_boundary')}")
+    unconfirmed = _get(v, "unconfirmed_reason")
     if unconfirmed:
         blocks.append(f"**미확인 사유**: {unconfirmed}")
     blocks.append("")
     blocks.append("#### 소스코드 분석")
     blocks.append("")
-    blocks.append(v["cause"])
+    blocks.append(_get(v, "cause", "_소스코드 분석 없음_"))
     blocks.append("")
     blocks.append("#### 재현 방법 및 POC")
     blocks.append("")
-    blocks.append(render_poc_steps(v["poc"]["steps"]))
+    blocks.append(render_poc_steps(_get_poc_steps(v)))
     blocks.append("")
     blocks.append("#### 권장 조치")
     blocks.append("")
-    blocks.append(v["remediation"])
+    blocks.append(_get(v, "remediation", "_권장 조치 없음_"))
 
     return "\n".join(blocks)
 

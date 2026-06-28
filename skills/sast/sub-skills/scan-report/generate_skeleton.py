@@ -355,12 +355,26 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Load data
-    master_list = load_json(args.master_list)
+    # Load data — 파일 없음 시 친화적 오류 출력
+    try:
+        master_list = load_json(args.master_list)
+    except FileNotFoundError:
+        print(f"ERROR: master-list.json 파일 없음: {args.master_list}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: master-list.json 파싱 실패: {e}", file=sys.stderr)
+        sys.exit(1)
     if isinstance(master_list, list):
         master_list = {"candidates": master_list}
 
-    auth_boundary = load_json(args.auth_boundary)
+    try:
+        auth_boundary = load_json(args.auth_boundary)
+    except FileNotFoundError:
+        print(f"ERROR: auth-boundary.json 파일 없음: {args.auth_boundary}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: auth-boundary.json 파싱 실패: {e}", file=sys.stderr)
+        sys.exit(1)
     if isinstance(auth_boundary, list):
         auth_boundary = {"routes": auth_boundary}
 
