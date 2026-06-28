@@ -280,49 +280,67 @@ def build_not_applied_table(
             if d.is_dir() and d.name.endswith("-scanner"):
                 all_scanners.add(d.name)
 
-    # Expected scanners from phase1_dir
-    expected_scanners: set[str] = set()
-    expected_path = Path(phase1_dir) / "_expected_scanners.json"
-    if expected_path.exists():
-        try:
-            data = load_json(str(expected_path))
-            if isinstance(data, list):
-                expected_scanners = set(data)
-            elif isinstance(data, dict):
-                expected_scanners = set(data.get("scanners", data.get("expected", [])))
-        except Exception:
-            pass
+    # 실제 실행된 스캐너 = phase1_dir에 결과 MD 파일이 존재하는 것
+    # _expected_scanners.json은 select_scanners.py 기준 33개만 있고 AI 검토 복원 스캐너는 포함 안 됨
+    # 따라서 실제 MD 파일 존재 여부로 판별해야 정확함
+    executed_scanners: set[str] = set()
+    phase1_path = Path(phase1_dir)
+    if phase1_path.exists():
+        for md_file in phase1_path.glob("*-scanner.md"):
+            executed_scanners.add(md_file.stem)
+    # 결과 파일이 없으면 _expected_scanners.json fallback
+    if not executed_scanners:
+        expected_path = phase1_path / "_expected_scanners.json"
+        if expected_path.exists():
+            try:
+                data = load_json(str(expected_path))
+                if isinstance(data, list):
+                    executed_scanners = set(data)
+                elif isinstance(data, dict):
+                    executed_scanners = set(data.get("scanners", data.get("expected", [])))
+            except Exception:
+                pass
 
-    not_applied = sorted(all_scanners - expected_scanners)
+    not_applied = sorted(all_scanners - executed_scanners)
 
     # Reasons from select_scanners_output
+    # select_scanners.py 텍스트 출력 형식: | scanner | 0 | ❌ 제외 | 사유 |
+    # JSON 형식도 지원
     reasons: dict[str, str] = {}
     if select_scanners_output and os.path.exists(select_scanners_output):
         try:
-            data = load_json(select_scanners_output)
-            # Support both list and dict formats
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict):
-                        name = item.get("scanner", item.get("name", ""))
-                        reason = item.get("reason", item.get("사유", "해당 없음"))
-                        if name:
-                            reasons[name] = reason
-            elif isinstance(data, dict):
-                # May be {scanner: reason} or {excluded: [{scanner, reason}]}
-                excluded = data.get("excluded", data.get("not_applied", []))
-                if isinstance(excluded, list):
-                    for item in excluded:
+            raw = open(select_scanners_output, encoding="utf-8").read()
+            # 텍스트 파이프 테이블 형식 파싱 (select_scanners.py 기본 출력)
+            for line in raw.splitlines():
+                m = re.match(
+                    r'\|\s*([A-Za-z0-9_-]+)\s*\|\s*\d+\s*\|\s*❌\s*제외\s*\|\s*(.+?)\s*\|',
+                    line
+                )
+                if m:
+                    reasons[m.group(1)] = m.group(2).strip()
+            # 텍스트 파싱 실패 시 JSON 시도
+            if not reasons:
+                data = json.loads(raw)
+                if isinstance(data, list):
+                    for item in data:
                         if isinstance(item, dict):
                             name = item.get("scanner", item.get("name", ""))
                             reason = item.get("reason", item.get("사유", "해당 없음"))
                             if name:
                                 reasons[name] = reason
-                else:
-                    # flat dict mapping scanner → reason
-                    for k, v in data.items():
-                        if isinstance(v, str):
-                            reasons[k] = v
+                elif isinstance(data, dict):
+                    excluded = data.get("excluded", data.get("not_applied", []))
+                    if isinstance(excluded, list):
+                        for item in excluded:
+                            if isinstance(item, dict):
+                                name = item.get("scanner", item.get("name", ""))
+                                reason = item.get("reason", item.get("사유", "해당 없음"))
+                                if name:
+                                    reasons[name] = reason
+                    else:
+                        for k, v in data.items():
+                            if isinstance(v, str):
+                                reasons[k] = v
         except Exception:
             pass
 

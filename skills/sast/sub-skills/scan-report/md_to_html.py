@@ -854,8 +854,12 @@ def _build_overview_banner(m):
     parts = []
     for k, v in rows:
         k, v = k.strip(), v.strip()
-        # 스캔 일시는 상단 마스트헤드에 표기되므로, 스캔 방식은 표기 정책상 개요에서 제외 (MD에는 유지)
-        if k in ('스캔 일시', '스캔 방식'):
+        # 대시보드 카드로 별도 표시되는 수치 필드는 개요 카드에서 제외 (MD에는 유지)
+        # 스캔 일시는 마스트헤드에, 스캔 방식은 표기 정책상 제외
+        _DASHBOARD_KEYS = ('스캔 일시', '스캔 방식',
+                           '확인됨', '확인된 취약점', '후보', '안전',
+                           '이상 없음 스캐너', '미적용 스캐너')
+        if any(k.startswith(dk) for dk in _DASHBOARD_KEYS):
             continue
         if '::' in v:
             # '라벨 :: 항목 ;; 라벨 :: 항목' 컨벤션: 키 글자 없이 구분선만 넣고
