@@ -109,6 +109,144 @@ def validate_safe_consistency(candidates):
     return issues
 
 
+def validate_skeleton_overview(skeleton_text):
+    """스켈레톤 개요 구조 검증.
+
+    메타 필드(**대상**, **스캔 일시** 등)가 h1 직후에 있고 ## 개요가 그 뒤에 별도로
+    위치하는 "분리 작성" 패턴을 감지한다. 이 구조에서 md_to_html.py의 개요 카드가
+    메타 필드를 인식하지 못해 대상/스캔일시/스택이 렌더링에서 누락된다.
+
+    정상 구조:
+        # h1
+        ## 개요          ← ## 개요가 h1 바로 다음
+        **대상**: ...    ← 메타 필드가 ## 개요 안
+
+    비정상 구조 (차단):
+        # h1
+        **대상**: ...    ← 메타 필드가 ## 개요 밖 (h1 직후 평문)
+        ---
+        ## 개요          ← ## 개요가 뒤늦게 등장
+
+    Returns:
+        list[str]: 오류 메시지 목록 (빈 리스트 = 통과)
+    """
+    issues = []
+
+    # h1 직후 ~ 첫 ## 헤딩 이전 구간에 메타 필드가 있는지 탐지
+    m_h1 = re.search(r'(?m)^#\s+.+$', skeleton_text)
+    if not m_h1:
+        return issues  # h1 없으면 스킵
+
+    after_h1 = skeleton_text[m_h1.end():]
+
+    # 첫 ## 헤딩 위치 파악
+    m_h2 = re.search(r'(?m)^##\s+', after_h1)
+    h2_offset = m_h2.start() if m_h2 else len(after_h1)
+    before_first_h2 = after_h1[:h2_offset]
+
+    # h1 ~ 첫 ## 사이에 **키**: 값 형태 메타 필드가 있으면 분리 작성 패턴
+    meta_in_preamble = re.search(r'(?m)^\*\*[^\n*]+\*\*\s*:', before_first_h2)
+    if meta_in_preamble:
+        # 첫 ## 헤딩이 ## 개요가 아닌 경우도 포함
+        first_h2_text = m_h2.group(0).strip() if m_h2 else ''
+        is_overview = bool(re.match(r'^##\s*개요\s*$', first_h2_text))
+        if not is_overview:
+            issues.append(
+                "ERROR: skeleton 개요 구조 오류 — h1 직후에 메타 필드(**대상**, **스캔 일시** 등)가 있고 "
+                "'## 개요'가 그 뒤에 별도로 위치합니다. "
+                "이 구조에서 md_to_html.py 개요 카드가 메타 필드를 인식하지 못합니다.\n"
+                "  수정: # h1 바로 다음에 '## 개요'를 쓰고, 모든 메타 필드를 그 안에 넣으세요.\n"
+                "  예) # 통합 취약점 스캔 보고서\n"
+                "      ## 개요\n"
+                "      **대상**: ..."
+            )
+    return issues
+
+
+def build_summary_table(master_list_path):
+    """master-list.json에서 총괄 요약 테이블을 직접 생성한다.
+
+    스켈레톤 작성자가 테이블/볼드 어느 형식으로 작성해도 이 함수가 덮어쓰므로
+    md_to_html.py 파싱 실패(수치 0 표시)가 발생하지 않는다.
+
+    Returns:
+        str: MD 테이블 텍스트. master-list 없으면 빈 문자열.
+    """
+    if not master_list_path:
+        return ''
+    try:
+        with open(master_list_path, encoding='utf-8') as f:
+            ml = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return ''
+
+    candidates = ml.get('candidates', [])
+    confirmed = sum(1 for c in candidates if c.get('status') == 'confirmed')
+    candidate = sum(1 for c in candidates if c.get('status') == 'candidate')
+    safe = sum(1 for c in candidates if c.get('status') == 'safe')
+
+    return (
+        f'| 확인됨 | {confirmed}건 |\n'
+        f'| 후보 (추가 검증 필요) | {candidate}건 |\n'
+        f'| 안전 (정적·동적 검증 완료) | {safe}건 |'
+    )
+
+
+def inject_summary_table(report_text, master_list_path):
+    """보고서 MD에서 총괄 요약 수치 블록을 master-list 기반으로 교체한다.
+
+    스켈레톤의 개요 섹션에 있는 확인됨/후보/안전 수치를
+    볼드 형식(**확인됨**: N건)이든 테이블 형식이든 관계없이
+    정확한 값으로 덮어쓴다.
+    """
+    if not master_list_path:
+        return report_text
+    try:
+        with open(master_list_path, encoding='utf-8') as f:
+            ml = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return report_text
+
+    candidates = ml.get('candidates', [])
+    confirmed = sum(1 for c in candidates if c.get('status') == 'confirmed')
+    candidate = sum(1 for c in candidates if c.get('status') == 'candidate')
+    safe = sum(1 for c in candidates if c.get('status') == 'safe')
+
+    # 볼드 형식 교체: **확인됨**: N건 / **후보...**: N건 / **안전...**: N건
+    report_text = re.sub(
+        r'(\*\*(?:확인됨|확인된 취약점)[^*]*\*\*\s*:\s*)\d+(?:건)?',
+        lambda m: m.group(1) + f'{confirmed}건',
+        report_text
+    )
+    report_text = re.sub(
+        r'(\*\*후보[^*]*\*\*\s*:\s*)\d+(?:건)?',
+        lambda m: m.group(1) + f'{candidate}건',
+        report_text
+    )
+    report_text = re.sub(
+        r'(\*\*안전[^*]*\*\*\s*:\s*)\d+(?:건)?',
+        lambda m: m.group(1) + f'{safe}건',
+        report_text
+    )
+    # 파이프 테이블 형식 교체: | 확인됨 | N건 |
+    report_text = re.sub(
+        r'(\|\s*(?:확인됨|확인된 취약점)[^|]*\|\s*)\d+(?:건)?(\s*\|)',
+        lambda m: m.group(1) + f'{confirmed}건' + m.group(2),
+        report_text
+    )
+    report_text = re.sub(
+        r'(\|\s*후보[^|]*\|\s*)\d+(?:건)?(\s*\|)',
+        lambda m: m.group(1) + f'{candidate}건' + m.group(2),
+        report_text
+    )
+    report_text = re.sub(
+        r'(\|\s*안전[^|]*\|\s*)\d+(?:건)?(\s*\|)',
+        lambda m: m.group(1) + f'{safe}건' + m.group(2),
+        report_text
+    )
+    return report_text
+
+
 def build_safe_section(master_list_path):
     """master-list.json을 읽어 ## 안전 판정 항목 섹션을 4분류로 자동 생성.
 
@@ -527,6 +665,12 @@ if __name__ == '__main__':
         except FileNotFoundError:
             print(f"WARNING: AI 자율 탐색 파일 없음: {args.ai}", file=sys.stderr)
 
+    # skeleton 개요 구조 검증 — 메타 필드 위치가 ## 개요 밖에 있으면 차단
+    _ov_issues = validate_skeleton_overview(skeleton)
+    if _ov_issues:
+        print('\n'.join(_ov_issues), file=sys.stderr)
+        sys.exit(8)
+
     # 조립
     sections_text = '\n\n---\n\n'.join(clean_section(s) for s in subagent_results)
     full_report = skeleton.replace('<!-- SCANNER_SECTIONS_HERE -->', sections_text)
@@ -597,6 +741,10 @@ if __name__ == '__main__':
 
     full_report = build_table_from_details(full_report, master_list_ids, id_to_remark, id_to_auth_boundary)
 
+    # 총괄 요약 수치를 master-list.json 기반으로 교체
+    # (스켈레톤 작성 형식(볼드/테이블)에 무관하게 정확한 값을 보장)
+    full_report = inject_summary_table(full_report, args.master_list)
+
     # skeleton과 output이 같은 경로이면 비멱등 조립 위험 차단
     if os.path.abspath(args.skeleton) == os.path.abspath(args.output):
         print(
@@ -627,6 +775,23 @@ if __name__ == '__main__':
 
     if '<!-- SAFE_SECTION_HERE -->' in full_report:
         full_report = full_report.replace('<!-- SAFE_SECTION_HERE -->', safe_md or '')
+
+    # 잔존 플레이스홀더 감지 — 치환 실패는 조용한 섹션 누락을 유발
+    _PLACEHOLDERS = [
+        '<!-- SCANNER_SECTIONS_HERE -->',
+        '<!-- CHAIN_SECTION_HERE -->',
+        '<!-- AI_DISCOVERY_SECTION_HERE -->',
+        '<!-- SAFE_SECTION_HERE -->',
+    ]
+    _remaining = [ph for ph in _PLACEHOLDERS if ph in full_report]
+    if _remaining:
+        print(
+            f"ERROR: 조립 후 플레이스홀더 {len(_remaining)}개가 치환되지 않고 남아있음:\n"
+            + '\n'.join(f"  {ph}" for ph in _remaining)
+            + "\n  보고서 섹션이 누락된 상태입니다. 스켈레톤 구조를 확인하세요.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     with open(args.output, 'w', encoding='utf-8') as f:
         f.write(full_report)

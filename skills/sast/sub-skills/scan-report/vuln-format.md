@@ -174,6 +174,8 @@ curl -X <METHOD> "<TARGET_HOST>/<API_PATH>" -H "Cookie: <SESSION_COOKIE>" -d "<P
 ```markdown
 # 통합 취약점 스캔 보고서
 
+## 개요
+
 **대상**: [스캔 디렉토리명]
 **스캔 일시**: [날짜]
 **스캔 방식**: 소스코드 분석 + 동적 테스트

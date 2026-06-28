@@ -79,14 +79,45 @@ _md_text = _sync_dashboard(_md_text)
 # 요약 테이블 스캐너 컬럼과 표기를 통일한다. 첫 셀이 숫자/ID인 표(요약·안전)는 매칭되지 않는다.
 _md_text = re.sub(r'(?m)^(\|\s*)([A-Za-z0-9][A-Za-z0-9-]*?)-scanner(\s*\|)', r'\1\2\3', _md_text)
 
-# 개요 정규화: '## 개요' 헤딩이 없고 h1 직후에 메타 블록(**키**: 값)이 평문으로 오면
-# 그 앞에 '## 개요' 헤딩을 삽입한다. 이렇게 하면 작성 스타일과 무관하게
-# 메타 블록이 개요 카드(배너)로 렌더된다.
-if not re.search(r'(?m)^##\s*개요\s*$', _md_text):
+# 개요 정규화: 두 가지 케이스 모두 처리
+# 케이스 A — '## 개요' 헤딩이 없고 h1 직후에 메타 블록(**키**: 값)이 평문으로 오면
+#             그 앞에 '## 개요' 헤딩을 삽입한다.
+# 케이스 B — '## 개요' 헤딩이 이미 있지만, h1과 '## 개요' 사이에 메타 블록이 흩어져 있으면
+#             (스켈레톤 작성자가 메타를 h1 직후에, 수치를 ## 개요 안에 분리 작성한 경우)
+#             흩어진 메타 블록을 '## 개요' 섹션 안으로 이동해 개요 카드가 올바르게 렌더되게 한다.
+_ov_section_exists = bool(re.search(r'(?m)^##\s*개요\s*$', _md_text))
+if not _ov_section_exists:
+    # 케이스 A: ## 개요 삽입
     _ov_m = re.search(r'(?m)^(#\s+.+\n)((?:[ \t]*\n)*)(\*\*[^\n*]+\*\*[ \t]*:)', _md_text)
     if _ov_m:
         _md_text = (_md_text[:_ov_m.start()] + _ov_m.group(1)
                     + '\n## 개요\n\n' + _ov_m.group(3) + _md_text[_ov_m.end():])
+else:
+    # 케이스 B: h1 직후 ~ '## 개요' 사이의 메타 블록을 '## 개요' 섹션 안으로 이동
+    # 패턴: h1 → [빈 줄] → 메타 블록들 → [구분선/빈 줄] → ## 개요
+    _ov_m = re.search(
+        r'(?m)^(# .+)\n'           # h1 제목
+        r'((?:[ \t]*\n)*)'         # h1 뒤 빈 줄
+        r'((?:\*\*[^\n*]+\*\*[ \t]*:.*\n(?:[ \t]*\n)*)+)'  # 메타 블록 1개 이상
+        r'((?:> [^\n]*\n(?:[ \t]*\n)*)*)' # 선택적 blockquote
+        r'(?:---[ \t]*\n(?:[ \t]*\n)*)?'  # 선택적 구분선
+        r'(##\s*개요)',             # ## 개요
+        _md_text
+    )
+    if _ov_m:
+        h1 = _ov_m.group(1)
+        meta_block = _ov_m.group(3).rstrip('\n')
+        bq_block = _ov_m.group(4)
+        ov_heading = _ov_m.group(5)
+        # h1만 남기고 메타 블록은 ## 개요 직후로 이동
+        _md_text = (
+            _md_text[:_ov_m.start()]
+            + h1 + '\n\n'
+            + ov_heading + '\n\n'
+            + meta_block + '\n'
+            + (bq_block if bq_block else '')
+            + _md_text[_ov_m.end():]
+        )
 
 # 동기화된 MD 를 디스크에도 반영 (단일 진실 원천)
 with open(_md_path, 'w', encoding='utf-8') as f:
@@ -130,17 +161,28 @@ lines = [l.rstrip('\n') for l in _render_md.splitlines()]
 # 대시보드 수치를 MD에서 동적으로 집계 (suffix 유무 모두 허용, 첫 셀에 괄호 수식어 허용)
 def _parse_dashboard(md):
     confirmed = candidate = safe = na = 0
-    # 첫 셀이 "확인된 취약점" 또는 "확인됨"으로 시작하면 매칭 (괄호 수식어 허용)
+    # 테이블 형식: | 확인됨 | 8건 |
     m = re.search(r'\|\s*(?:확인된 취약점|확인됨)[^|]*\|\s*(\d+)(?:건)?', md)
     if m: confirmed = int(m.group(1))
     m = re.search(r'\|\s*후보[^|]*\|\s*(\d+)(?:건)?', md)
     if m: candidate = int(m.group(1))
-    # "스캔 완료 (이상 없음)", "이상 없음 스캐너", "이상 없음" 등 괄호/후행 단어 모두 허용
     m = re.search(r'\|\s*(?:스캔 완료|이상 없음)[^|]*\|\s*(\d+)(?:개)?', md)
     if m: safe = int(m.group(1))
-    # "해당 없음 (미적용)", "미적용 스캐너", "미적용" 등 허용
     m = re.search(r'\|\s*(?:해당 없음|미적용)[^|]*\|\s*(\d+)(?:개)?', md)
     if m: na = int(m.group(1))
+    # 볼드 키-값 형식 fallback: **확인됨**: 8건
+    if confirmed == 0:
+        m = re.search(r'\*\*(?:확인된 취약점|확인됨)\*\*\s*:\s*(\d+)(?:건)?', md)
+        if m: confirmed = int(m.group(1))
+    if candidate == 0:
+        m = re.search(r'\*\*후보[^*]*\*\*\s*:\s*(\d+)(?:건)?', md)
+        if m: candidate = int(m.group(1))
+    if safe == 0:
+        m = re.search(r'\*\*(?:스캔 완료|이상 없음)[^*]*\*\*\s*:\s*(\d+)(?:개)?', md)
+        if m: safe = int(m.group(1))
+    if na == 0:
+        m = re.search(r'\*\*(?:해당 없음|미적용)[^*]*\*\*\s*:\s*(\d+)(?:개)?', md)
+        if m: na = int(m.group(1))
     return confirmed, candidate, safe, na
 
 _confirmed, _candidate, _safe, _na = _parse_dashboard(_md_text)

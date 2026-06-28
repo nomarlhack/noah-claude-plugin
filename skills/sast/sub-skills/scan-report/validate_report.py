@@ -399,19 +399,32 @@ if json_output_arg:
     try:
         # === 추가 경고 검사 ===
 
-        # (e) 총괄 요약 테이블 단위 접미사 검증 (#10)
-        # "확인됨", "후보", "이상 없음" 행의 건수에 'N건'/'N개' 접미사가 없으면
-        # md_to_html.py 대시보드가 0으로 표시됨
+        # (e) 총괄 요약 수치 검증 — 단위 접미사 없거나 수치가 0이면 파싱 실패
+        # 볼드 형식과 테이블 형식 모두 검사.
+        # assemble_report.py의 inject_summary_table()이 정상 실행됐으면 이 검사는 통과해야 함.
+        # 직접 HTML 생성(assemble 미사용) 경로에서도 차단하기 위해 errors로 격상.
+        _confirmed_re = re.search(
+            r'(?:\*\*(?:확인됨|확인된 취약점)[^*]*\*\*\s*:\s*(\d+)(?:건)?'
+            r'|\|\s*(?:확인됨|확인된 취약점)[^|]*\|\s*(\d+)(?:건)?\s*\|)',
+            md_content
+        )
+        if _confirmed_re:
+            _val = int(_confirmed_re.group(1) or _confirmed_re.group(2))
+            if _val == 0 and expected > 0:
+                errors.append(
+                    f"총괄 요약의 '확인됨' 수치가 0인데 기대 건수는 {expected}건 — "
+                    f"inject_summary_table()이 적용되지 않았거나 master-list.json 없이 조립됨"
+                )
+        # 테이블 형식의 단위 접미사 없는 행도 error로 격상
         _summary_tbl_m = re.search(r'## 총괄 요약.*?(?=## |\Z)', md_content, re.DOTALL)
         if _summary_tbl_m:
             for _row in _summary_tbl_m.group(0).split('\n'):
                 if '|' in _row and re.search(r'\|\s*\d+\s*\|', _row):
-                    # 숫자만 있고 '건'/'개' 없는 셀 탐지
                     _bare_num = re.search(r'\|\s*(\d+)\s*\|', _row)
                     if _bare_num:
-                        warnings.append(
+                        errors.append(
                             f"총괄 요약 테이블 건수에 단위 접미사(N건/N개) 없음 — "
-                            f"대시보드가 0으로 표시될 수 있습니다: {_row.strip()[:80]}"
+                            f"대시보드 수치가 0으로 표시됩니다: {_row.strip()[:80]}"
                         )
 
         # (f) 진입 경계 플레이스홀더 검출 (#8)

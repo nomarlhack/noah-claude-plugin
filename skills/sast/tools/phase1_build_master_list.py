@@ -113,6 +113,7 @@ if args.merge and out_path.is_file():
 # 외부망.무인증 / 외부망.인증 / 내부망.무인증 / 내부망.인증 4분류를 파생한다.
 _AUTH_BOUNDARY_DATA = None
 _AB_ROUTES = []  # [(surface_key, identity_source, is_external)]
+_AB_FALLBACK_LOG = []  # url_path 매칭 실패로 file_path 폴백 사용된 항목 로그
 
 def _load_auth_boundary_routes(phase1_dir: Path):
     global _AUTH_BOUNDARY_DATA, _AB_ROUTES
@@ -225,7 +226,11 @@ def _derive_auth_boundary(url_path: str, file_path: str = "") -> str:
                 return "내부망.인증" if is_auth else "내부망.무인증"
 
     # routes 매칭 실패 또는 url_path 없음 → file_path 기반 폴백
-    return _derive_auth_boundary_from_file(file_path)
+    # 폴백 사용 여부를 WARNING으로 노출: 인증경계가 자동 파생된 항목을 식별 가능하게 함
+    reason = "url_path 없음" if not url_path else f"url_path='{url_path}' routes 매칭 실패"
+    result = _derive_auth_boundary_from_file(file_path)
+    _AB_FALLBACK_LOG.append(f"{reason} → file_path='{file_path}' → {result}")
+    return result
 
 
 def _same_path(a, b):
@@ -842,6 +847,16 @@ print(
 )
 for c in candidates:
     print(f"- {c['id']}: {c['title']} @ {c['file']}:{c['line']}")
+
+if _AB_FALLBACK_LOG:
+    print(
+        f"\nINFO: 인증경계 {len(_AB_FALLBACK_LOG)}건이 url_path 매칭 실패로 파일경로 기반 자동 파생됨 "
+        f"(스캐너 에이전트가 url_path를 비워두면 오판 가능):"
+    )
+    for msg in _AB_FALLBACK_LOG[:10]:   # 최대 10건만 출력
+        print(f"  {msg}")
+    if len(_AB_FALLBACK_LOG) > 10:
+        print(f"  ... 외 {len(_AB_FALLBACK_LOG) - 10}건")
 
 if errors:
     print(f"\n*** {len(errors)} ERROR(s) detected — 메인 에이전트는 해당 스캐너를 재실행해야 합니다 ***")
