@@ -321,6 +321,12 @@ Phase 1 에이전트는 단일 메시지 안에서 모든 그룹의 Agent 도구
      [print(f'샤드{f[\"shard\"]}: IDOR-{f[\"id_start\"]}~IDOR-{f[\"id_end\"]}') for f in m['files']]"
    ```
    샤드당 1개 서브에이전트를 단일 메시지로 병렬 디스패치한다. 각 프롬프트에 `guidelines-phase1.md` + `idor-scanner/phase1.md`의 "대규모 인벤토리 샤딩"·"검토 단위는 파일" 규칙 + 담당 `idor_shard_<n>.md` + **해당 샤드의 ID 채번 범위(`IDOR-{id_start}`~`IDOR-{id_end}`)** 를 전달한다. 각 에이전트는 담당 파일을 통째로 Read해 호출 service 계층까지 추적하고 소유권 게이트를 `[검증]`/`[부재]`/`[부분]`으로 확정하며, 결과를 `<SHARD_DIR>/idor_shard_<n>_result.md`(manifest 블록 포함)로 저장한다. **에이전트는 `idor-scanner.md`를 직접 수정하지 않는다 — 병합은 스크립트가 수행한다.**
+
+   **[필수] 샤드 result.md의 manifest 블록 정확한 형식** — 이 형식을 지키지 않으면 `idor_shard_merge.py` 파싱이 실패한다:
+   - 마커: `<!-- NOAH-SAST MANIFEST v1 -->` / `<!-- /NOAH-SAST MANIFEST -->` (PHASE1·IDOR·SHARD 등 접두사 금지)
+   - candidates: `[{"id": "IDOR-1"}, {"id": "IDOR-2"}]` 객체 배열 (문자열 배열 `["IDOR-1"]` 금지)
+   - 후보 헤더: `## IDOR-<N>: 제목` (double hash, `###` triple hash 금지)
+
 3. **병합 (스크립트 책임, 에이전트 직접 수행 금지):** `python3 <NOAH_SAST_DIR>/tools/idor_shard_merge.py <PHASE1_RESULTS_DIR>/idor-scanner.md <SHARD_DIR>` 를 실행한다. 스크립트가 각 샤드 result.md의 MANIFEST JSON을 파싱하여 신규 후보 섹션을 `idor-scanner.md`에 삽입하고, 완전성(헤더 존재 + 최소 본문)을 검증한다. 실패 시 오류 메시지에 따라 재실행한다. **메인 에이전트가 `idor-scanner.md`를 직접 Edit/Write해 병합하는 행위는 금지 — 스크립트 우회로 검증이 무력화된다.**
 4. **게이트 해제 (검증 경로 단일):** `python3 <NOAH_SAST_DIR>/tools/phase1_build_master_list.py <PHASE1_RESULTS_DIR> <PHASE1_RESULTS_DIR>/master-list.json --merge --idor-shards-merged <SHARD_DIR>`를 실행한다. 스크립트가 (a) 샤드 manifest의 K개 결과 파일 모두 존재·MANIFEST JSON 파싱 성공, (b) ID 형식·범위·중복 검증, (c) 각 후보 ID가 `idor-scanner.md`에 헤더 + 최소 본문으로 존재하는지 확인, (d) `[INCOMPLETE]` 마커 해소를 검증한 뒤에만 sentinel을 발급하고 게이트를 연다. 검증 실패 시 `IDOR_SHARDS_INVALID`로 막힌다. **메인 에이전트가 sentinel을 직접 만들거나 게이트를 우회하는 행위는 금지(예외 없음).**
 

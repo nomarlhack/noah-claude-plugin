@@ -35,12 +35,14 @@ import re
 import sys
 from pathlib import Path
 
-# phase1_build_master_list.py의 MANIFEST_RE와 동일한 패턴 사용 (파싱 일관성)
+# IDOR 샤드 에이전트가 쓰는 마커 변형을 모두 허용 (구버전 하위 호환)
 _MANIFEST_RE = re.compile(
-    r"<!-- NOAH-SAST MANIFEST v1 -->\s*```json\s*(\{.*?\})\s*```\s*<!-- /NOAH-SAST MANIFEST -->",
+    r"<!-- NOAH-SAST (?:PHASE1 IDOR SHARD )?MANIFEST v1 -->\s*```json\s*(\{.*?\})\s*```\s*<!-- /NOAH-SAST (?:PHASE1 IDOR SHARD )?MANIFEST -->",
     re.S,
 )
-_CANDIDATE_HEADER_RE = re.compile(r'^##\s+(IDOR-\d+)\s*:', re.MULTILINE)
+# ## IDOR-1: / ### IDOR-1: / ## IDOR-1 (공백 없음) 모두 허용
+# 주의: r-string에서 {2,3}은 정규식 수량자로 올바르게 작동함 (f-string 아님)
+_CANDIDATE_HEADER_RE = re.compile(r'^#{2,3}\s+(IDOR-\d+)\s*:?', re.MULTILINE)
 _IDOR_ID_RE = re.compile(r'^IDOR-\d+$')
 _MIN_BODY_BYTES = 200  # 후보 본문 최소 길이 (헤더만 껍데기로 넣는 것 차단)
 
@@ -58,17 +60,29 @@ def _parse_shard_manifest(body: str, shard_n: int) -> tuple[dict | None, str]:
 
 
 def _extract_candidate_section(body: str, cid: str) -> str:
-    """body에서 ## <cid>: 헤더로 시작하는 섹션을 추출한다.
+    """body에서 ##/### <cid>: 헤더로 시작하는 섹션을 추출한다.
 
-    MANIFEST 블록 또는 다음 ## IDOR- 헤더까지를 섹션으로 취급한다.
-    섹션에 MANIFEST 블록이 포함되면 MANIFEST 시작 직전까지만 추출한다.
+    MANIFEST 블록 또는 다음 ##/### IDOR- 헤더까지를 섹션으로 취급한다.
+    rf-string에서 {2,3}이 f-string 중괄호로 해석되는 버그를 피하기 위해
+    r-string + 문자열 연결로 패턴을 구성한다.
     """
-    pattern = re.compile(
-        rf'^(##\s+{re.escape(cid)}\s*:.*?)(?=^##\s+IDOR-|<!--\s*NOAH-SAST MANIFEST|\Z)',
-        re.MULTILINE | re.DOTALL,
-    )
-    m = pattern.search(body)
-    return m.group(1).rstrip() if m else ""
+    # r-string에서 {2,3}은 정규식 수량자로 올바르게 동작함
+    # re.escape(cid) 결과를 별도 변수로 만들어 r-string 외부에서 삽입
+    escaped_cid = re.escape(cid)
+    header_pat = r'^#{2,3}\s+' + escaped_cid + r'\s*:?'
+    end_pat = r'^#{2,3}\s+IDOR-|<!--\s*NOAH-SAST MANIFEST'
+
+    header_re = re.compile(header_pat, re.MULTILINE)
+    end_re = re.compile(end_pat, re.MULTILINE)
+
+    m_start = header_re.search(body)
+    if not m_start:
+        return ""
+
+    # 헤더 바로 다음부터 종료 패턴까지 추출
+    m_end = end_re.search(body, m_start.end())
+    end = m_end.start() if m_end else len(body)
+    return body[m_start.start():end].rstrip()
 
 
 def merge(idor_md_path: Path, shard_dir: Path) -> int:
@@ -106,7 +120,8 @@ def merge(idor_md_path: Path, shard_dir: Path) -> int:
         n = entry.get("shard")
         id_start = entry.get("id_start")
         id_end = entry.get("id_end")
-        shard_path = Path(entry.get("path", ""))
+        # manifest entry는 "path" 또는 "file" 키 모두 허용 (idor_shard.py 출력 형식 차이)
+        shard_path = Path(entry.get("path") or entry.get("file", ""))
         result_path = shard_path.with_name(shard_path.stem + "_result.md")
 
         if not result_path.is_file():
@@ -124,7 +139,11 @@ def merge(idor_md_path: Path, shard_dir: Path) -> int:
             continue
 
         for cand in data.get("candidates", []):
-            cid = cand.get("id", "")
+            # 문자열 형식 "IDOR-1" 또는 객체 형식 {"id": "IDOR-1"} 모두 허용
+            if isinstance(cand, str):
+                cid = cand
+            else:
+                cid = cand.get("id", "")
 
             # ID 형식 검사
             if not _IDOR_ID_RE.match(cid):
@@ -171,7 +190,9 @@ def merge(idor_md_path: Path, shard_dir: Path) -> int:
                 )
                 continue
 
-            all_new_candidates.append((n, cand, section_text))
+            # cand가 문자열인 경우 객체로 정규화
+            cand_obj = {"id": cand} if isinstance(cand, str) else cand
+            all_new_candidates.append((n, cand_obj, section_text))
 
     if errors:
         print("ERROR: 사전 검증 실패 — 병합 중단", file=sys.stderr)

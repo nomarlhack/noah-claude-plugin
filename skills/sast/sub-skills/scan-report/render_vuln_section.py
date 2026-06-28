@@ -259,6 +259,15 @@ def main():
             all_valid = False
             continue
 
+        # list top-level 지원: [{scanner, vulnerabilities}, ...] → 각 항목을 개별 처리
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict) and validate_data(item, filepath):
+                    sections.append((item, filepath))
+                else:
+                    all_valid = False
+            continue
+
         if not validate_data(data, filepath):
             all_valid = False
             continue

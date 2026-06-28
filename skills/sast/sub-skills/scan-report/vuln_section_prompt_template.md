@@ -23,7 +23,7 @@
         "required": ["id", "title", "type", "status", "location", "entry_boundary", "source", "sink", "cause", "poc", "remediation"],
         "properties": {
           "id": {"type": "string", "description": "master-list candidates[].id (예: XSS-1)"},
-          "title": {"type": "string", "description": "취약점 제목"},
+          "title": {"type": "string", "description": "취약점 제목 — | 문자 포함 금지 (대신 '/' 또는 '또는'으로 대체). 예: addBot/delBotPenalty"},
           "type": {"type": "string", "description": "취약점 유형 (예: XSS, SSRF)"},
           "status": {"type": "string", "enum": ["확인됨", "후보"], "description": "판정"},
           "location": {"type": "string", "description": "파일경로:라인번호"},

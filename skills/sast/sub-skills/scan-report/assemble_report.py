@@ -163,6 +163,34 @@ def validate_skeleton_overview(skeleton_text):
     return issues
 
 
+def build_summary_table(master_list_path):
+    """master-list.json에서 총괄 요약 테이블을 직접 생성한다.
+
+    스켈레톤 작성자가 테이블/볼드 어느 형식으로 작성해도 이 함수가 덮어쓰므로
+    md_to_html.py 파싱 실패(수치 0 표시)가 발생하지 않는다.
+
+    Returns:
+        str: MD 테이블 텍스트. master-list 없으면 빈 문자열.
+    """
+    if not master_list_path:
+        return ''
+    try:
+        with open(master_list_path, encoding='utf-8') as f:
+            ml = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return ''
+
+    candidates = ml.get('candidates', [])
+    confirmed = sum(1 for c in candidates if c.get('status') == 'confirmed')
+    candidate = sum(1 for c in candidates if c.get('status') == 'candidate')
+    safe = sum(1 for c in candidates if c.get('status') == 'safe')
+
+    return (
+        f'| 확인됨 | {confirmed}건 |\n'
+        f'| 후보 (추가 검증 필요) | {candidate}건 |\n'
+        f'| 안전 (정적·동적 검증 완료) | {safe}건 |'
+    )
+
 
 def inject_summary_table(report_text, master_list_path):
     """보고서 MD에서 총괄 요약 수치 블록을 master-list 기반으로 교체한다.
@@ -533,6 +561,9 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
     _has_ab = id_to_auth_boundary is not None
     _has_remark = id_to_remark is not None
 
+    def _escape_cell(s):
+        return str(s).replace('|', '\\|').replace('\n', ' ')
+
     if _has_ab:
         table_lines = [
             '| # | ID | 제목 | 상태 | 인증경계 |',
@@ -541,7 +572,7 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
         for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
             vid_cell = vid if vid else '—'
             ab = id_to_auth_boundary.get(vid, '') if vid else ''
-            table_lines.append(f'| {idx} | {vid_cell} | {title} | {status} | {ab} |')
+            table_lines.append(f'| {idx} | {vid_cell} | {_escape_cell(title)} | {status} | {_escape_cell(ab)} |')
     elif _has_remark:
         table_lines = [
             '| 순번 | ID | 취약점 제목 | 스캐너 | 상태 | 비고 |',
@@ -550,7 +581,7 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
         for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
             vid_cell = vid if vid else '—'
             remark = id_to_remark.get(vid, '—') if vid else '—'
-            table_lines.append(f'| {idx} | {vid_cell} | {title} | {_scanner_disp(scanner)} | {status} | {remark} |')
+            table_lines.append(f'| {idx} | {vid_cell} | {_escape_cell(title)} | {_scanner_disp(scanner)} | {status} | {_escape_cell(remark)} |')
     else:
         table_lines = [
             '| 순번 | ID | 취약점 제목 | 스캐너 | 상태 |',
@@ -558,7 +589,7 @@ def build_table_from_details(report_text, master_list_ids=None, id_to_remark=Non
         ]
         for idx, (title, vid, vtype, scanner, status) in enumerate(vulns, 1):
             vid_cell = vid if vid else '—'
-            table_lines.append(f'| {idx} | {vid_cell} | {title} | {_scanner_disp(scanner)} | {status} |')
+            table_lines.append(f'| {idx} | {vid_cell} | {_escape_cell(title)} | {_scanner_disp(scanner)} | {status} |')
     new_table = '\n'.join(table_lines)
 
     # 헤딩 직후 placeholder 테이블을 자동 생성 테이블로 치환한다.
