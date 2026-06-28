@@ -109,7 +109,9 @@ def render_poc_steps(steps: list) -> str:
         return "_POC 정보 없음_"
     lines = []
     for step in steps:
-        lines.append(f"##### {step.get('title', 'Step')}")
+        # vuln-format.md 규약: POC 단계는 ##### 헤딩이 아닌 **볼드** 텍스트
+        # lint_reader_layer.py가 h5(#####)를 헤딩으로 검사하므로 볼드 형식 사용
+        lines.append(f"**{step.get('title', 'Step')}**")
         lines.append("")
         lines.append(step.get("content", ""))
         lines.append("")
