@@ -163,34 +163,6 @@ def validate_skeleton_overview(skeleton_text):
     return issues
 
 
-def build_summary_table(master_list_path):
-    """master-list.json에서 총괄 요약 테이블을 직접 생성한다.
-
-    스켈레톤 작성자가 테이블/볼드 어느 형식으로 작성해도 이 함수가 덮어쓰므로
-    md_to_html.py 파싱 실패(수치 0 표시)가 발생하지 않는다.
-
-    Returns:
-        str: MD 테이블 텍스트. master-list 없으면 빈 문자열.
-    """
-    if not master_list_path:
-        return ''
-    try:
-        with open(master_list_path, encoding='utf-8') as f:
-            ml = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return ''
-
-    candidates = ml.get('candidates', [])
-    confirmed = sum(1 for c in candidates if c.get('status') == 'confirmed')
-    candidate = sum(1 for c in candidates if c.get('status') == 'candidate')
-    safe = sum(1 for c in candidates if c.get('status') == 'safe')
-
-    return (
-        f'| 확인됨 | {confirmed}건 |\n'
-        f'| 후보 (추가 검증 필요) | {candidate}건 |\n'
-        f'| 안전 (정적·동적 검증 완료) | {safe}건 |'
-    )
-
 
 def inject_summary_table(report_text, master_list_path):
     """보고서 MD에서 총괄 요약 수치 블록을 master-list 기반으로 교체한다.
