@@ -319,6 +319,16 @@ python3 <NOAH_SAST_DIR>/tools/select_scanners.py <PATTERN_INDEX_DIR> <PROJECT_RO
 
 Phase 1 에이전트는 단일 메시지 안에서 모든 그룹의 Agent 도구를 동시에 호출하여 병렬 실행한다. 모든 에이전트가 완료된 후에만 Step 6로 진행한다. 완료 후 그룹 수와 수신된 결과 수를 대조하여, 누락된 에이전트가 있으면 해당 그룹만 재실행한다. 반환 요약에 `[INCOMPLETE: scanner-name]`이 있으면 해당 스캐너만 별도 그룹으로 재실행한다.
 
+**[필수] idor-scanner 에이전트 디스패치 전 규모 사전 확인 (하드 게이트 선행 조건):** idor-scanner가 적용 스캐너 목록에 있으면, **에이전트를 디스패치하기 전에** 반드시 아래 명령으로 규모를 확인한다. `idor_sharding_required=true`이면 단일 에이전트 디스패치를 금지하고 즉시 샤딩으로 진행한다.
+
+```bash
+python3 <NOAH_SAST_DIR>/tools/idor_inventory.py \
+  --locindex <PATTERN_INDEX_DIR>/idor-scanner.locindex.json \
+  --project-root <PROJECT_ROOT> \
+  --count-only
+# 출력: idor_endpoint_count=N / idor_file_count=M / idor_sharding_required=true|false
+```
+
 **[필수] idor-scanner 인벤토리 샤딩 (하드 게이트):** idor-scanner 그룹이 `[INCOMPLETE: idor-scanner]`(또는 `[INCOMPLETE: idor ...]` 어떤 형태든)를 반환하거나, 인벤토리(`<PHASE1_RESULTS_DIR>/idor-scanner.md`의 `### IDOR 검토 인벤토리` — 외부 인벤토리 파일을 참조해 `N 진입점 / M 파일`로 규모만 적은 경우 포함)가 임계(40파일/120행) 초과면, deep-read 샤딩을 **반드시 수행한다.** 이 조건은 메인 에이전트의 재량 사항이 아니다. **AI 자율 탐색(Step 6)·단일 후속 에이전트·"이미 일부 확인했다"는 판단으로 샤딩을 대체하거나 생략하는 것을 금지한다.** AI 자율 탐색은 샤딩을 보완할 수는 있어도 대체하지 못한다(전수성·완전성 백스톱이 다름).
 
 > **기계적 강제 (예외 없음):** `phase1_build_master_list.py`가 위 조건을 검사하여, 샤딩 미완 상태이면 `IDOR_SHARDING_REQUIRED` **ERROR(exit 1)로 차단**한다(아래 "마스터 목록 생성" 단계에서 즉시 발동). 게이트 해제는 **오직 산출물 검증을 통과한 sentinel로만** 가능하다 — sentinel을 손으로 `touch`하거나, "환경상 불가"로 면제하거나, 빈 파일을 만들어 우회할 수 없다(스크립트가 샤드 결과 파일 실재·병합 상태를 재검증한다). 따라서 이 게이트를 통과하지 않고는 Step 6로 진행할 수 없다.

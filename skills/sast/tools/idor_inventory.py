@@ -980,6 +980,10 @@ def main() -> int:
     ap.add_argument("--locindex", default=None, help="idor-scanner.locindex.json 경로 (taint 모드)")
     ap.add_argument("--project-root", default=None, help="프로젝트 루트 (컨트롤러 source-only 스캔 모드)")
     ap.add_argument("--out", default=None)
+    ap.add_argument(
+        "--count-only", action="store_true",
+        help="인벤토리를 생성하지 않고 엔드포인트 수·파일 수만 출력한다 (샤딩 임계 사전 확인용).",
+    )
     args = ap.parse_args()
 
     locindex = args.locindex or args.locindex_positional
@@ -1008,6 +1012,14 @@ def main() -> int:
         else:
             by_key[key] = dict(r)
     rows = list(by_key.values())
+
+    # --count-only: 파일 수·엔드포인트 수만 출력하고 종료 (샤딩 임계 사전 확인용)
+    if args.count_only:
+        unique_files = len({r["file"] for r in rows if r.get("file")})
+        print(f"idor_endpoint_count={len(rows)}")
+        print(f"idor_file_count={unique_files}")
+        print(f"idor_sharding_required={'true' if unique_files > 40 or len(rows) > 120 else 'false'}")
+        return 0
 
     # 인증 게이트 미경유 경로 표시 (project-root 있을 때만; 미발견 시 '[미상]')
     exclude_regexes: list = []
