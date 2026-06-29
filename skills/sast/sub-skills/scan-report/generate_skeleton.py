@@ -40,8 +40,8 @@ def load_json(path: str) -> dict | list:
 
 
 def safe_label(text: str) -> str:
-    """mermaid 라벨에서 큰따옴표를 제거하고 특수문자를 안전하게 처리한다."""
-    return str(text).replace('"', "'").replace('\n', ' ')
+    """mermaid 라벨에서 큰따옴표·파이프 등 특수문자를 안전하게 처리한다."""
+    return str(text).replace('"', "'").replace('|', '/').replace('\n', ' ')
 
 
 def trunc(text: str, n: int = 20) -> str:
@@ -100,8 +100,8 @@ def build_auth_boundary(auth_boundary: dict) -> str:
         ]
         for gw in gateways:
             gid = gw.get("id", "")
-            hp = gw.get("host_pattern", "")
-            bp = gw.get("base_path", "")
+            hp = gw.get("host_pattern", "").replace("|", "&#124;")
+            bp = gw.get("base_path", "").replace("|", "&#124;")
             sections.append(f"| {gid} | {hp} | {bp} |")
         sections.append("")
 
@@ -114,8 +114,8 @@ def build_auth_boundary(auth_boundary: dict) -> str:
         ]
         for cl in clients:
             cid = cl.get("id", "")
-            persona = cl.get("persona", "")
-            cred = cl.get("credential", "")
+            persona = cl.get("persona", "").replace("|", "&#124;")
+            cred = cl.get("credential", "").replace("|", "&#124;")
             sections.append(f"| {cid} | {persona} | `{cred}` |")
         sections.append("")
 
@@ -127,11 +127,11 @@ def build_auth_boundary(auth_boundary: dict) -> str:
             "|------|----------|----------|---------|-------|",
         ]
         for rt in routes:
-            surface = rt.get("surface_key", rt.get("surface", ""))
-            client_ids = ", ".join(rt.get("client_ids", []))
+            surface = rt.get("surface_key", rt.get("surface", "")).replace("|", "&#124;")
+            client_ids = ", ".join(rt.get("client_ids", [])).replace("|", "&#124;")
             gw_id = rt.get("gateway_id", "(없음)")
-            auth_basis = rt.get("auth_basis", "")
-            reachability = rt.get("reachability", "")
+            auth_basis = rt.get("auth_basis", "").replace("|", "&#124;")
+            reachability = rt.get("reachability", "").replace("|", "&#124;")
             sections.append(f"| `{surface}` | {client_ids} | {gw_id} | {auth_basis} | {reachability} |")
         sections.append("")
 
