@@ -288,6 +288,26 @@ def main():
         # If jsonschema not available, all_valid was only set False on parse errors
         sys.exit(1)
 
+    # 중복 ID 사전 감지 및 제거 (여러 JSON 파일에 동일 ID가 포함된 경우)
+    seen_ids: set[str] = set()
+    dedup_warnings: list[str] = []
+    for data, _filepath in sections:
+        vulns = data.get("vulnerabilities", [])
+        kept = []
+        for v in vulns:
+            vid = v.get("id", "")
+            if vid and vid in seen_ids:
+                dedup_warnings.append(f"중복 ID 건너뜀: {vid} (파일: {_filepath})")
+            else:
+                if vid:
+                    seen_ids.add(vid)
+                kept.append(v)
+        data["vulnerabilities"] = kept
+
+    if dedup_warnings:
+        for w in dedup_warnings:
+            print(f"WARNING: {w}", file=sys.stderr)
+
     # Render
     rendered_parts = []
     summary_parts = []

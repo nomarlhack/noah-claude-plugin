@@ -699,6 +699,17 @@ if __name__ == '__main__':
         print('\n'.join(_ov_issues), file=sys.stderr)
         sys.exit(8)
 
+    # 섹션 내 중복 ID 감지 및 경고 (render_vuln_section.py를 거치지 않은 MD fallback 경우 대비)
+    _combined_sections = '\n'.join(subagent_results)
+    _all_ids_in_sections = re.findall(r'\*\*ID\*\*:\s*([A-Z]+-[\w]+)', _combined_sections)
+    from collections import Counter as _Counter
+    _dup_ids = {k: v for k, v in _Counter(_all_ids_in_sections).items() if v > 1}
+    if _dup_ids:
+        print(f"WARNING: 섹션 내 중복 ID 감지 — {_dup_ids}. 보고서에 중복 항목이 포함됩니다. "
+              f"원인: 여러 배치 JSON 파일이 동일 ID를 포함함. render_vuln_section.py 실행 시 "
+              f"자동 제거됩니다. 직접 MD를 전달하는 경우 소스 JSON에서 중복을 제거하세요.",
+              file=sys.stderr)
+
     # 조립
     sections_text = '\n\n---\n\n'.join(clean_section(s) for s in subagent_results)
     full_report = skeleton.replace('<!-- SCANNER_SECTIONS_HERE -->', sections_text)
