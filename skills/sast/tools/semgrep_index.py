@@ -511,6 +511,37 @@ def resolve_exclude_paths(
     return exclude
 
 
+def _is_valid_index(out_dir: Path, scanner_name: str) -> bool:
+    """기존 인덱스 파일이 완전하고 유효한지 검증한다.
+
+    resume 시 스킵 조건: json + locindex 양쪽이 존재하고, 양쪽 모두 JSON 파싱에
+    성공하며, locindex에 `_scanner` 완료 마커가 있어야 한다.
+    둘 중 하나라도 없거나 잘린(파싱 실패) 파일이면 False를 반환해 재처리한다.
+    rules/ 없는 grep-less 스캐너는 locindex가 없으므로 json 파싱 성공만으로 유효 판정.
+    """
+    json_path = out_dir / f"{scanner_name}.json"
+    locindex_path = out_dir / f"{scanner_name}.locindex.json"
+
+    if not json_path.exists():
+        return False
+    try:
+        json.loads(json_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+
+    # locindex가 없으면 grep-less 스캐너(rules/ 없음) — json만 유효하면 OK
+    if not locindex_path.exists():
+        return True
+    try:
+        locindex = json.loads(locindex_path.read_text(encoding="utf-8"))
+        if "_scanner" not in locindex:
+            return False
+    except (json.JSONDecodeError, OSError):
+        return False
+
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Noah SAST semgrep 인덱싱 스크립트")
     parser.add_argument("--scanners-dir", required=True)
@@ -519,6 +550,10 @@ def main() -> int:
     parser.add_argument(
         "--exclude-paths", nargs="*", default=[],
         help="스캔에서 제외할 추가 경로 (절대경로 또는 project-root 기준 상대경로)",
+    )
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="이미 유효한 인덱스 파일이 있는 스캐너는 건너뛰고 나머지만 처리한다.",
     )
     args = parser.parse_args()
 
@@ -549,9 +584,11 @@ def main() -> int:
     counts: dict[str, int] = {}
     processed: list[str] = []
     skipped: list[str] = []
+    resumed: list[str] = []
 
     # 비-UTF8 텍스트 파일(EUC-KR/CP949/ISO-8859 등)을 UTF-8로 변환한 임시 미러 빌드.
     # semgrep이 비-UTF8 파일을 파싱 못 해 매치를 누락하는 문제를 보완.
+    # --resume 시 모든 스캐너가 스킵되더라도 mirror 빌드는 항상 수행한다(일관성).
     print("UTF-8 mirror 빌드 중...", file=sys.stderr)
     utf8_mirror, mirror_path_map = build_utf8_mirror(project_root, exclude_abs=exclude_abs)
     if utf8_mirror is not None:
@@ -561,6 +598,11 @@ def main() -> int:
         print("  비-UTF8 파일 없음", file=sys.stderr)
 
     for scanner_dir in scanner_dirs:
+        name = scanner_dir.name
+        if args.resume and _is_valid_index(out_dir, name):
+            resumed.append(name)
+            print(f"  [resume] {name}: 유효한 인덱스 존재 → 스킵", file=sys.stderr)
+            continue
         name = scanner_dir.name
         try:
             n = process_scanner(
@@ -594,12 +636,18 @@ def main() -> int:
 
     print(f"파일 저장 완료: {out_dir}/")
     print()
+    if resumed:
+        print(f"[resume] 유효한 기존 인덱스 재사용 (스킵): {len(resumed)}개")
+        for name in sorted(resumed):
+            print(f"  {name}")
+        print()
     if processed:
         print("스캐너별 히트 건수 (semgrep 적용):")
         for name in sorted(processed):
             print(f"{name}: {counts[name]}건")
     else:
-        print("semgrep 적용 대상 스캐너 없음 (rules/ 디렉토리를 가진 스캐너가 없음)")
+        if not resumed:
+            print("semgrep 적용 대상 스캐너 없음 (rules/ 디렉토리를 가진 스캐너가 없음)")
     if skipped:
         print()
         print(f"rules/ 없음 — 빈 인덱스 작성 (grep-less 스캐너): {len(skipped)}개")
@@ -614,6 +662,7 @@ def _emit_summary(rc: int) -> None:
     parser.add_argument("--project-root")
     parser.add_argument("--out-dir")
     parser.add_argument("--exclude-paths", nargs="*", default=[])
+    parser.add_argument("--resume", action="store_true")
     args, _ = parser.parse_known_args()
     processed_count = 0
     if args.scanners_dir and Path(args.scanners_dir).is_dir():

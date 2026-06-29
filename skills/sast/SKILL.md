@@ -86,7 +86,28 @@ echo "/tmp/phase1_results_$(basename <PROJECT_ROOT>)_$(date +%s)"
 > `semgrep_index.py`는 `<scanner>.json`(rule_id→위치 목록)과 함께 **위치 중심 사이드카 `<scanner>.locindex.json`**을 생성한다. locindex는 같은 file:line의 다중 룰 매치를 1개 위치로 병합하고 신뢰도 tier(taint>ast>generic)로 승격하되 `rule_ids` 배열로 모든 매치를 보존한다. Phase 1 그룹 에이전트가 tier 우선순위로 검토하는 데 사용한다(§6-A-1). 또한 비-UTF8 파일(EUC-KR 등)은 UTF-8 mirror로 변환되어 스캔되므로 한국어 레거시 코드베이스의 매치 누락이 방지된다.
 
 ```bash
-python3 <NOAH_SAST_DIR>/tools/semgrep_index.py --scanners-dir <NOAH_SAST_DIR>/scanners --project-root <PROJECT_ROOT> --out-dir <PATTERN_INDEX_DIR>
+nohup python3 <NOAH_SAST_DIR>/tools/semgrep_index.py \
+  --scanners-dir <NOAH_SAST_DIR>/scanners \
+  --project-root <PROJECT_ROOT> \
+  --out-dir <PATTERN_INDEX_DIR> \
+  > /tmp/semgrep_index_<basename PROJECT_ROOT>.log 2>&1 &
+SEMGREP_PID=$!
+disown $SEMGREP_PID
+echo "PID=$SEMGREP_PID (nohup 백그라운드 실행)"
+```
+
+완료 확인: `grep "run_semgrep_index_exit" /tmp/semgrep_index_<basename PROJECT_ROOT>.log`
+
+**중단된 경우 재개:** `--resume` 플래그를 추가하면 json + locindex가 모두 유효한 스캐너는 건너뛰고 나머지만 처리한다. 유효성 기준: (1) json 파싱 성공, (2) locindex 존재 시 `_scanner` 완료 마커 확인. 잘린 파일이나 마커 없는 파일은 재처리된다.
+
+```bash
+nohup python3 <NOAH_SAST_DIR>/tools/semgrep_index.py \
+  --scanners-dir <NOAH_SAST_DIR>/scanners \
+  --project-root <PROJECT_ROOT> \
+  --out-dir <PATTERN_INDEX_DIR> \
+  --resume \
+  > /tmp/semgrep_index_<basename PROJECT_ROOT>.log 2>&1 &
+disown $!
 ```
 
 **분기 판정 (메인 에이전트):**
